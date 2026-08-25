@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: 15 107 79; /* #0F6B4F - Deep Fairway Green */
+    --primary-hover: 11 87 65; /* #0B5741 */
+    --primary-soft: 232 244 239; /* #E8F4EF */
+    --accent: 107 191 62; /* #6BBF3E - Lime Green Accent */
+    --accent-soft: 237 248 233; /* #EDF8E9 */
+    --background: 247 249 248; /* #F7F9F8 - Neutral Background */
+    --surface: 255 255 255; /* #FFFFFF */
+    --surface-muted: 241 244 242; /* #F1F4F2 */
+    --foreground: 22 32 27; /* #16201B - Dark Readable Text */
+    --foreground-muted: 102 115 108; /* #66736C */
+    --border: 221 229 225; /* #DDE5E1 - Thin Border */
+    --border-strong: 200 211 206; /* #C8D3CE */
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    background-color: #F7F9F8;
+    color: #16201B;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Focus styling as specified by PRD and design brief */
+  :focus-visible {
+    @apply outline-none ring-2 ring-fairway-600 ring-offset-1;
+  }
+}
+
+/* Custom Swiss CRM Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1F4F2;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C8D3CE;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A3D5C1;
+}
+
+/* Leaflet Map Custom Marker & Popup Styles */
+.leaflet-popup-content-wrapper {
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 0;
+  border: 1px solid #DDE5E1;
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.custom-facility-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #0F6B4F;
+  color: white;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(15, 107, 79, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.custom-facility-marker:hover {
+  transform: scale(1.15);
+}
+
+.custom-property-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #6BBF3E;
+  color: #052F23;
+  border: 2px solid white;
+  box-shadow: 0 4px 12px rgba(107, 191, 62, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.custom-property-marker:hover {
+  transform: scale(1.15);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
