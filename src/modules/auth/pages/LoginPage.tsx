@@ -156,18 +156,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <div className="space-y-1 text-xs">
             <button
               type="button"
-              onClick={() => handleSelectDemoAccount('admin@fairway.co.in')}
+              onClick={() => handleSelectDemoAccount('amit@fairway.co.in')}
               className="w-full text-left hover:text-fairway-800 hover:bg-surface p-1.5 rounded transition-colors flex items-center justify-between border border-transparent hover:border-border"
             >
-              <span className="font-mono text-[11px] text-foreground">admin@fairway.co.in</span>
+              <span className="font-mono text-[11px] text-foreground">amit@fairway.co.in</span>
               <span className="font-semibold text-fairway-700 text-[10px] bg-fairway-100 px-1.5 py-0.5 rounded">Super Admin</span>
             </button>
             <button
               type="button"
-              onClick={() => handleSelectDemoAccount('ops@fairway.co.in')}
+              onClick={() => handleSelectDemoAccount('aryan@fairway.co.in')}
               className="w-full text-left hover:text-fairway-800 hover:bg-surface p-1.5 rounded transition-colors flex items-center justify-between border border-transparent hover:border-border"
             >
-              <span className="font-mono text-[11px] text-foreground">ops@fairway.co.in</span>
+              <span className="font-mono text-[11px] text-foreground">aryan@fairway.co.in</span>
               <span className="font-semibold text-slate-700 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">Sales Admin</span>
             </button>
           </div>

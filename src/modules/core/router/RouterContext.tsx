@@ -137,11 +137,11 @@ export function pathToView(view: ActiveNavView, entityId?: string): string {
 }
 
 export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [pathname, setPathname] = useState<string>(() => window.location.pathname || '/dashboard');
+  const [pathname, setPathname] = useState<string>(() => window.location.pathname || '/login');
 
   useEffect(() => {
     const handlePopState = () => {
-      setPathname(window.location.pathname || '/dashboard');
+      setPathname(window.location.pathname || '/login');
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);

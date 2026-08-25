@@ -30,9 +30,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
       const stored = localStorage.getItem('fw_auth_authenticated');
-      return stored !== null ? stored === 'true' : true;
+      return stored === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
 
@@ -55,14 +55,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(true);
     try {
       localStorage.setItem('fw_auth_authenticated', 'true');
-    } catch {}
+    } catch { }
     return true;
   };
 
   const signup = (name: string, email: string, _password?: string): boolean => {
     const normalizedEmail = email.trim().toLowerCase();
     let existing = users.find((u) => u.email.toLowerCase() === normalizedEmail);
-    
+
     if (!existing) {
       const newUser: User = {
         id: `usr_${Date.now()}`,
@@ -87,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(true);
     try {
       localStorage.setItem('fw_auth_authenticated', 'true');
-    } catch {}
+    } catch { }
     return true;
   };
 
@@ -95,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
     try {
       localStorage.setItem('fw_auth_authenticated', 'false');
-    } catch {}
+    } catch { }
   };
 
   const switchUser = (userId: string) => {

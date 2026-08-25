@@ -57,6 +57,7 @@ interface AppShellProps {
   onOpenNewInquiry: () => void;
   onOpenNewCompany: () => void;
   onOpenNewTask: () => void;
+  onSignOut?: () => void;
   children: React.ReactNode;
 }
 
@@ -67,9 +68,10 @@ export const AppShell: React.FC<AppShellProps> = ({
   onOpenNewInquiry,
   onOpenNewCompany,
   onOpenNewTask,
+  onSignOut,
   children,
 }) => {
-  const { currentUser, users, switchUser, logout, isSuperAdmin, isAdmin } = useAuth();
+  const { currentUser, logout, isSuperAdmin, isAdmin } = useAuth();
   const { success } = useToast();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
@@ -472,56 +474,74 @@ export const AppShell: React.FC<AppShellProps> = ({
               </button>
 
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-surface rounded-card border border-border shadow-popover p-2 z-50 animate-fade-in">
-                  <div className="px-2 py-1.5 border-b border-border mb-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
-                      Switch Role / Persona (RBAC)
-                    </span>
-                    <span className="text-xs text-foreground-muted">Test different role permissions instantly:</span>
-                  </div>
-                  <div className="space-y-1">
-                    {users.map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          switchUser(u.id);
-                          setIsUserMenuOpen(false);
-                          success(`Switched user to ${u.name}`, `Active role: ${u.role.toUpperCase()}`);
-                        }}
-                        className={`w-full flex items-center justify-between p-2 rounded-md text-xs transition-colors text-left ${
-                          currentUser.id === u.id
-                            ? 'bg-fairway-50 text-fairway-900 font-bold border border-fairway-200'
-                            : 'hover:bg-surface-muted text-foreground'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover" />
-                          <div className="truncate">
-                            <span className="block truncate">{u.name}</span>
-                            <span className="text-[10px] text-foreground-muted">{u.department}</span>
-                          </div>
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsUserMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-72 bg-surface rounded-xl border border-border shadow-popover p-3 z-50 animate-fade-in text-left">
+                    {/* Logged in User Profile Card */}
+                    <div className="flex items-start gap-3 p-2.5 rounded-lg bg-surface-muted/60 border border-border mb-2">
+                      <img
+                        src={currentUser.avatar}
+                        alt={currentUser.name}
+                        className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-fairway-500/20"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1 mb-0.5">
+                          <span className="text-xs font-bold text-foreground truncate block">
+                            {currentUser.name}
+                          </span>
+                          <span
+                            className={`text-[9px] px-1.5 py-0.2 rounded font-bold border uppercase shrink-0 ${getRoleBadgeStyle(
+                              currentUser.role
+                            )}`}
+                          >
+                            {currentUser.role.replace('_', ' ')}
+                          </span>
                         </div>
-                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold border uppercase shrink-0 ${getRoleBadgeStyle(u.role)}`}>
-                          {u.role.replace('_', ' ')}
+                        <span className="text-[11px] text-foreground-muted block truncate font-mono">
+                          {currentUser.email}
                         </span>
-                      </button>
-                    ))}
-                  </div>
+                        {currentUser.department && (
+                          <span className="text-[10px] text-foreground-muted block mt-0.5">
+                            {currentUser.department}
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="pt-2 mt-1 border-t border-border">
-                    <button
-                      onClick={() => {
-                        setIsUserMenuOpen(false);
-                        logout();
-                        success('Signed out', 'You have been signed out of Fairway CRM.');
-                      }}
-                      className="w-full flex items-center gap-2 p-2 rounded-md text-xs text-rose-600 hover:bg-rose-50 font-medium transition-colors text-left"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Sign Out</span>
-                    </button>
+                    {/* Quick Navigation / Settings */}
+                    <div className="space-y-0.5 pt-1">
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          onNavigate('settings');
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-foreground hover:bg-surface-muted transition-colors text-left font-medium"
+                      >
+                        <Settings className="w-4 h-4 text-foreground-muted" />
+                        <span>Settings & Preferences</span>
+                      </button>
+                    </div>
+
+                    {/* Sign Out Action */}
+                    <div className="pt-2 mt-1 border-t border-border">
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          logout();
+                          onSignOut?.();
+                          success('Signed out', 'You have been signed out of Fairway CRM.');
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-rose-600 hover:bg-rose-50 font-medium transition-colors text-left"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>

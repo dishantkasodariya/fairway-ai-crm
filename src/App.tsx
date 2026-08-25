@@ -49,16 +49,20 @@ const AppRouter: React.FC = () => {
     setIsInquiryModalOpen(true);
   };
 
-  // Redirect to /dashboard if logged in and accessing /login or /signup
+  // Redirect root URL '/' to '/dashboard' if authenticated or '/login' if not authenticated
   useEffect(() => {
-    if (isAuthenticated && (pathname === '/login' || pathname === '/signup' || pathname === '/')) {
-      navigate('/dashboard', true);
+    if (pathname === '/' || pathname === '') {
+      if (isAuthenticated) {
+        navigate('/dashboard', true);
+      } else {
+        navigate('/login', true);
+      }
     }
   }, [isAuthenticated, pathname]);
 
-  // Render Auth Pages if not logged in
-  if (!isAuthenticated) {
-    if (authView === 'signup' || pathname === '/signup') {
+  // Auth routes (/login, /signup) or Unauthenticated: Render ONLY Auth Pages (No AppShell, No Dashboard)
+  if (isAuthRoute || pathname === '/login' || pathname === '/signup' || !isAuthenticated) {
+    if (pathname === '/signup' || authView === 'signup') {
       return (
         <SignUpPage
           onNavigateToLogin={() => navigate('/login')}
@@ -217,6 +221,7 @@ const AppRouter: React.FC = () => {
       }}
       onOpenNewCompany={() => setIsCompanyModalOpen(true)}
       onOpenNewTask={() => handleNavigate('tasks')}
+      onSignOut={() => navigate('/login')}
     >
       {renderActiveView()}
 
