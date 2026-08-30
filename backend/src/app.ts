@@ -9,7 +9,10 @@ const app = express();
 
 // Middlewares
 app.use(cors({
-  origin: config.clientUrl,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, server-to-server) or any origin in production/development
+    callback(null, true);
+  },
   credentials: true,
 }));
 app.use(morgan('dev'));
