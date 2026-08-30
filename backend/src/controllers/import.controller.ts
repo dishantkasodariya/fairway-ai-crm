@@ -124,7 +124,8 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
       const compName = getVal(raw, mapping.companyName, mapping.company, 'Company', 'Company Name', 'Client');
       const siteName = getVal(raw, mapping.siteName, mapping.city, 'Site Name', 'City', 'Location', 'Hub') || 'Gujarat Industrial Cluster';
       const areaRaw = getVal(raw, mapping.requiredAreaSqFt, mapping.areaRequired, 'Area Required (sq. ft.)', 'Required Area', 'Area').replace(/[^0-9.]/g, '');
-      const area = parseFloat(areaRaw) || 0;
+      const parsedArea = parseFloat(areaRaw);
+      const area = Number.isFinite(parsedArea) && parsedArea >= 0 ? parsedArea : 0;
       const dateVal = raw[mapping.inquiryDate || 'Date'] ?? raw['Date_1'] ?? raw['Date'] ?? getVal(raw, mapping.date, 'Date');
       const contactName = getVal(raw, mapping.contactName, mapping.contactPerson, 'Contact Person', 'Contact');
       const rawPhone = getVal(raw, mapping.phone, mapping.contactNumber, 'Contact Number', 'Phone', 'Mobile');
@@ -144,122 +145,132 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
         continue;
       }
 
-      // 1. Resolve or Create Company
-      let companyId: string;
-      const compCheck = await client.query(
-        'SELECT id, name FROM companies WHERE name ILIKE $1 OR legal_name ILIKE $1 LIMIT 1;',
-        [compName]
-      );
+      await client.query('SAVEPOINT row_savepoint');
 
-      if (compCheck.rows.length > 0) {
-        companyId = compCheck.rows[0].id;
-      } else {
-        companyId = `comp_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
-        await client.query(
-          `INSERT INTO companies (
-            id, name, legal_name, website, industry, status, address, city, state, pincode,
-            phone, email, assigned_owner_name, prospect_stage, priority, created_at, updated_at
-          ) VALUES (
-            $1, $2, $3, $4, $5, 'Active', $6, $7, 'Gujarat', '392130',
-            $8, $9, $10, 'Requirement Confirmed', 'High', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-          );`,
-          [
-            companyId,
-            compName,
-            `${compName} Private Limited`,
-            `https://${compName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
-            industry,
-            `${siteName}`,
-            siteName,
-            phone,
-            email,
-            enteredBy,
-          ]
-        );
-      }
-
-      // 2. Resolve or Create Contact
-      let contactId: string | null = null;
-      if (contactName) {
-        const cntCheck = await client.query(
-          'SELECT id FROM contacts WHERE company_id = $1 AND name ILIKE $2 LIMIT 1;',
-          [companyId, contactName]
+      try {
+        // 1. Resolve or Create Company
+        let companyId: string;
+        const compCheck = await client.query(
+          'SELECT id, name FROM companies WHERE name ILIKE $1 OR legal_name ILIKE $1 LIMIT 1;',
+          [compName]
         );
 
-        if (cntCheck.rows.length > 0) {
-          contactId = cntCheck.rows[0].id;
+        if (compCheck.rows.length > 0) {
+          companyId = compCheck.rows[0].id;
         } else {
-          contactId = `cnt_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+          companyId = `comp_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
           await client.query(
-            `INSERT INTO contacts (
-              id, company_id, company_name, name, designation, department, phone, email, is_primary, created_at, updated_at
+            `INSERT INTO companies (
+              id, name, legal_name, website, industry, status, address, city, state, pincode,
+              phone, email, assigned_owner_name, prospect_stage, priority, created_at, updated_at
             ) VALUES (
-              $1, $2, $3, $4, 'Key Decision Maker', 'Supply Chain Operations', $5, $6, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+              $1, $2, $3, $4, $5, 'Active', $6, $7, 'Gujarat', '392130',
+              $8, $9, $10, 'Requirement Confirmed', 'High', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             );`,
-            [contactId, companyId, compName, contactName, phone, email]
+            [
+              companyId,
+              compName,
+              `${compName} Private Limited`,
+              `https://${compName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
+              industry,
+              `${siteName}`,
+              siteName,
+              phone,
+              email,
+              enteredBy,
+            ]
           );
         }
+
+        // 2. Resolve or Create Contact
+        let contactId: string | null = null;
+        if (contactName) {
+          const cntCheck = await client.query(
+            'SELECT id FROM contacts WHERE company_id = $1 AND name ILIKE $2 LIMIT 1;',
+            [companyId, contactName]
+          );
+
+          if (cntCheck.rows.length > 0) {
+            contactId = cntCheck.rows[0].id;
+          } else {
+            contactId = `cnt_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+            await client.query(
+              `INSERT INTO contacts (
+                id, company_id, company_name, name, designation, department, phone, email, is_primary, created_at, updated_at
+              ) VALUES (
+                $1, $2, $3, $4, 'Key Decision Maker', 'Supply Chain Operations', $5, $6, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+              );`,
+              [contactId, companyId, compName, contactName, phone, email]
+            );
+          }
+        }
+
+        // 3. Create Inquiry with strictly incrementing sequence number
+        highestNum += 1;
+        const inquiryNumber = `INQ-${highestNum}`;
+        const inquiryId = `inq_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+        const budgetMonthlyINR = area > 0 ? Math.round(area * 22) : 0; // Est. ₹22/sq.ft
+        const parsedInquiryDate = parseDateString(dateVal);
+        const stage = mapStatusToStage(remark1Status);
+        const requirementDesc = comments || (area > 0 ? `Requirement for ${area.toLocaleString()} sq.ft at ${siteName}` : `Industrial inquiry at ${siteName} (Area TBD)`);
+        const nextAction = remark2NextAction || 'Initial requirement review & discovery contact';
+        const followUpDate = remark3FollowUp ? parseDateString(remark3FollowUp) : new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0];
+
+        const insertInqSql = `
+          INSERT INTO inquiries (
+            id, inquiry_number, company_id, company_name, contact_id, contact_name, contact_phone, contact_email,
+            source, inquiry_date, salesperson_name, requirement, required_area_sq_ft, location, target_corridor,
+            industry, possession_date, lease_duration_months, budget_monthly_inr, dock_requirements, clear_height_ft,
+            floor_load_capacity, power_kva, fire_systems_required, priority, lead_score, opportunity_score, stage,
+            status, next_action, next_follow_up_date, created_at, updated_at
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8,
+            'Excel Import', $9, $10, $11, $12, $13, $14,
+            $15, '2026-10-01', 60, $16, 6, 12,
+            '5 MT/sq.m', 500, true, 'High', 85, 90, $17,
+            'Active', $18, $19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+          ) RETURNING *;
+        `;
+
+        const inqValues = [
+          inquiryId,
+          inquiryNumber,
+          companyId,
+          compName,
+          contactId,
+          contactName || null,
+          phone || null,
+          email || null,
+          parsedInquiryDate,
+          enteredBy,
+          requirementDesc,
+          area,
+          siteName,
+          `${siteName} Corridor`,
+          industry,
+          budgetMonthlyINR,
+          stage,
+          nextAction,
+          followUpDate,
+        ];
+
+        const inqRes = await client.query(insertInqSql, inqValues);
+        importedInquiries.push({
+          id: inqRes.rows[0].id,
+          inquiryNumber: inqRes.rows[0].inquiry_number,
+          companyName: compName,
+          requiredAreaSqFt: area,
+          siteName,
+        });
+
+        await client.query('RELEASE SAVEPOINT row_savepoint');
+        importedCount++;
+      } catch (rowError: any) {
+        await client.query('ROLLBACK TO SAVEPOINT row_savepoint');
+        console.warn(`Row ${rowIndex} skipped due to error:`, rowError.message);
+        errors.push({ row: rowIndex, error: rowError.message || 'Database insert error' });
+        skippedCount++;
       }
-
-      // 3. Create Inquiry with strictly incrementing sequence number
-      highestNum += 1;
-      const inquiryNumber = `INQ-${highestNum}`;
-      const inquiryId = `inq_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
-      const budgetMonthlyINR = area > 0 ? Math.round(area * 22) : 0; // Est. ₹22/sq.ft
-      const parsedInquiryDate = parseDateString(dateVal);
-      const stage = mapStatusToStage(remark1Status);
-      const requirementDesc = comments || (area > 0 ? `Requirement for ${area.toLocaleString()} sq.ft at ${siteName}` : `Industrial inquiry at ${siteName} (Area TBD)`);
-      const nextAction = remark2NextAction || 'Initial requirement review & discovery contact';
-      const followUpDate = remark3FollowUp ? parseDateString(remark3FollowUp) : new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0];
-
-      const insertInqSql = `
-        INSERT INTO inquiries (
-          id, inquiry_number, company_id, company_name, contact_id, contact_name, contact_phone, contact_email,
-          source, inquiry_date, salesperson_name, requirement, required_area_sq_ft, location, target_corridor,
-          industry, possession_date, lease_duration_months, budget_monthly_inr, dock_requirements, clear_height_ft,
-          floor_load_capacity, power_kva, fire_systems_required, priority, lead_score, opportunity_score, stage,
-          status, next_action, next_follow_up_date, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8,
-          'Excel Import', $9, $10, $11, $12, $13, $14,
-          $15, '2026-10-01', 60, $16, 6, 12,
-          '5 MT/sq.m', 500, true, 'High', 85, 90, $17,
-          'Active', $18, $19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-        ) RETURNING *;
-      `;
-
-      const inqValues = [
-        inquiryId,
-        inquiryNumber,
-        companyId,
-        compName,
-        contactId,
-        contactName || null,
-        phone || null,
-        email || null,
-        parsedInquiryDate,
-        enteredBy,
-        requirementDesc,
-        area,
-        siteName,
-        `${siteName} Corridor`,
-        industry,
-        budgetMonthlyINR,
-        stage,
-        nextAction,
-        followUpDate,
-      ];
-
-      const inqRes = await client.query(insertInqSql, inqValues);
-      importedInquiries.push({
-        id: inqRes.rows[0].id,
-        inquiryNumber: inqRes.rows[0].inquiry_number,
-        companyName: compName,
-        requiredAreaSqFt: area,
-        siteName,
-      });
-
-      importedCount++;
     }
 
     await client.query('COMMIT');

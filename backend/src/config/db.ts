@@ -366,6 +366,20 @@ export const initDatabase = async () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      -- Auto-migrate columns to unconstrained NUMERIC/BIGINT to prevent any numeric field overflow
+      ALTER TABLE inquiries ALTER COLUMN required_area_sq_ft TYPE NUMERIC;
+      ALTER TABLE inquiries ALTER COLUMN budget_monthly_inr TYPE NUMERIC;
+      ALTER TABLE inquiries ALTER COLUMN power_kva TYPE NUMERIC;
+      ALTER TABLE inquiries ALTER COLUMN clear_height_ft TYPE NUMERIC;
+      ALTER TABLE inquiries ALTER COLUMN dock_requirements TYPE BIGINT;
+      ALTER TABLE inquiries ALTER COLUMN lease_duration_months TYPE BIGINT;
+      ALTER TABLE inquiries ALTER COLUMN lead_score TYPE BIGINT;
+      ALTER TABLE inquiries ALTER COLUMN opportunity_score TYPE BIGINT;
+
+      ALTER TABLE facilities ALTER COLUMN latitude TYPE NUMERIC;
+      ALTER TABLE facilities ALTER COLUMN longitude TYPE NUMERIC;
+      ALTER TABLE facilities ALTER COLUMN built_up_area_sq_ft TYPE NUMERIC;
     `);
     console.log('✅ Table "inquiries" verified / updated in PostgreSQL.');
 
