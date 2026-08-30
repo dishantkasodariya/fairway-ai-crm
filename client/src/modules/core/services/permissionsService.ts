@@ -13,7 +13,7 @@ export interface RolePermissionItem {
 }
 
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
+import { API_BASE_URL } from './api';
 
 export const PermissionsService = {
   async getRolePermissions(): Promise<{ success: boolean; data?: RolePermissionItem[]; error?: string }> {

@@ -1,6 +1,5 @@
 import { ImportResult } from '@/modules/core/types';
-
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
+import { API_BASE_URL } from './api';
 
 export interface ColumnMapping {
   companyName?: string;

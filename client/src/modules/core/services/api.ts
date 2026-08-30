@@ -1,6 +1,19 @@
 // Base API helper client
 
-const BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
+const getBaseUrl = (): string => {
+  let url: string = (import.meta as any).env?.VITE_API_URL || '/api';
+  if (url.endsWith('/')) {
+    url = url.slice(0, -1);
+  }
+  // If user provided backend domain without /api (e.g. https://fairway-crm-backend.onrender.com), append /api
+  if (url.startsWith('http') && !url.endsWith('/api') && !url.includes('/api/')) {
+    url = `${url}/api`;
+  }
+  return url;
+};
+
+export const API_BASE_URL = getBaseUrl();
+const BASE_URL = API_BASE_URL;
 
 
 export interface ApiResponse<T = any> {

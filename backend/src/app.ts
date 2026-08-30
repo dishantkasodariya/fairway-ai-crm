@@ -20,8 +20,9 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 
-// API Root
+// API Routes (mounted on both /api and root / for resilience)
 app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 // 404 Handler
 app.use((_req, res) => {
