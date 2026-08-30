@@ -1134,17 +1134,17 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
 
       {/* Advanced Filters Drawer (Right Slide-Out) */}
       {isFilterDrawerOpen && (
-        <div className="fixed inset-0 top-0 left-0 w-screen h-screen z-[99999] flex justify-end animate-fade-in select-none overflow-hidden">
+        <div className="fixed inset-0 z-[99999] flex justify-end animate-fade-in select-none overflow-hidden m-0 p-0">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 top-0 left-0 w-full h-full bg-black/60 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 w-full h-full bg-black/60 backdrop-blur-xs transition-opacity"
             onClick={() => setIsFilterDrawerOpen(false)}
           />
 
           {/* Drawer Container */}
-          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border h-full max-h-screen shadow-2xl flex flex-col z-10 animate-slide-left top-0 right-0">
+          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0">
             {/* Header */}
-            <div className="p-5 border-b border-border bg-surface flex items-start justify-between">
+            <div className="p-5 border-b border-border bg-surface flex items-start justify-between border-t-0">
               <div>
                 <h3 className="text-base font-bold text-foreground">Advanced Filters</h3>
                 <p className="text-xs text-foreground-muted mt-0.5">Filter companies by category and ownership...</p>
