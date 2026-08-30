@@ -673,9 +673,16 @@ export class StorageService {
   }
 
   // Rule-based Explainable Matching Engine (as specified in PRD Section 13)
-  public static matchPropertiesForInquiry(inquiry: Inquiry): PropertyMatchResult[] {
+  public static matchPropertiesForInquiry(inquiry?: Inquiry): PropertyMatchResult[] {
+    if (!inquiry) return [];
     const properties = this.getProperties();
     const results: PropertyMatchResult[] = [];
+
+    const inqLocation = (inquiry.location || '').trim();
+    const inqCorridor = (inquiry.targetCorridor || '').trim();
+    const inqIndustry = (inquiry.industry || '').trim().toLowerCase();
+    const inqArea = Number(inquiry.requiredAreaSqFt) || 0;
+    const inqDocks = Number(inquiry.dockRequirements) || 0;
 
     for (const prop of properties) {
       if (prop.status === 'Fully Leased') continue;
@@ -684,52 +691,54 @@ export class StorageService {
       const details: string[] = [];
 
       // 1. Location / Corridor Match (Weight: 30%)
-      const reqLoc = (inquiry.location + ' ' + (inquiry.targetCorridor || '')).toLowerCase();
-      const propLoc = (prop.location + ' ' + prop.corridor + ' ' + prop.city).toLowerCase();
+      const reqLoc = (inqLocation + ' ' + inqCorridor).toLowerCase();
+      const propLoc = ((prop.location || '') + ' ' + (prop.corridor || '') + ' ' + (prop.city || '')).toLowerCase();
       const locationMatch = Boolean(
-        reqLoc.includes(prop.city.toLowerCase()) ||
-        propLoc.includes(inquiry.location.toLowerCase()) ||
-        (inquiry.targetCorridor && prop.corridor.toLowerCase().includes(inquiry.targetCorridor.toLowerCase()))
+        (prop.city && reqLoc.includes(prop.city.toLowerCase())) ||
+        (inqLocation && propLoc.includes(inqLocation.toLowerCase())) ||
+        (inqCorridor && prop.corridor && prop.corridor.toLowerCase().includes(inqCorridor.toLowerCase()))
       );
 
       if (locationMatch) {
         score += 30;
-        details.push(`✓ Location Match: Situated in ${prop.city} (${prop.corridor})`);
+        details.push(`✓ Location Match: Situated in ${prop.city || 'Gujarat'} (${prop.corridor || 'Industrial Park'})`);
       } else {
-        details.push(`✕ Location: Located in ${prop.city}, outside primary target`);
+        details.push(`✕ Location: Located in ${prop.city || 'Gujarat'}, outside primary target`);
       }
 
       // 2. Area Compatibility (Weight: 30%)
       // Available area should accommodate requirement (allow +/- 25% tolerance)
-      const areaRatio = prop.availableAreaSqFt / inquiry.requiredAreaSqFt;
+      const propAvailArea = Number(prop.availableAreaSqFt) || 0;
+      const areaRatio = inqArea > 0 ? propAvailArea / inqArea : 1;
       let areaMatch = false;
-      if (prop.availableAreaSqFt >= inquiry.requiredAreaSqFt) {
+      if (inqArea === 0 || propAvailArea >= inqArea) {
         score += 30;
         areaMatch = true;
         details.push(
-          `✓ Area Match: ${prop.availableAreaSqFt.toLocaleString()} sq.ft available (Needs ${inquiry.requiredAreaSqFt.toLocaleString()} sq.ft)`
+          `✓ Area Match: ${propAvailArea.toLocaleString()} sq.ft available ${inqArea > 0 ? `(Needs ${inqArea.toLocaleString()} sq.ft)` : ''}`
         );
       } else if (areaRatio >= 0.75) {
         score += 20;
         areaMatch = true;
         details.push(
-          `~ Partial Area: ${prop.availableAreaSqFt.toLocaleString()} sq.ft available (${Math.round(areaRatio * 100)}% of requirement)`
+          `~ Partial Area: ${propAvailArea.toLocaleString()} sq.ft available (${Math.round(areaRatio * 100)}% of requirement)`
         );
       } else {
         details.push(
-          `✕ Area Insufficient: ${prop.availableAreaSqFt.toLocaleString()} sq.ft available (<75% of requirement)`
+          `✕ Area Insufficient: ${propAvailArea.toLocaleString()} sq.ft available (<75% of requirement)`
         );
       }
 
       // 3. Docks Compatibility (Weight: 15%)
-      const docksMatch = prop.docksCount >= inquiry.dockRequirements;
+      const propDocks = Number(prop.docksCount) || 0;
+      const docksMatch = propDocks >= inqDocks;
       if (docksMatch) {
         score += 15;
-        details.push(`✓ Docks Match: ${prop.docksCount} docks available (Needs ${inquiry.dockRequirements})`);
+        details.push(`✓ Docks Match: ${propDocks} docks available (Needs ${inqDocks})`);
       } else {
-        const dockScore = Math.max(0, Math.round((prop.docksCount / (inquiry.dockRequirements || 1)) * 15));
+        const dockScore = Math.max(0, Math.round((propDocks / (inqDocks || 1)) * 15));
         score += dockScore;
-        details.push(`~ Docks: ${prop.docksCount} docks available (Requested ${inquiry.dockRequirements})`);
+        details.push(`~ Docks: ${propDocks} docks available (Requested ${inqDocks})`);
       }
 
       // 4. Timeline / Availability (Weight: 15%)
@@ -738,21 +747,23 @@ export class StorageService {
       const timelineMatch = propAvail <= possessionTarget;
       if (timelineMatch) {
         score += 15;
-        details.push(`✓ Timeline Match: Ready by ${prop.availabilityDate} (Requested ${inquiry.possessionDate})`);
+        details.push(`✓ Timeline Match: Ready by ${prop.availabilityDate || 'Immediate'} (Requested ${inquiry.possessionDate || '2026'})`);
       } else {
         score += 5;
-        details.push(`~ Possession Timeline: Available ${prop.availabilityDate}`);
+        details.push(`~ Possession Timeline: Available ${prop.availabilityDate || 'TBD'}`);
       }
 
       // 5. Industry & Technical Suitability (Weight: 10%)
-      const industryMatch = prop.suitableIndustries.some(
-        (ind) =>
-          ind.toLowerCase().includes(inquiry.industry.toLowerCase()) ||
-          inquiry.industry.toLowerCase().includes(ind.toLowerCase())
-      );
+      const suitableList = Array.isArray(prop.suitableIndustries) ? prop.suitableIndustries : [];
+      const industryMatch = suitableList.some((ind) => {
+        if (!ind) return false;
+        const indStr = String(ind).toLowerCase();
+        return !inqIndustry || indStr.includes(inqIndustry) || inqIndustry.includes(indStr);
+      });
+
       if (industryMatch) {
         score += 10;
-        details.push(`✓ Industry Fit: Certified for ${inquiry.industry}`);
+        details.push(`✓ Industry Fit: Certified for ${inquiry.industry || 'Industrial Warehousing'}`);
       } else {
         score += 5;
         details.push(`~ Multi-purpose Grade A specification`);
