@@ -1,0 +1,235 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-app: #F7F9F8;
+    --bg-surface: #FFFFFF;
+    --bg-surface-muted: #F1F4F2;
+    --bg-card: #FFFFFF;
+    --text-foreground: #16201B;
+    --text-muted: #66736C;
+    --text-subtle: #8C9B93;
+    --border-color: #DDE5E1;
+    --border-strong: #C8D3CE;
+    --border-subtle: #EAEFEA;
+
+    --fw-50: #F0F9F5;
+    --fw-100: #E8F4EF;
+    --fw-200: #D1EAE0;
+    --fw-300: #A3D5C1;
+    --fw-400: #5BAFA1;
+    --fw-500: #2A8F70;
+    --fw-600: #0F6B4F;
+    --fw-700: #0B5741;
+    --fw-800: #084332;
+    --fw-900: #052F23;
+    --fw-950: #021B14;
+
+    --accent-50: #F5FCF0;
+    --accent-100: #EDF8E9;
+    --accent-200: #DAF2CF;
+    --accent-300: #BFE7AE;
+    --accent-400: #94D776;
+    --accent-500: #6BBF3E;
+    --accent-600: #56A12E;
+    --accent-700: #427F24;
+    --accent-800: #34641F;
+    --accent-900: #2C531C;
+
+    --primary: 15 107 79;
+    --primary-hover: 11 87 65;
+    --primary-soft: 232 244 239;
+    --accent: 107 191 62;
+    --accent-soft: 237 248 233;
+    --background: 247 249 248;
+    --surface: 255 255 255;
+    --surface-muted: 241 244 242;
+    --foreground: 22 32 27;
+    --foreground-muted: 102 115 108;
+    --border: 221 229 225;
+    --border-strong: 200 211 206;
+    --card: 255 255 255;
+    --card-foreground: 22 32 27;
+    --muted: 241 244 242;
+    --muted-foreground: 102 115 108;
+    --chart-1: #0F6B4F;
+    --chart-2: #6BBF3E;
+    --chart-3: #0284c7;
+    --chart-4: #6366f1;
+    --chart-5: #f59e0b;
+    --destructive-foreground: var(--color-red-800);
+    --success: var(--color-emerald-500);
+    --success-foreground: var(--color-emerald-900);
+    --info: var(--color-violet-500);
+    --info-foreground: var(--color-violet-900);
+    --warning: var(--color-yellow-500);
+    --warning-foreground: var(--color-yellow-900);
+    --invert: var(--color-zinc-900);
+    --invert-foreground: var(--color-zinc-50);
+  }
+
+  .dark {
+    --bg-app: #0A0A0A;
+    --bg-surface: #171717;
+    --bg-surface-muted: #262626;
+    --bg-card: #171717;
+    --text-foreground: #F5F5F5;
+    --text-muted: #A3A3A3;
+    --text-subtle: #737373;
+    --border-color: #262626;
+    --border-strong: #333333;
+    --border-subtle: #1F1F1F;
+
+    --background: 10 10 10;
+    --surface: 23 23 23;
+    --surface-muted: 38 38 38;
+    --foreground: 245 245 245;
+    --foreground-muted: 163 163 163;
+    --border: 38 38 38;
+    --border-strong: 51 51 51;
+    --card: 23 23 23;
+    --card-foreground: 245 245 245;
+    --muted: 38 38 38;
+    --muted-foreground: 163 163 163;
+    --destructive-foreground: var(--color-red-600);
+    --success: var(--color-emerald-500);
+    --success-foreground: var(--color-emerald-600);
+    --info: var(--color-violet-500);
+    --info-foreground: var(--color-violet-600);
+    --warning: var(--color-yellow-500);
+    --warning-foreground: var(--color-yellow-600);
+    --invert: var(--color-zinc-700);
+    --invert-foreground: var(--color-zinc-50);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    background-color: var(--bg-app, #F7F9F8);
+    color: var(--text-foreground, #16201B);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
+    font-variant-numeric: tabular-nums;
+  }
+
+
+  /* Focus styling as specified by PRD and design brief */
+  :focus-visible {
+    @apply outline-none ring-2 ring-fairway-600 ring-offset-1;
+  }
+}
+
+/* Custom Swiss CRM Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface-muted, #F1F4F2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong, #C8D3CE);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fw-400, #5BAFA1);
+}
+
+
+/* Leaflet Map Custom Marker & Popup Styles */
+.leaflet-popup-content-wrapper {
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 0;
+  border: 1px solid #DDE5E1;
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.custom-facility-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--fw-600, #0F6B4F);
+  color: white;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.custom-facility-marker:hover {
+  transform: scale(1.15);
+}
+
+.custom-property-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--accent-500, #6BBF3E);
+  color: var(--fw-950, #052F23);
+  border: 2px solid white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.custom-property-marker:hover {
+  transform: scale(1.15);
+}
+
+
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Modern Thin Minimalist Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+  transition: background 0.15s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.65);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.8);
+}

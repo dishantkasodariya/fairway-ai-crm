@@ -1,0 +1,1263 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Building2,
+  Search,
+  Filter,
+  Plus,
+  Download,
+  UploadCloud,
+  MapPin,
+  ChevronRight,
+  Settings,
+  RefreshCw,
+  List,
+  LayoutGrid,
+  Phone,
+  Mail,
+  Warehouse,
+  FileText,
+  X,
+  RotateCcw,
+  MoreHorizontal,
+  Edit3,
+  Trash2,
+  Eye,
+  AlertTriangle,
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/modules/core/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@/modules/core/components/ui/tooltip';
+import { StorageService } from '@/modules/core/services/storageService';
+import { CompanyService } from '@/modules/core/services/companyService';
+import { useAuth } from '@/modules/core/providers/AuthContext';
+import { useToast } from '@/modules/core/providers/ToastContext';
+import { cn } from '@/modules/core/lib/utils';
+import { Company, PriorityLevel, CompanyStatus } from '@/modules/core/types';
+import { Button } from '@/modules/core/components/ui/Button';
+import { Badge } from '@/modules/core/components/ui/Badge';
+import { Card } from '@/modules/core/components/ui/Card';
+import { Modal } from '@/modules/core/components/ui/Modal';
+import { Combobox } from '@/modules/core/components/ui/combobox-1';
+import { UserCombobox } from '@/modules/core/components/ui/UserCombobox';
+import { NewCompanyModal } from '../components/NewCompanyModal';
+import { NewCompanyPage } from './NewCompanyPage';
+import {
+  CompanyCard,
+  CompanyLineCard,
+  CompanyCardSkeleton,
+  CompanyEmptyState,
+} from '../components/CompanyCard';
+import {
+  DataGrid,
+  DataGridContainer,
+  dataGridFeatures,
+  type DataGridFeatures,
+} from '@/components/reui/data-grid/data-grid';
+import { DataGridColumnHeader } from '@/components/reui/data-grid/data-grid-column-header';
+import { DataGridPagination } from '@/components/reui/data-grid/data-grid-pagination';
+import { DataGridScrollArea } from '@/components/reui/data-grid/data-grid-scroll-area';
+import { DataGridTable } from '@/components/reui/data-grid/data-grid-table';
+import {
+  ColumnDef,
+  PaginationState,
+  SortingState,
+  useTable,
+} from '@tanstack/react-table';
+
+type ColumnVisibilityMap = Record<string, boolean>;
+type ColumnPinningMap = {
+  start: string[];
+  end: string[];
+};
+
+export interface CompanyListViewProps {
+  onSelectCompany: (id: string) => void;
+  onOpenNewCompany: () => void;
+  onOpenImport: () => void;
+  onNavigateToMap: () => void;
+}
+
+const VIEW_MODE_STORAGE_KEY = 'fairway_companies_view_mode_v3';
+const TABLE_STATE_STORAGE_KEY = 'fairway_companies_table_grid_state_v3';
+
+const formatStageLabel = (stage?: string) => {
+  if (!stage) return 'New';
+  const clean = stage.replace(/_/g, ' ').toLowerCase();
+  if (clean.includes('requirement')) return 'Requirement Confirmed';
+  if (clean.includes('matched') || clean.includes('property')) return 'Property Matched';
+  if (clean.includes('visit')) return 'Site Visit Planned';
+  if (clean.includes('proposal') || clean.includes('negotiation')) return 'Proposal / Neg.';
+  if (clean.includes('won') || clean.includes('active')) return 'Active Client';
+  if (clean.includes('lost')) return 'Closed Lost';
+  if (clean.includes('new')) return 'New Lead';
+  return stage.replace(/_/g, ' ');
+};
+
+const getStageBadgeStyle = (stage?: string) => {
+  const clean = (stage || '').toLowerCase();
+  if (clean.includes('won') || clean.includes('active')) {
+    return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60';
+  }
+  if (clean.includes('requirement') || clean.includes('confirm')) {
+    return 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800/60';
+  }
+  if (clean.includes('matched') || clean.includes('visit')) {
+    return 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800/60';
+  }
+  if (clean.includes('proposal')) {
+    return 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800/60';
+  }
+  return 'bg-surface-muted text-foreground-muted border-border';
+};
+
+const sanitizeDisplayString = (str?: string, fallback: string = '—'): string => {
+  if (!str) return fallback;
+  // If string contains non-printable or corrupt binary chars from raw zip imports
+  if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/.test(str) || str.startsWith('PK') || str.includes('table1.xml')) {
+    return fallback;
+  }
+  return str.trim() || fallback;
+};
+
+// Safe JSON parser for stored table state
+const getStoredTableState = () => {
+  try {
+    const raw = localStorage.getItem(TABLE_STATE_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.error('Failed to parse stored companies table state', e);
+  }
+  return {};
+};
+
+const getStoredViewMode = (): 'table' | 'grid' => {
+  try {
+    const saved = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    if (saved === 'table' || saved === 'grid') return saved;
+  } catch (e) {
+    console.error('Failed to parse stored view mode', e);
+  }
+  return 'table';
+};
+
+export const CompanyListView: React.FC<CompanyListViewProps> = ({
+  onSelectCompany,
+  onOpenNewCompany,
+  onOpenImport,
+  onNavigateToMap,
+}) => {
+  const { canEdit, currentUser } = useAuth();
+  const { success, error } = useToast();
+  const initialTableState = useMemo(() => getStoredTableState(), []);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [industryFilter, setIndustryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [ownerFilter, setOwnerFilter] = useState('all');
+  const [cityFilter, setCityFilter] = useState('all');
+
+  // Draft filter states for slide-out drawer
+  const [draftIndustryFilter, setDraftIndustryFilter] = useState('all');
+  const [draftStatusFilter, setDraftStatusFilter] = useState('all');
+  const [draftPriorityFilter, setDraftPriorityFilter] = useState('all');
+  const [draftOwnerFilter, setDraftOwnerFilter] = useState('all');
+  const [draftCityFilter, setDraftCityFilter] = useState('all');
+
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => getStoredViewMode());
+  const [pageMode, setPageMode] = useState<'list' | 'form'>('list');
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Edit and Delete state
+  const [companyToEdit, setCompanyToEdit] = useState<Company | null>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  // Persist View Mode
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch (e) {
+      console.error('Failed to persist view mode', e);
+    }
+  }, [viewMode]);
+
+  // Controlled Table Grid State (Persisted)
+  const [pagination, setPagination] = useState<PaginationState>(() => initialTableState.pagination || {
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [sorting, setSorting] = useState<SortingState>(() => initialTableState.sorting || []);
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityMap>(() => initialTableState.columnVisibility || {});
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningMap>(
+    () => ({
+      start: Array.isArray(initialTableState.columnPinning?.start) && initialTableState.columnPinning.start.length > 0
+        ? initialTableState.columnPinning.start
+        : ['actions', 'name'],
+      end: Array.isArray(initialTableState.columnPinning?.end)
+        ? initialTableState.columnPinning.end
+        : [],
+    })
+  );
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => initialTableState.columnOrder || []);
+  const [columnSizing, setColumnSizing] = useState<Record<string, number>>(() => initialTableState.columnSizing || {});
+
+  // Persist Table Grid State
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        TABLE_STATE_STORAGE_KEY,
+        JSON.stringify({
+          pagination,
+          sorting,
+          columnVisibility,
+          columnPinning,
+          columnOrder,
+          columnSizing,
+        })
+      );
+    } catch (e) {
+      console.error('Failed to persist companies table state', e);
+    }
+  }, [pagination, sorting, columnVisibility, columnPinning, columnOrder, columnSizing]);
+
+  const loadCompanies = async () => {
+    setIsLoading(true);
+    try {
+      const activeSort = sorting[0];
+      const res = await CompanyService.getCompanies({
+        search: debouncedSearchQuery || undefined,
+        industry: industryFilter !== 'all' ? industryFilter : undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+        city: cityFilter !== 'all' ? cityFilter : undefined,
+        assignedOwnerId: ownerFilter !== 'all' ? ownerFilter : undefined,
+        pageNumber: pagination.pageIndex + 1,
+        pageSize: pagination.pageSize,
+        sortBy: activeSort ? activeSort.id : 'createdAt',
+        ascending: activeSort ? !activeSort.desc : false,
+      });
+
+      if (res.success && res.data) {
+        setCompanies(res.data);
+        setTotalCount(res.totalCount ?? res.data.length);
+      } else {
+        const localData = StorageService.getCompanies();
+        setCompanies(localData);
+        setTotalCount(localData.length);
+      }
+    } catch (err) {
+      console.error('Failed to load companies', err);
+      const localData = StorageService.getCompanies();
+      setCompanies(localData);
+      setTotalCount(localData.length);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCompanies();
+  }, [
+    pagination.pageIndex,
+    pagination.pageSize,
+    sorting,
+    debouncedSearchQuery,
+    industryFilter,
+    statusFilter,
+    priorityFilter,
+    ownerFilter,
+    cityFilter,
+  ]);
+
+  const users = StorageService.getUsers();
+  const allFacilities = StorageService.getFacilities();
+  const allInquiries = StorageService.getInquiries();
+
+  // Extract unique industries & cities
+  const uniqueIndustries = Array.from(new Set(companies.map((c) => c.industry))).filter(Boolean);
+  const uniqueCities = Array.from(new Set(companies.map((c) => c.city))).filter(Boolean);
+
+  const activeFiltersCount =
+    (industryFilter !== 'all' ? 1 : 0) +
+    (statusFilter !== 'all' ? 1 : 0) +
+    (priorityFilter !== 'all' ? 1 : 0) +
+    (ownerFilter !== 'all' ? 1 : 0) +
+    (cityFilter !== 'all' ? 1 : 0);
+
+  const openFilterDrawer = () => {
+    setDraftIndustryFilter(industryFilter);
+    setDraftStatusFilter(statusFilter);
+    setDraftPriorityFilter(priorityFilter);
+    setDraftOwnerFilter(ownerFilter);
+    setDraftCityFilter(cityFilter);
+    setIsFilterDrawerOpen(true);
+  };
+
+  const handleApplyFilters = () => {
+    setIndustryFilter(draftIndustryFilter);
+    setStatusFilter(draftStatusFilter);
+    setPriorityFilter(draftPriorityFilter);
+    setOwnerFilter(draftOwnerFilter);
+    setCityFilter(draftCityFilter);
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
+    setIsFilterDrawerOpen(false);
+  };
+
+  const handleClearAllFilters = () => {
+    setSearchQuery('');
+    setIndustryFilter('all');
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setOwnerFilter('all');
+    setCityFilter('all');
+    setDraftIndustryFilter('all');
+    setDraftStatusFilter('all');
+    setDraftPriorityFilter('all');
+    setDraftOwnerFilter('all');
+    setDraftCityFilter('all');
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
+    setIsFilterDrawerOpen(false);
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    handleClearAllFilters();
+    try {
+      await loadCompanies();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleOpenEditCompany = (company: Company) => {
+    setCompanyToEdit(company);
+    setPageMode('form');
+  };
+
+  const handleDeleteCompanyConfirm = (company: Company) => {
+    setCompanyToDelete(company);
+    setIsDeleteModalOpen(true);
+  };
+
+  const executeDeleteCompany = async () => {
+    if (!companyToDelete) return;
+    setIsDeleting(true);
+    try {
+      await CompanyService.deleteCompany(companyToDelete.id);
+      StorageService.deleteCompany(companyToDelete.id);
+      success('Company Deleted', `Removed ${companyToDelete.name} from CRM.`);
+      setIsDeleteModalOpen(false);
+      setCompanyToDelete(null);
+      loadCompanies();
+    } catch (err: any) {
+      error('Delete Failed', err.message || 'Failed to delete company');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // TanStack Column Definitions
+  const companyColumns = useMemo<ColumnDef<DataGridFeatures, Company>[]>(
+    () => [
+      {
+        id: 'actions',
+        header: () => <span className="text-[11px] font-semibold text-foreground-muted pl-1">Action</span>,
+        cell: ({ row }) => {
+          const comp = row.original;
+          return (
+            <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                    title="Actions"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44 bg-surface border border-border shadow-dialog z-50">
+                  <DropdownMenuItem
+                    onClick={() => onSelectCompany(comp.id)}
+                    className="flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-fairway-600" />
+                    <span>View Company</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleOpenEditCompany(comp)}
+                    className="flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Edit Company</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteCompanyConfirm(comp)}
+                    className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Company</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+        size: 70,
+        minSize: 60,
+        enableSorting: false,
+        enablePinning: true,
+      },
+      {
+        id: 'name',
+        accessorKey: 'name',
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Company Name" />,
+        cell: ({ row }) => {
+          const comp = row.original;
+          const displayName = sanitizeDisplayString(comp.name, 'Unnamed Enterprise');
+          const displayLegal = sanitizeDisplayString(comp.legalName, `${displayName} Pvt Ltd`);
+          const initials = (displayName.slice(0, 2) || 'CO').toUpperCase();
+
+          return (
+            <div
+              onClick={() => onSelectCompany(comp.id)}
+              className="flex items-center gap-2.5 py-0.5 cursor-pointer group/cell"
+            >
+              <div className="w-7 h-7 rounded-lg bg-fairway-100 text-fairway-900 dark:bg-fairway-950/70 dark:text-fairway-200 dark:border-fairway-700/60 font-bold text-xs flex items-center justify-center shrink-0 border border-fairway-300 shadow-xs">
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <span className="font-bold text-foreground group-hover/cell:text-fairway-700 transition-colors block truncate">
+                  {displayName}
+                </span>
+                <span className="text-[10px] text-foreground-muted font-normal block truncate">
+                  {displayLegal}
+                </span>
+              </div>
+            </div>
+          );
+        },
+        size: 260,
+        minSize: 200,
+        enableSorting: true,
+        enablePinning: true,
+      },
+      {
+        id: 'industry',
+        accessorKey: 'industry',
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Industry" />,
+        cell: ({ row }) => (
+          <span className="text-xs text-foreground-muted truncate block max-w-[200px]">
+            {sanitizeDisplayString(row.original.industry, 'General Industrial')}
+          </span>
+        ),
+        size: 190,
+        minSize: 140,
+        enableSorting: true,
+      },
+      {
+        id: 'location',
+        accessorKey: 'city',
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Location" />,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-1 text-xs text-foreground truncate">
+            <MapPin className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
+            <span className="truncate">
+              {sanitizeDisplayString(row.original.city, 'Dahej')}, {sanitizeDisplayString(row.original.state, 'Gujarat')}
+            </span>
+          </div>
+        ),
+        size: 160,
+        minSize: 130,
+        enableSorting: true,
+      },
+      {
+        id: 'assignedOwnerName',
+        accessorKey: 'assignedOwnerName',
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Owner" />,
+        cell: ({ row }) => {
+          const comp = row.original;
+          const ownerUser = users.find(
+            (u) => u.id === comp.assignedOwnerId || (comp.assignedOwnerName && u.name.toLowerCase() === comp.assignedOwnerName.toLowerCase())
+          );
+          const ownerName = sanitizeDisplayString(comp.assignedOwnerName || ownerUser?.name, 'Admin');
+          const avatarUrl = ownerUser?.avatar;
+
+          return (
+            <div className="flex items-center gap-2 text-xs">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={ownerName}
+                  className="w-5 h-5 rounded-full object-cover border border-fairway-300 dark:border-fairway-700/60 shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    if (e.currentTarget.nextElementSibling) {
+                      (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
+                    }
+                  }}
+                />
+              ) : null}
+              <div
+                className={cn(
+                  "w-5 h-5 rounded-full bg-fairway-100 text-fairway-800 font-bold text-[10px] items-center justify-center border border-fairway-300 dark:bg-fairway-950/70 dark:text-fairway-300 dark:border-fairway-700/60 shrink-0",
+                  avatarUrl ? "hidden" : "flex"
+                )}
+              >
+                {ownerName.charAt(0).toUpperCase()}
+              </div>
+              <span className="truncate font-medium text-foreground">
+                {ownerName}
+              </span>
+            </div>
+          );
+        },
+        size: 170,
+        minSize: 130,
+        enableSorting: true,
+      },
+      {
+        id: 'prospectStage',
+        accessorKey: 'prospectStage',
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Stage" />,
+        cell: ({ row }) => {
+          const badgeClass = getStageBadgeStyle(row.original.prospectStage);
+          const label = formatStageLabel(row.original.prospectStage);
+          return (
+            <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border inline-flex items-center whitespace-nowrap ${badgeClass}`}>
+              {label}
+            </span>
+          );
+        },
+        size: 170,
+        minSize: 140,
+        enableSorting: true,
+      },
+      {
+        id: 'priority',
+        accessorKey: 'priority',
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Priority" />,
+        cell: ({ row }) => (
+          <Badge
+            variant={row.original.priority === 'High' ? 'danger' : row.original.priority === 'Medium' ? 'warning' : 'default'}
+            size="sm"
+            dot
+          >
+            {row.original.priority || 'Medium'}
+          </Badge>
+        ),
+        size: 110,
+        minSize: 90,
+        enableSorting: true,
+      },
+      {
+        id: 'facilitiesCount',
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Facilities" className="justify-center" />,
+        cell: ({ row }) => {
+          const count = row.original.facilitiesCount ?? StorageService.getFacilities(row.original.id).length;
+          return (
+            <div className="text-center">
+              <span className="font-mono font-bold bg-surface-muted dark:bg-[#161c24] px-2 py-0.5 rounded border border-border text-[11px]">
+                {count}
+              </span>
+            </div>
+          );
+        },
+        size: 100,
+        minSize: 85,
+        enableSorting: false,
+      },
+      {
+        id: 'inquiriesCount',
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Inquiries" className="justify-center" />,
+        cell: ({ row }) => {
+          const count = row.original.inquiriesCount ?? StorageService.getInquiries(row.original.id).length;
+          return (
+            <div className="text-center">
+              <span className="font-mono font-bold bg-fairway-50 text-fairway-900 dark:bg-fairway-950 dark:text-fairway-300 px-2 py-0.5 rounded border border-fairway-200 dark:border-fairway-800 text-[11px]">
+                {count}
+              </span>
+            </div>
+          );
+        },
+        size: 100,
+        minSize: 85,
+        enableSorting: false,
+      },
+    ],
+    [onSelectCompany, users]
+  );
+
+  const table = useTable({
+    features: dataGridFeatures,
+    columns: companyColumns,
+    data: companies,
+    pageCount: Math.ceil((totalCount || companies.length || 0) / (pagination.pageSize || 10)),
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
+    getRowId: (row: Company) => row.id,
+    state: {
+      pagination,
+      sorting,
+      columnVisibility,
+      columnPinning,
+      columnOrder,
+      columnSizing,
+    },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnPinningChange: setColumnPinning,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+  });
+
+  const exportCSV = () => {
+    const headers = ['Company Name', 'Legal Name', 'Industry', 'Status', 'City', 'Owner', 'Priority', 'Prospect Stage'];
+    const rows = companies.map((c) => [
+      `"${c.name}"`,
+      `"${c.legalName || ''}"`,
+      `"${c.industry || ''}"`,
+      `"${c.status || ''}"`,
+      `"${c.city || ''}"`,
+      `"${c.assignedOwnerName || ''}"`,
+      `"${c.priority || ''}"`,
+      `"${c.prospectStage || ''}"`,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Fairway_CRM_Companies_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (pageMode === 'form') {
+    return (
+      <NewCompanyPage
+        companyToEdit={companyToEdit}
+        onBack={() => {
+          setPageMode('list');
+          setCompanyToEdit(null);
+        }}
+        onSuccess={(id) => {
+          setPageMode('list');
+          setCompanyToEdit(null);
+          loadCompanies();
+          onSelectCompany(id);
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4 w-full text-left">
+      {/* Header Pattern with Actions & Full Width */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
+            <Building2 className="w-6 h-6 text-fairway-600" />
+            <span>Companies Master</span>
+          </h1>
+          <p className="text-xs text-foreground-muted mt-1">
+            Top-level customer accounts, linked facilities, active inquiry requirements and ownership.
+          </p>
+        </div>
+
+        {/* Action Toolbar */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={exportCSV} leftIcon={<Download className="w-3.5 h-3.5" />}>
+            Export CSV
+          </Button>
+          <Button size="sm" variant="outline" onClick={onOpenImport} leftIcon={<UploadCloud className="w-3.5 h-3.5" />}>
+            Import
+          </Button>
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => {
+                setCompanyToEdit(null);
+                setPageMode('form');
+              }}
+              leftIcon={<Plus className="w-4 h-4" />}
+            >
+              Add Company
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Modern KPI Cards with Glowing Sparkline Waves */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Card 1: Total Corporate Accounts */}
+        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-fairway-400/60 relative overflow-hidden group">
+          <div>
+            <span className="text-sm font-bold text-foreground tracking-tight block">
+              Total Corporate Accounts
+            </span>
+            <span className="text-xs text-foreground-muted mt-4 block font-medium">
+              Registered Clients
+            </span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+              {totalCount || companies.length}
+            </span>
+          </div>
+
+          <div className="shrink-0 pb-1">
+            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
+              <defs>
+                <linearGradient id="compWave1" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4 L 120 40 L 0 40 Z"
+                fill="url(#compWave1)"
+              />
+              <path
+                d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4"
+                fill="none"
+                stroke="var(--fw-600, #0084FF)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 2: Linked Facility Nodes */}
+        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-accent-400/60 relative overflow-hidden group">
+          <div>
+            <span className="text-sm font-bold text-foreground tracking-tight block">
+              Linked Facility Nodes
+            </span>
+            <span className="text-xs text-foreground-muted mt-4 block font-medium">
+              Industrial Sites Mapped
+            </span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+              {allFacilities.length}
+            </span>
+          </div>
+
+          <div className="shrink-0 pb-1">
+            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
+              <defs>
+                <linearGradient id="compWave2" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--accent-500, #10B981)" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="var(--accent-500, #10B981)" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M 0 30 Q 15 22, 30 25 T 60 19 T 90 12 T 120 8 L 120 40 L 0 40 Z"
+                fill="url(#compWave2)"
+              />
+              <path
+                d="M 0 30 Q 15 22, 30 25 T 60 19 T 90 12 T 120 8"
+                fill="none"
+                stroke="var(--accent-500, #10B981)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        </div>
+
+        {/* Card 3: Active Opportunities */}
+        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-indigo-400/60 relative overflow-hidden group">
+          <div>
+            <span className="text-sm font-bold text-foreground tracking-tight block">
+              Active Opportunities
+            </span>
+            <span className="text-xs text-foreground-muted mt-4 block font-medium">
+              Ongoing Inquiries
+            </span>
+            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+              {allInquiries.filter((i) => i.status === 'Active').length}
+            </span>
+          </div>
+
+          <div className="shrink-0 pb-1">
+            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
+              <defs>
+                <linearGradient id="compWave3" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--chart-5, #8B5CF6)" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="var(--chart-5, #8B5CF6)" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6 L 120 40 L 0 40 Z"
+                fill="url(#compWave3)"
+              />
+              <path
+                d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6"
+                fill="none"
+                stroke="var(--chart-5, #8B5CF6)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Control Bar: Search, Filters, Refresh, Customizer & View Switcher */}
+      <div className="bg-surface border border-border p-3 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-3">
+        {/* Left Side: Search Box */}
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by company name, location, email, contact..."
+            className="w-full bg-surface-muted/60 dark:bg-[#11161d] text-foreground text-xs rounded-xl pl-9 pr-9 py-2 border border-border/80 focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground p-0.5"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Right Side: Tool Buttons & View Toggle */}
+        <TooltipProvider delayDuration={200}>
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            {/* Filter Drawer Trigger Button */}
+            <button
+              type="button"
+              onClick={openFilterDrawer}
+              className={cn(
+                "h-9 px-3.5 rounded-button border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-2xs shrink-0",
+                activeFiltersCount > 0
+                  ? "bg-fairway-50 text-fairway-700 border-fairway-300 dark:bg-fairway-950/60 dark:text-fairway-300 dark:border-fairway-700"
+                  : "bg-white dark:bg-[#11161d] text-foreground border-border hover:bg-surface-muted"
+              )}
+            >
+              <Filter className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+              <span>Filter</span>
+              {activeFiltersCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-fairway-600 text-white text-[10px] flex items-center justify-center font-bold">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+
+            {/* Clear Filters Button */}
+            {activeFiltersCount > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleClearAllFilters}
+                    className="size-9 rounded-button border border-rose-200 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 hover:bg-rose-100 flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-2xs"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Reset all filters
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Refresh Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing || isLoading}
+                  className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-70"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "w-4 h-4 transition-transform duration-700",
+                      (isRefreshing || isLoading) && "animate-spin text-fairway-600"
+                    )}
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                Refresh
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Column Visibility Customizer Menu (Table Mode Only) */}
+            {viewMode === 'table' && (
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        <Settings className="w-4 h-4 text-foreground-muted" />
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Customize columns
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end" className="w-56 bg-surface border border-border shadow-dialog z-50">
+                  <DropdownMenuLabel className="text-xs font-bold text-foreground">
+                    Toggle Column Visibility
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {table.getAllLeafColumns().map((column) => {
+                    if (column.id === 'actions') return null;
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize text-xs cursor-pointer text-foreground"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                      >
+                        {column.id.replace(/([A-Z])/g, ' $1')}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Segmented View Switcher (List / Card View matching exact reference UI) */}
+            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={cn(
+                      "w-9 h-full flex items-center justify-center transition-all cursor-pointer",
+                      viewMode === 'table'
+                        ? "bg-fairway-600 text-white font-bold"
+                        : "text-foreground hover:text-foreground hover:bg-surface-muted/60"
+                    )}
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  List
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grid')}
+                    className={cn(
+                      "w-9 h-full flex items-center justify-center transition-all cursor-pointer",
+                      viewMode === 'grid'
+                        ? "bg-fairway-600 text-white font-bold"
+                        : "text-foreground hover:text-foreground hover:bg-surface-muted/60"
+                    )}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Card
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </TooltipProvider>
+      </div>
+
+      {/* ================= VIEW MODE 1: TANSTACK DATA-GRID TABLE ================= */}
+      {viewMode === 'table' ? (
+        <DataGrid
+          table={table}
+          recordCount={totalCount || companies.length}
+          isLoading={isLoading}
+          tableLayout={{
+            columnsPinnable: true,
+            columnsResizable: true,
+            headerSticky: true,
+          }}
+        >
+          <div className="w-full space-y-2.5">
+            {companies.length === 0 && !isLoading ? (
+              <CompanyEmptyState
+                hasFilters={activeFiltersCount > 0 || !!searchQuery}
+                onClearFilters={handleClearAllFilters}
+                onNewCompany={onOpenNewCompany}
+              />
+            ) : (
+              <Card className="p-0 border border-border bg-surface shadow-xs rounded-xl overflow-hidden">
+                <DataGridContainer className="w-full">
+                  <DataGridScrollArea className="w-full max-h-[calc(100vh-280px)] overflow-auto" orientation="both">
+                    <DataGridTable />
+                  </DataGridScrollArea>
+                </DataGridContainer>
+              </Card>
+            )}
+            {companies.length > 0 && <DataGridPagination sizes={[10, 20, 50, 100]} />}
+          </div>
+        </DataGrid>
+      ) : (
+        /* ================= VIEW MODE 2: RICH GRID CARDS ================= */
+        <DataGrid
+          table={table}
+          recordCount={totalCount || companies.length}
+          isLoading={isLoading}
+        >
+          <div className="space-y-4">
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from({ length: Math.min(pagination.pageSize, 6) }).map((_, i) => (
+                  <CompanyCardSkeleton key={i} mode="grid" />
+                ))}
+              </div>
+            ) : companies.length === 0 ? (
+              <CompanyEmptyState
+                hasFilters={activeFiltersCount > 0 || !!searchQuery}
+                onClearFilters={handleClearAllFilters}
+                onNewCompany={onOpenNewCompany}
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {companies.map((comp) => (
+                  <CompanyCard
+                    key={comp.id}
+                    company={comp}
+                    onSelect={onSelectCompany}
+                    onEdit={handleOpenEditCompany}
+                    onDelete={handleDeleteCompanyConfirm}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Pagination for Card View */}
+            {companies.length > 0 && <DataGridPagination sizes={[10, 20, 50, 100]} />}
+          </div>
+        </DataGrid>
+      )}
+
+
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && companyToDelete && (
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setCompanyToDelete(null);
+          }}
+          maxWidth="md"
+          title={
+            <div className="flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="w-5 h-5" />
+              <span>Delete Company Account</span>
+            </div>
+          }
+          description="Are you sure you want to permanently delete this corporate record?"
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 rounded-xl space-y-1.5 text-foreground">
+              <p className="font-semibold text-rose-900 dark:text-rose-200">
+                You are deleting: <span className="font-bold underline">{companyToDelete.name}</span>
+              </p>
+              <p className="text-[11px] text-foreground-muted">
+                This will delete the company account, related linked activity history and dissociate inquiries. This action cannot be reversed.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setCompanyToDelete(null);
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={executeDeleteCompany}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Company'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Advanced Filters Drawer (Right Slide-Out) */}
+      {isFilterDrawerOpen && (
+        <div className="fixed inset-0 top-0 left-0 w-screen h-screen z-[99999] flex justify-end animate-fade-in select-none overflow-hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 top-0 left-0 w-full h-full bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsFilterDrawerOpen(false)}
+          />
+
+          {/* Drawer Container */}
+          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border h-full max-h-screen shadow-2xl flex flex-col z-10 animate-slide-left top-0 right-0">
+            {/* Header */}
+            <div className="p-5 border-b border-border bg-surface flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-bold text-foreground">Advanced Filters</h3>
+                <p className="text-xs text-foreground-muted mt-0.5">Filter companies by category and ownership...</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterDrawerOpen(false)}
+                className="p-1 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Filter Controls Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {/* Status Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground block">Company Status</label>
+                <Combobox
+                  options={[
+                    { value: 'all', label: 'All statuses' },
+                    { value: 'Active', label: 'Active' },
+                    { value: 'Prospect', label: 'Prospect' },
+                    { value: 'Inactive', label: 'Inactive' },
+                  ]}
+                  value={draftStatusFilter}
+                  onChange={setDraftStatusFilter}
+                  placeholder="Select status..."
+                />
+              </div>
+
+              {/* Priority Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground block">Priority Level</label>
+                <Combobox
+                  options={[
+                    { value: 'all', label: 'All priorities' },
+                    { value: 'High', label: '🔴 High Priority' },
+                    { value: 'Medium', label: '🟡 Medium Priority' },
+                    { value: 'Low', label: '🟢 Low Priority' },
+                  ]}
+                  value={draftPriorityFilter}
+                  onChange={setDraftPriorityFilter}
+                  placeholder="Select priority..."
+                />
+              </div>
+
+              {/* Industry Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground block">Industry Segment</label>
+                <Combobox
+                  options={[
+                    { value: 'all', label: 'All industries' },
+                    ...uniqueIndustries.map((ind) => ({ value: ind, label: ind })),
+                  ]}
+                  value={draftIndustryFilter}
+                  onChange={setDraftIndustryFilter}
+                  placeholder="Select industry..."
+                  searchPlaceholder="Search industry..."
+                />
+              </div>
+
+              {/* City Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground block">City / Cluster</label>
+                <Combobox
+                  options={[
+                    { value: 'all', label: 'All cities' },
+                    ...uniqueCities.map((ct) => ({ value: ct, label: ct })),
+                  ]}
+                  value={draftCityFilter}
+                  onChange={setDraftCityFilter}
+                  placeholder="Select city..."
+                  searchPlaceholder="Search city..."
+                />
+              </div>
+
+              {/* Assigned Owner Filter with Images */}
+              <UserCombobox
+                label="Assigned Account Owner"
+                users={users}
+                value={draftOwnerFilter === 'all' ? '' : draftOwnerFilter}
+                onChange={(val) => setDraftOwnerFilter(val || 'all')}
+                placeholder="All salespersons"
+                allowClear
+              />
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 border-t border-border bg-surface flex items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleClearAllFilters}
+                className="flex-1 text-xs"
+              >
+                Clear Filters
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleApplyFilters}
+                className="flex-1 text-xs bg-fairway-700 hover:bg-fairway-800"
+              >
+                Apply Filters
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const CompaniesPage = CompanyListView;
+export default CompaniesPage;

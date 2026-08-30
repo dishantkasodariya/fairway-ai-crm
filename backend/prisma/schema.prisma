@@ -1,0 +1,34 @@
+// Prisma schema for Fairway CRM (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  super_admin
+  admin
+  sales
+  viewer
+}
+
+model User {
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  password           String
+  name               String
+  role               Role     @default(admin)
+  avatar             String?
+  department         String?  @default("Industrial Leasing")
+  status             String   @default("Active")
+  assignedLeadsCount Int      @default(0)
+  lastActive         DateTime @default(now())
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("users")
+}

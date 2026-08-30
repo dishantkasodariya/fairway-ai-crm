@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/images/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fairway CRM — Industrial Warehouse Operations & Leasing</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Synchronous Pre-render Theme & Dark Mode Bootstrapper (Eliminates Flash on Refresh) -->
+    <script>
+      (function() {
+        try {
+          var mode = localStorage.getItem('fw_crm_color_mode') || 'system';
+          var isDark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var themeId = localStorage.getItem('fw_crm_active_theme_id') || 'fairway';
+
+          var palettes = {
+            fairway: {
+              shades: { 50: '#F0F9F5', 100: '#E8F4EF', 200: '#D1EAE0', 300: '#A3D5C1', 400: '#5BAFA1', 500: '#2A8F70', 600: '#0F6B4F', 700: '#0B5741', 800: '#084332', 900: '#052F23', 950: '#021B14' },
+              accent: { 50: '#F5FCF0', 100: '#EDF8E9', 200: '#DAF2CF', 300: '#BFE7AE', 400: '#94D776', 500: '#6BBF3E', 600: '#56A12E', 700: '#427F24', 800: '#34641F', 900: '#2C531C' },
+              charts: ['#0F6B4F', '#6BBF3E', '#0284c7', '#6366f1', '#f59e0b']
+            },
+            royal_indigo: {
+              shades: { 50: '#EEF2FF', 100: '#E0E7FF', 200: '#C7D2FE', 300: '#A5B4FC', 400: '#818CF8', 500: '#6366F1', 600: '#4F46E5', 700: '#4338CA', 800: '#3730A3', 900: '#312E81', 950: '#1E1B4B' },
+              accent: { 50: '#ECFEFF', 100: '#CFFAFE', 200: '#A5F3FC', 300: '#67E8F9', 400: '#22D3EE', 500: '#06B6D4', 600: '#0891B2', 700: '#0E7490', 800: '#155E75', 900: '#164E63' },
+              charts: ['#4F46E5', '#06B6D4', '#818CF8', '#10B981', '#F59E0B']
+            },
+            ocean_sapphire: {
+              shades: { 50: '#F0F9FF', 100: '#E0F2FE', 200: '#BAE6FD', 300: '#7DD3FC', 400: '#38BDF8', 500: '#0EA5E9', 600: '#0284C7', 700: '#0369A1', 800: '#075985', 900: '#0C4A6E', 950: '#082F49' },
+              accent: { 50: '#F8FAFC', 100: '#F1F5F9', 200: '#E2E8F0', 300: '#CBD5E1', 400: '#94A3B8', 500: '#38BDF8', 600: '#0284C7', 700: '#0369A1', 800: '#1E293B', 900: '#0F172A' },
+              charts: ['#0284C7', '#38BDF8', '#6366F1', '#10B981', '#F59E0B']
+            },
+            carbon_slate: {
+              shades: { 50: '#FAFAFA', 100: '#F4F4F5', 200: '#E4E4E7', 300: '#D4D4D8', 400: '#A1A1AA', 500: '#71717A', 600: '#18181B', 700: '#09090B', 800: '#09090B', 900: '#09090B', 950: '#000000' },
+              accent: { 50: '#F8FAFC', 100: '#F1F5F9', 200: '#E2E8F0', 300: '#CBD5E1', 400: '#94A3B8', 500: '#64748B', 600: '#475569', 700: '#334155', 800: '#1E293B', 900: '#0F172A' },
+              charts: ['#18181B', '#71717A', '#A1A1AA', '#10B981', '#F59E0B']
+            },
+            crimson_ruby: {
+              shades: { 50: '#FFF1F2', 100: '#FFE4E6', 200: '#FECDD3', 300: '#FDA4AF', 400: '#FB7185', 500: '#F43F5E', 600: '#E11D48', 700: '#BE123C', 800: '#9F1239', 900: '#881337', 950: '#4C0519' },
+              accent: { 50: '#FFFBEB', 100: '#FEF3C7', 200: '#FDE68A', 300: '#FCD34D', 400: '#FBBF24', 500: '#F59E0B', 600: '#D97706', 700: '#B45309', 800: '#92400E', 900: '#78350F' },
+              charts: ['#E11D48', '#F59E0B', '#FB7185', '#10B981', '#6366F1']
+            },
+            amber_gold: {
+              shades: { 50: '#FFFBEB', 100: '#FEF3C7', 200: '#FDE68A', 300: '#FCD34D', 400: '#FBBF24', 500: '#F59E0B', 600: '#D97706', 700: '#B45309', 800: '#92400E', 900: '#78350F', 950: '#451A03' },
+              accent: { 50: '#ECFDF5', 100: '#D1FAE5', 200: '#A7F3D0', 300: '#6EE7B7', 400: '#34D399', 500: '#10B981', 600: '#059669', 700: '#047857', 800: '#065F46', 900: '#064E3B' },
+              charts: ['#D97706', '#10B981', '#F59E0B', '#3B82F6', '#8B5CF6']
+            },
+            purple_amethyst: {
+              shades: { 50: '#FAF5FF', 100: '#F3E8FF', 200: '#E9D5FF', 300: '#D8B4FE', 400: '#C084FC', 500: '#A855F7', 600: '#9333EA', 700: '#7E22CE', 800: '#6B21A8', 900: '#581C87', 950: '#3B0764' },
+              accent: { 50: '#FDF4FF', 100: '#FAE8FF', 200: '#F5D0FE', 300: '#F0ABFC', 400: '#E879F9', 500: '#D946EF', 600: '#C026D3', 700: '#A21CAF', 800: '#86198F', 900: '#701A75' },
+              charts: ['#9333EA', '#D946EF', '#C084FC', '#10B981', '#F59E0B']
+            },
+            teal_cyan: {
+              shades: { 50: '#F0FDFA', 100: '#CCFBF1', 200: '#99F6E4', 300: '#5EEAD4', 400: '#2DD4BF', 500: '#14B8A6', 600: '#0D9488', 700: '#0F766E', 800: '#115E59', 900: '#134E4A', 950: '#042F2E' },
+              accent: { 50: '#F0FDF4', 100: '#DCFCE7', 200: '#BBF7D0', 300: '#86EFAC', 400: '#4ADE80', 500: '#22C55E', 600: '#16A34A', 700: '#15803D', 800: '#166534', 900: '#14532D' },
+              charts: ['#0D9488', '#22C55E', '#2DD4BF', '#6366F1', '#F59E0B']
+            },
+            burnt_terracotta: {
+              shades: { 50: '#FFF7ED', 100: '#FFEDD5', 200: '#FED7AA', 300: '#FDBA74', 400: '#FB923C', 500: '#F97316', 600: '#EA580C', 700: '#C2410C', 800: '#9A3412', 900: '#7C2D12', 950: '#431407' },
+              accent: { 50: '#FFFBEB', 100: '#FEF3C7', 200: '#FDE68A', 300: '#FCD34D', 400: '#FBBF24', 500: '#F59E0B', 600: '#D97706', 700: '#B45309', 800: '#92400E', 900: '#78350F' },
+              charts: ['#EA580C', '#F59E0B', '#FB923C', '#10B981', '#6366F1']
+            }
+          };
+
+          var pal = palettes[themeId] || palettes.fairway;
+          var root = document.documentElement;
+
+          var hexToRgb = function(hex) {
+            var s = hex.replace('#', '');
+            var num = parseInt(s.length === 3 ? s.split('').map(function(c){return c+c;}).join('') : s, 16);
+            return ((num >> 16) & 255) + ' ' + ((num >> 8) & 255) + ' ' + (num & 255);
+          };
+
+          var primaryRgb = hexToRgb(pal.shades[600]);
+          var primaryHoverRgb = hexToRgb(pal.shades[700]);
+          var primarySoftRgb = hexToRgb(isDark ? pal.shades[950] : pal.shades[100]);
+          var accentRgb = hexToRgb(pal.accent[500]);
+          var accentSoftRgb = hexToRgb(isDark ? pal.accent[900] : pal.accent[100]);
+
+          if (isDark) {
+            root.classList.add('dark');
+            root.style.setProperty('--bg-app', '#0B0F17', 'important');
+            root.style.setProperty('--bg-surface', '#111827', 'important');
+            root.style.setProperty('--bg-surface-muted', '#1F2937', 'important');
+            root.style.setProperty('--bg-card', '#111827', 'important');
+            root.style.setProperty('--text-foreground', '#F9FAFB', 'important');
+            root.style.setProperty('--border-color', '#374151', 'important');
+            root.style.setProperty('--background', '11 15 23', 'important');
+            root.style.setProperty('--surface', '17 24 39', 'important');
+            root.style.setProperty('--surface-muted', '31 41 55', 'important');
+            root.style.setProperty('--foreground', '249 250 251', 'important');
+            root.style.setProperty('--border', '55 65 81', 'important');
+            root.style.setProperty('--card', '17 24 39', 'important');
+            root.style.setProperty('--card-foreground', '249 250 251', 'important');
+          } else {
+            root.classList.remove('dark');
+          }
+
+          for (var s in pal.shades) {
+            root.style.setProperty('--fw-' + s, pal.shades[s], 'important');
+          }
+          for (var a in pal.accent) {
+            root.style.setProperty('--accent-' + a, pal.accent[a], 'important');
+          }
+
+          root.style.setProperty('--primary', primaryRgb, 'important');
+          root.style.setProperty('--primary-hover', primaryHoverRgb, 'important');
+          root.style.setProperty('--primary-soft', primarySoftRgb, 'important');
+          root.style.setProperty('--accent', accentRgb, 'important');
+          root.style.setProperty('--accent-soft', accentSoftRgb, 'important');
+
+          for (var c = 0; c < pal.charts.length; c++) {
+            root.style.setProperty('--chart-' + (c + 1), pal.charts[c], 'important');
+          }
+
+          var styleTag = document.getElementById('crm-dynamic-theme-style');
+          if (!styleTag) {
+            styleTag = document.createElement('style');
+            styleTag.id = 'crm-dynamic-theme-style';
+            document.head.appendChild(styleTag);
+          }
+
+          var css = ':root, html, body {';
+          if (isDark) {
+            css += '--bg-app: #0B0F17 !important; --bg-surface: #111827 !important; --bg-surface-muted: #1F2937 !important; --text-foreground: #F9FAFB !important; --border-color: #374151 !important;';
+          }
+          for (var s in pal.shades) {
+            css += '--fw-' + s + ': ' + pal.shades[s] + ' !important;';
+          }
+          for (var a in pal.accent) {
+            css += '--accent-' + a + ': ' + pal.accent[a] + ' !important;';
+          }
+          css += '--primary: ' + primaryRgb + ' !important;';
+          css += '--primary-hover: ' + primaryHoverRgb + ' !important;';
+          css += '--primary-soft: ' + primarySoftRgb + ' !important;';
+          css += '--accent: ' + accentRgb + ' !important;';
+          css += '--accent-soft: ' + accentSoftRgb + ' !important;';
+          css += '}';
+          if (isDark) {
+            css += 'html.dark .hover\\:bg-surface-muted:hover, html.dark .hover\\:bg-slate-50:hover, html.dark .hover\\:bg-slate-100:hover, html.dark .hover\\:bg-slate-200:hover, html.dark .hover\\:bg-gray-50:hover, html.dark .hover\\:bg-gray-100:hover { background-color: #1F2937 !important; }';
+            css += 'html.dark .hover\\:bg-surface:hover, html.dark .hover\\:bg-white:hover { background-color: #111827 !important; }';
+            css += 'html.dark .hover\\:bg-rose-50:hover { background-color: rgba(76, 5, 25, 0.4) !important; }';
+            css += 'html.dark .hover\\:bg-emerald-50:hover { background-color: rgba(6, 78, 59, 0.45) !important; }';
+            css += 'html.dark .hover\\:bg-amber-50:hover { background-color: rgba(69, 26, 3, 0.4) !important; }';
+            css += 'html.dark .text-foreground, html.dark .text-slate-900, html.dark .text-slate-800, html.dark .text-slate-700, html.dark .text-gray-900, html.dark .text-gray-800, html.dark .text-gray-700, html.dark .text-black { color: #F9FAFB !important; }';
+            css += 'html.dark .text-foreground-muted, html.dark .text-muted-foreground, html.dark .text-slate-600, html.dark .text-slate-500, html.dark .text-slate-400, html.dark .text-gray-600, html.dark .text-gray-500, html.dark .text-gray-400 { color: #9CA3AF !important; }';
+            css += 'html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6, html.dark strong, html.dark b { color: #F9FAFB !important; }';
+            css += 'html.dark label { color: #E5E7EB !important; }';
+            css += 'html.dark th { color: #9CA3AF !important; }';
+            css += 'html.dark td { color: #F9FAFB !important; }';
+          }
+          css += '.bg-fairway-600 { background-color: ' + pal.shades[600] + ' !important; }';
+          css += '.bg-fairway-700 { background-color: ' + pal.shades[700] + ' !important; }';
+          css += '.bg-fairway-800 { background-color: ' + pal.shades[800] + ' !important; }';
+          css += '.bg-fairway-50 { background-color: ' + (isDark ? pal.shades[950] + 'B3' : pal.shades[50]) + ' !important; }';
+          css += '.bg-fairway-100 { background-color: ' + (isDark ? pal.shades[900] + 'CC' : pal.shades[100]) + ' !important; }';
+          css += '.bg-fairway-200 { background-color: ' + (isDark ? pal.shades[800] : pal.shades[200]) + ' !important; }';
+          css += '.text-fairway-600 { color: ' + (isDark ? pal.shades[300] : pal.shades[600]) + ' !important; }';
+          css += '.text-fairway-700 { color: ' + (isDark ? pal.shades[200] : pal.shades[700]) + ' !important; }';
+          css += '.text-fairway-800 { color: ' + (isDark ? pal.shades[200] : pal.shades[800]) + ' !important; }';
+          css += '.text-fairway-900 { color: ' + (isDark ? pal.shades[100] : pal.shades[900]) + ' !important; }';
+          styleTag.textContent = css;
+        } catch(e) {}
+      })();
+    </script>
+  </head>
+
+
+
+
+  <body class="bg-background text-foreground antialiased min-h-screen font-sans selection:bg-fairway-100 selection:text-fairway-900">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

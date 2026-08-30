@@ -19,44 +19,65 @@ Fairway CRM is a high-performance, modular enterprise web application engineered
 
 ---
 
-## 🏗️ Feature-Based Modular Architecture
+## 🏗️ Repository Architecture
 
-The codebase follows a scalable **feature-based modular architecture** under `src/modules/`:
+The repository is structured as a fullstack monorepo with distinct frontend and backend services:
 
 ```
-src/
-├── App.tsx                           # Pure router / view orchestrator
-├── index.css                         # Global CSS & Tailwind design tokens
-├── main.tsx                          # App bootstrapping & storage initialization
-└── modules/
-    ├── core/                         # Single shared foundation module
-    │   ├── components/
-    │   │   ├── ui/                   # Shared UI primitives (Button, Modal, Card, Badge, etc.)
-    │   │   ├── CommandPalette.tsx    # ⌘K Global search dialog
-    │   │   ├── LostReasonModal.tsx   # Mandatory lost opportunity capture
-    │   │   ├── NotificationPopover.tsx
-    │   │   └── WonCelebrationModal.tsx
-    │   ├── data/                     # Seed demonstration datasets
-    │   ├── lib/                      # cn() class merge utilities
-    │   ├── pages/                    # 404 Fallback page
-    │   ├── providers/                # Auth, Notification, and Toast contexts
-    │   ├── services/                 # LocalStorage persistence engine
-    │   ├── types/                    # Shared TypeScript data models
-    │   ├── ui/                       # Global AppShell, Sidebar, and Topbar
-    │   └── utils/                    # Currency (INR), Area (sq.ft), Date formatters
-    ├── companies/                    # Company accounts & facility management
-    ├── dashboard/                    # Executive KPI dashboard
-    ├── import-export/                # CSV migration wizard
-    ├── inquiries/                    # Lead management & stepper wizard
-    ├── map/                          # India industrial corridor map
-    ├── pipeline/                     # Kanban board
-    ├── properties/                   # Warehouse park catalog
-    ├── proposals/                    # Commercial term sheets
-    ├── reports/                      # Analytics & performance metrics
-    ├── settings/                     # User management & RBAC matrix
-    ├── site-visits/                  # Inspection scheduling
-    └── tasks/                        # Follow-up touchpoint engine
+fireway-demo/
+├── client/                     # React 18 + Vite + Tailwind CSS Frontend
+│   ├── public/                 # Static assets & icons
+│   ├── src/
+│   │   ├── App.tsx             # Main view router
+│   │   ├── index.css           # Global design system & tokens
+│   │   ├── main.tsx            # App bootstrapping
+│   │   └── modules/            # Modular feature domains (companies, pipeline, tasks, etc.)
+│   ├── package.json
+│   └── vite.config.ts
+├── backend/                    # Node.js + Express + TypeScript API Server
+│   ├── src/
+│   │   ├── config/             # Environment & server configuration
+│   │   ├── controllers/        # Request handlers (health, companies, etc.)
+│   │   ├── middleware/         # Error handler & request logging
+│   │   ├── routes/             # RESTful API route definitions
+│   │   ├── app.ts              # Express app setup & middleware
+│   │   └── server.ts           # Server bootstrap & entry point
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── .env.example
+├── package.json                # Root monorepo script runner
+└── README.md
 ```
+
+---
+
+## 🚀 Getting Started
+
+### 1. Run Both Frontend & Backend Concurrently (Root)
+```bash
+# Install root orchestration tools
+npm install
+
+# Start both backend (port 5000) and client (port 5173) simultaneously
+npm run dev
+```
+
+### 2. Run Individually
+
+**Client (Frontend):**
+```bash
+cd client
+npm install
+npm run dev
+```
+
+**Backend (API Server):**
+```bash
+cd backend
+npm install
+npm run dev
+```
+
 
 ---
 
