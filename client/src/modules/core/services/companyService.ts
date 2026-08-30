@@ -1,4 +1,4 @@
-import { Company } from '@/modules/core/types';
+import { Company, Contact, Facility, Inquiry } from '@/modules/core/types';
 import { API_BASE_URL } from './api';
 
 export interface CreateCompanyPayload {
@@ -67,6 +67,28 @@ export class CompanyService {
       return json;
     } catch (err: any) {
       console.warn('CompanyService.getCompanies failed:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Fetch single company by ID with its related contacts, facilities, and inquiries
+   */
+  static async getCompanyById(id: string): Promise<{
+    success: boolean;
+    data?: Company & {
+      contacts?: Contact[];
+      facilities?: Facility[];
+      inquiries?: Inquiry[];
+    };
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/companies/${id}`);
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      console.warn('CompanyService.getCompanyById failed:', err);
       return { success: false, error: err.message };
     }
   }

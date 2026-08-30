@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Building2,
   Phone,
@@ -25,8 +25,10 @@ import {
   CheckCircle2,
   Check,
   ChevronDown,
+  Loader2,
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
+import CompanyService from '@/modules/core/services/companyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { Company, Contact, Facility, Inquiry, Task, Note, Activity, Proposal, SiteVisit } from '@/modules/core/types';
@@ -61,6 +63,7 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
   const { canEdit, canDelete, currentUser, users } = useAuth();
   const { success, error } = useToast();
 
+  const [loading, setLoading] = useState(true);
   const [company, setCompany] = useState<Company | undefined>(StorageService.getCompanyById(companyId));
   const [contacts, setContacts] = useState<Contact[]>(StorageService.getContacts(companyId));
   const [facilities, setFacilities] = useState<Facility[]>(StorageService.getFacilities(companyId));
@@ -116,18 +119,83 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
     assignedUserId: currentUser.id,
   });
 
+  // Fetch live company data from backend on mount or ID change
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCompany = async () => {
+      setLoading(true);
+      try {
+        const res = await CompanyService.getCompanyById(companyId);
+        if (isMounted && res.success && res.data) {
+          setCompany(res.data);
+          if (res.data.contacts && res.data.contacts.length > 0) {
+            setContacts(res.data.contacts);
+          } else {
+            setContacts(StorageService.getContacts(companyId));
+          }
+          if (res.data.facilities && res.data.facilities.length > 0) {
+            setFacilities(res.data.facilities);
+          } else {
+            setFacilities(StorageService.getFacilities(companyId));
+          }
+          if (res.data.inquiries && res.data.inquiries.length > 0) {
+            setInquiries(res.data.inquiries);
+          } else {
+            setInquiries(StorageService.getInquiries(companyId));
+          }
+        } else if (isMounted) {
+          const localComp = StorageService.getCompanyById(companyId);
+          setCompany(localComp);
+        }
+      } catch {
+        if (isMounted) {
+          setCompany(StorageService.getCompanyById(companyId));
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchCompany();
+    return () => {
+      isMounted = false;
+    };
+  }, [companyId]);
+
   // Reload handler
-  const refreshData = () => {
-    const freshCompany = StorageService.getCompanyById(companyId);
-    setCompany(freshCompany);
-    setContacts(StorageService.getContacts(companyId));
-    setFacilities(StorageService.getFacilities(companyId));
-    setInquiries(StorageService.getInquiries(companyId));
+  const refreshData = async () => {
+    try {
+      const res = await CompanyService.getCompanyById(companyId);
+      if (res.success && res.data) {
+        setCompany(res.data);
+        if (res.data.contacts) setContacts(res.data.contacts);
+        if (res.data.facilities) setFacilities(res.data.facilities);
+        if (res.data.inquiries) setInquiries(res.data.inquiries);
+      } else {
+        const freshCompany = StorageService.getCompanyById(companyId);
+        setCompany(freshCompany);
+        setContacts(StorageService.getContacts(companyId));
+        setFacilities(StorageService.getFacilities(companyId));
+        setInquiries(StorageService.getInquiries(companyId));
+      }
+    } catch {
+      const freshCompany = StorageService.getCompanyById(companyId);
+      setCompany(freshCompany);
+    }
     setTasks(StorageService.getTasks(companyId));
     setNotes(StorageService.getNotes(companyId));
     setActivities(StorageService.getActivities(companyId));
     setProposals(StorageService.getProposals(companyId));
   };
+
+  if (loading) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm font-medium text-muted-foreground">Loading company dossier...</p>
+      </div>
+    );
+  }
 
   if (!company) {
     return (

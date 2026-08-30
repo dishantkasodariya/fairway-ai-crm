@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Building2,
@@ -17,8 +17,10 @@ import {
   FileSpreadsheet,
   Phone,
   Mail,
+  Loader2,
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
+import { InquiryService } from '@/modules/core/services/inquiryService';
 import { TaskService } from '@/modules/core/services/taskService';
 import { ProposalService } from '@/modules/core/services/proposalService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
@@ -54,6 +56,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
   const { canEdit, currentUser, users } = useAuth();
   const { success, error } = useToast();
 
+  const [loading, setLoading] = useState(true);
   const [inquiry, setInquiry] = useState<Inquiry | undefined>(StorageService.getInquiryById(inquiryId));
   const [propertyMatches, setPropertyMatches] = useState<PropertyMatchResult[]>(
     inquiry ? StorageService.matchPropertiesForInquiry(inquiry) : []
@@ -70,6 +73,50 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
   const [activities, setActivities] = useState<Activity[]>(
     inquiry ? StorageService.getActivities(inquiry.companyId).filter((a) => !a.inquiryId || a.inquiryId === inquiry.id) : []
   );
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchInquiry = async () => {
+      setLoading(true);
+      try {
+        const res = await InquiryService.getInquiryById(inquiryId);
+        if (isMounted && res.success && res.data) {
+          setInquiry(res.data);
+          setPropertyMatches(StorageService.matchPropertiesForInquiry(res.data));
+          setProposals(StorageService.getProposals().filter((p) => p.inquiryId === res.data!.id));
+          setSiteVisits(StorageService.getSiteVisits().filter((s) => s.inquiryId === res.data!.id));
+          setTasks(StorageService.getTasks().filter((t) => t.inquiryId === res.data!.id));
+          setActivities(
+            StorageService.getActivities(res.data!.companyId).filter((a) => !a.inquiryId || a.inquiryId === res.data!.id)
+          );
+        } else if (isMounted) {
+          const localInq = StorageService.getInquiryById(inquiryId);
+          setInquiry(localInq);
+          if (localInq) {
+            setPropertyMatches(StorageService.matchPropertiesForInquiry(localInq));
+            setProposals(StorageService.getProposals().filter((p) => p.inquiryId === localInq.id));
+            setSiteVisits(StorageService.getSiteVisits().filter((s) => s.inquiryId === localInq.id));
+            setTasks(StorageService.getTasks().filter((t) => t.inquiryId === localInq.id));
+            setActivities(
+              StorageService.getActivities(localInq.companyId).filter((a) => !a.inquiryId || a.inquiryId === localInq.id)
+            );
+          }
+        }
+      } catch {
+        if (isMounted) {
+          const localInq = StorageService.getInquiryById(inquiryId);
+          setInquiry(localInq);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchInquiry();
+    return () => {
+      isMounted = false;
+    };
+  }, [inquiryId]);
 
   const pipelineStages = StorageService.getPipelineStages();
 
