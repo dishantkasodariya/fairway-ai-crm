@@ -28,7 +28,6 @@
     "typescript": "^5.7.3"
   },
   "devDependencies": {
-    "@esbuild/win32-x64": "^0.28.2",
     "nodemon": "^3.1.14",
     "tsx": "^4.19.3"
   }
