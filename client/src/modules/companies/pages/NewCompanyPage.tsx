@@ -384,14 +384,14 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
             {/* Website URL */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">Corporate Website</label>
-              <div className="relative">
-                <Globe className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <div className="relative flex items-center">
+                <Globe className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   value={formData.website}
                   onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                   placeholder="https://company.com"
-                  className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl pl-9.5 pr-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted"
+                  className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl pl-10 pr-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted shadow-2xs"
                 />
               </div>
             </div>
@@ -429,7 +429,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               placeholder="Plot No., GIDC Phase / Estate, Highway Landmark..."
-              className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl p-3 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted resize-none"
+              className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl p-3 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted resize-none shadow-2xs"
             />
           </div>
 
@@ -441,7 +441,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                 value={formData.state}
                 onChange={(e) => setFormData({ ...formData, state: e.target.value })}
                 placeholder="Gujarat"
-                className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted"
+                className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted shadow-2xs"
               />
             </div>
 
@@ -452,7 +452,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                 value={formData.pincode}
                 onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
                 placeholder="392130"
-                className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted"
+                className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted shadow-2xs"
               />
             </div>
           </div>
@@ -480,14 +480,14 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
             {/* Official Phone */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">Official Corporate Phone / Landline</label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <div className="relative flex items-center">
+                <Phone className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="+91 2642 24XXXX"
-                  className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl pl-9.5 pr-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all font-mono placeholder:text-foreground-muted"
+                  className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl pl-10 pr-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all font-mono placeholder:text-foreground-muted shadow-2xs"
                 />
               </div>
             </div>
@@ -495,14 +495,14 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
             {/* Corporate Email */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">Corporate Email Address</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <div className="relative flex items-center">
+                <Mail className="w-4 h-4 text-foreground-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="contact@company.com"
-                  className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl pl-9.5 pr-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted"
+                  className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl pl-10 pr-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted shadow-2xs"
                 />
               </div>
             </div>

@@ -18,6 +18,7 @@ import {
   Phone,
   Mail,
   Loader2,
+  Download,
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
 import { InquiryService } from '@/modules/core/services/inquiryService';
@@ -27,6 +28,7 @@ import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { Inquiry, PropertyMatchResult, Proposal, SiteVisit, PipelineStageKey, Task, Activity } from '@/modules/core/types';
 import { formatINR, formatSqFt, formatDate, formatRelativeDate, getPriorityBadge, getPipelineStageBadge } from '@/modules/core/utils/formatters';
+import { downloadProposalPDF } from '@/modules/core/utils/proposalPdfGenerator';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { Card, CardHeader, CardTitle } from '@/modules/core/components/ui/Card';
@@ -744,8 +746,12 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
                     <div className="flex items-center gap-2">
                       <Button
                         size="xs"
-                        variant="ghost"
-                        onClick={() => success('Proposal PDF', `Downloaded ${prp.documentName}`)}
+                        variant="outline"
+                        leftIcon={<Download className="w-3.5 h-3.5" />}
+                        onClick={() => {
+                          downloadProposalPDF(prp);
+                          success('Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'} for print/download`);
+                        }}
                       >
                         Download PDF
                       </Button>

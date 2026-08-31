@@ -27,6 +27,7 @@ import { Badge } from '@/modules/core/components/ui/Badge';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuLabel } from '@/modules/core/components/ui/DropdownMenu';
 
 import { DataTable7, ColumnConfig } from '@/modules/core/components/ui/data-table-7';
+import { downloadProposalPDF } from '@/modules/core/utils/proposalPdfGenerator';
 
 export interface ProposalListViewProps {
   onNavigateToCompany: (companyId: string) => void;
@@ -203,18 +204,30 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
     {
       key: 'actions',
       label: 'PDF Document',
-      width: 160,
+      width: 170,
       render: (prp) => (
         <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
-            onClick={() => success('Proposal PDF', `Downloaded ${prp.documentName}`)}
-            className="p-1.5 text-foreground-muted hover:text-purple-700 hover:bg-purple-50 rounded transition-colors"
-            title={`Download ${prp.documentName}`}
+            onClick={() => {
+              downloadProposalPDF(prp);
+              success('Generating Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'} for print/download`);
+            }}
+            className="p-1.5 text-fairway-700 dark:text-fairway-300 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/60 rounded-md transition-colors border border-transparent hover:border-purple-200 cursor-pointer shadow-2xs"
+            title={`Download / Print ${prp.documentName || 'Commercial Proposal'}`}
           >
             <Download className="w-3.5 h-3.5" />
           </button>
-          <span className="text-[11px] text-foreground-muted truncate">{prp.documentName}</span>
+          <span
+            onClick={() => {
+              downloadProposalPDF(prp);
+              success('Generating Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'} for print/download`);
+            }}
+            className="text-[11px] text-fairway-700 dark:text-fairway-300 hover:underline cursor-pointer font-medium truncate"
+            title={`Click to view & download ${prp.documentName}`}
+          >
+            {prp.documentName}
+          </span>
         </div>
       ),
     },

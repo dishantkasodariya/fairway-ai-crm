@@ -47,9 +47,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   };
 
 
-  const handleSelectDemoAccount = (demoEmail: string) => {
+  const handleSelectDemoAccount = async (demoEmail: string) => {
     setEmail(demoEmail);
     setPassword('fairway123');
+    setIsLoading(true);
+    try {
+      const result = await login(demoEmail, 'fairway123');
+      setIsLoading(false);
+      if (result.success) {
+        success('Welcome back', result.message || 'Signed in successfully to Fairway workspace.');
+        onLoginSuccess();
+      } else {
+        error('Sign In Failed', result.error || 'Invalid credentials.');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      error('Sign In Error', err.message || 'An unexpected error occurred.');
+    }
   };
 
   return (
@@ -166,18 +180,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <div className="space-y-1 text-xs">
             <button
               type="button"
-              onClick={() => handleSelectDemoAccount('bhavya@gmail.com')}
+              onClick={() => handleSelectDemoAccount('amit@fairway.co.in')}
               className="w-full text-left hover:text-fairway-800 hover:bg-surface p-1.5 rounded transition-colors flex items-center justify-between border border-transparent hover:border-border"
             >
-              <span className="font-mono text-[11px] text-foreground">bhavya@gmail.com</span>
+              <span className="font-mono text-[11px] text-foreground">amit@fairway.co.in</span>
               <span className="font-semibold text-purple-700 text-[10px] bg-purple-100 dark:bg-purple-950/70 dark:text-purple-300 px-1.5 py-0.5 rounded">Super Admin</span>
             </button>
             <button
               type="button"
-              onClick={() => handleSelectDemoAccount('sales@fairway.co.in')}
+              onClick={() => handleSelectDemoAccount('aryan@fairway.co.in')}
               className="w-full text-left hover:text-fairway-800 hover:bg-surface p-1.5 rounded transition-colors flex items-center justify-between border border-transparent hover:border-border"
             >
-              <span className="font-mono text-[11px] text-foreground">sales@fairway.co.in</span>
+              <span className="font-mono text-[11px] text-foreground">aryan@fairway.co.in</span>
               <span className="font-semibold text-emerald-700 text-[10px] bg-emerald-100 dark:bg-emerald-950/70 dark:text-emerald-300 px-1.5 py-0.5 rounded">Sales Lead</span>
             </button>
           </div>

@@ -656,24 +656,24 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
             </Badge>
           </div>
 
-          {/* Preview Table with Solid Background */}
-          <div className="overflow-x-auto border border-border rounded-xl max-h-88 shadow-2xs">
+          {/* Preview Table with Theme System Styling */}
+          <div className="overflow-x-auto border border-border rounded-2xl max-h-[460px] shadow-xs bg-surface">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-surface-muted dark:bg-[#161B22] text-[11px] font-bold uppercase text-foreground-muted sticky top-0 z-10 border-b border-border shadow-xs">
+              <thead className="bg-surface-muted/90 dark:bg-[#161B22] text-[11px] font-bold uppercase tracking-wider text-foreground-muted sticky top-0 z-10 border-b border-border shadow-2xs backdrop-blur-xs">
                 <tr>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22]">#</th>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22]">Company</th>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22]">Site Name</th>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22]">Area Required</th>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22]">Date</th>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22]">Contact Person</th>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22]">Phone</th>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22]">Entered By</th>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22]">Status Remark</th>
-                  <th className="p-3 bg-surface-muted dark:bg-[#161B22] text-right">Validation</th>
+                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">#</th>
+                  <th className="px-3.5 py-3 text-foreground whitespace-nowrap">Company</th>
+                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Site Name</th>
+                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Area Required</th>
+                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Date</th>
+                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Contact Person</th>
+                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Phone</th>
+                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Entered By</th>
+                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Status Remark</th>
+                  <th className="px-3.5 py-3 text-foreground text-right whitespace-nowrap">Validation</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border text-xs">
+              <tbody className="divide-y divide-border/70 text-xs">
                 {parsedRows.map((r, i) => {
                   const companyName = r[columnMapping.companyName]?.toString().trim();
                   const siteName = r[columnMapping.siteName]?.toString().trim();
@@ -682,47 +682,83 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                   const rawDate = r[columnMapping.inquiryDate] ?? r['Date_1'] ?? r['Date'];
                   const formattedDate = formatExcelDate(rawDate);
                   const isMissingCompany = !companyName;
+                  const remarkText = r[columnMapping.remark1CurrentStatus]?.toString().trim();
 
                   return (
-                    <tr key={i} className={isMissingCompany ? 'bg-rose-500/10 text-rose-800 dark:text-rose-300' : 'hover:bg-surface-muted/30'}>
-                      <td className="p-3 font-mono font-bold text-foreground-muted">{i + 1}</td>
-                      <td className="p-3 font-bold text-foreground">{companyName || '⚠️ Missing Company'}</td>
-                      <td className="p-3 text-foreground-muted">{siteName || '—'}</td>
-                      <td className="p-3 font-mono font-bold text-foreground">
+                    <tr
+                      key={i}
+                      className={`transition-colors ${
+                        isMissingCompany
+                          ? 'bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100/50 dark:hover:bg-rose-950/40'
+                          : 'hover:bg-surface-muted/40'
+                      }`}
+                    >
+                      <td className="px-3.5 py-2.5 font-mono font-bold text-foreground-muted text-[11px] whitespace-nowrap">
+                        {i + 1}
+                      </td>
+                      <td className="px-3.5 py-2.5 font-bold text-foreground whitespace-nowrap">
+                        {companyName ? (
+                          <span>{companyName}</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            Missing Company
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-foreground-muted whitespace-nowrap">
+                        {siteName || '—'}
+                      </td>
+                      <td className="px-3.5 py-2.5 font-mono font-bold text-foreground whitespace-nowrap">
                         {area > 0 ? (
                           `${area.toLocaleString()} sq.ft`
                         ) : (
-                          <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800/60">
+                          <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60 shadow-2xs">
                             Open / TBD
                           </span>
                         )}
                       </td>
-                      <td className="p-3 text-foreground-muted font-mono text-[11px]">{formattedDate || '—'}</td>
-                      <td className="p-3 text-foreground-muted">{r[columnMapping.contactName] || '—'}</td>
-                      <td className="p-3 text-foreground-muted font-mono text-[11px]">
+                      <td className="px-3.5 py-2.5 text-foreground-muted font-mono text-[11px] whitespace-nowrap">
+                        {formattedDate || '—'}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-foreground-muted whitespace-nowrap">
+                        {r[columnMapping.contactName] || '—'}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-foreground-muted font-mono text-[11px] whitespace-nowrap">
                         {r[columnMapping.phone] ? String(r[columnMapping.phone]) : '—'}
                       </td>
-                      <td className="p-3 text-foreground-muted">{r[columnMapping.enteredBy] || 'Prapti Shah'}</td>
-                      <td className="p-3 text-foreground-muted max-w-[200px] truncate" title={r[columnMapping.remark1CurrentStatus]}>
-                        {r[columnMapping.remark1CurrentStatus] ? (
-                          <span className="px-2 py-0.5 rounded-full bg-surface-muted border border-border text-[10px] font-semibold truncate block">
-                            {String(r[columnMapping.remark1CurrentStatus])}
+                      <td className="px-3.5 py-2.5 text-foreground-muted whitespace-nowrap">
+                        {r[columnMapping.enteredBy] || 'Prapti Shah'}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-foreground-muted max-w-[220px]">
+                        {remarkText && remarkText.toLowerCase() !== 'active' ? (
+                          <span
+                            className="inline-block max-w-[200px] truncate px-2.5 py-0.5 rounded-md bg-surface-muted/80 text-foreground-muted border border-border/80 text-[11px] font-medium shadow-2xs align-middle"
+                            title={remarkText}
+                          >
+                            {remarkText}
                           </span>
                         ) : (
-                          'Active'
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-muted/50 text-foreground-muted border border-border/60 text-[11px] font-medium shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            Active
+                          </span>
                         )}
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
                         {isMissingCompany ? (
-                          <span className="text-[10px] font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950 px-2 py-0.5 rounded-full border border-rose-300 dark:border-rose-800">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/70 px-2.5 py-1 rounded-md border border-rose-200 dark:border-rose-800/60 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
                             Will Skip
                           </span>
                         ) : area > 0 ? (
-                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/70 px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/60 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                             Valid
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold text-sky-700 dark:text-sky-300 bg-sky-100 dark:bg-sky-950 px-2 py-0.5 rounded-full border border-sky-300 dark:border-sky-800">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/70 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-800/60 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
                             Valid (Open Spec)
                           </span>
                         )}

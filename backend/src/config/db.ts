@@ -193,6 +193,30 @@ export const initDatabase = async () => {
 
     const defaultSeedUsers = [
       [
+        'usr_amit_1',
+        'Amit Patel',
+        'amit@fairway.co.in',
+        defaultPasswordHash,
+        'super_admin',
+        'Executive Leadership',
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        '+91 98250 12345',
+        'Active',
+        16,
+      ],
+      [
+        'usr_aryan_1',
+        'Aryan Verma',
+        'aryan@fairway.co.in',
+        defaultPasswordHash,
+        'sales',
+        'Gujarat Leasing Desk',
+        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+        '+91 98250 67890',
+        'Active',
+        14,
+      ],
+      [
         'usr_bhavya_1',
         'Bhavya Sharma',
         'bhavya@gmail.com',
