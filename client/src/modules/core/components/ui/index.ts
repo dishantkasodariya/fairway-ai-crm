@@ -1,7 +1,6 @@
 export * from './Button';
 export { Input, Textarea } from './Input';
 export * from './Select';
-export * from './Label';
 export * from './Badge';
 export * from './Card';
 export * from './Modal';
@@ -9,7 +8,6 @@ export * from './DropdownMenu';
 export * from './Tabs';
 export * from './Breadcrumbs';
 export * from './Skeleton';
-export * from './EmptyState';
 export * from './avatar';
 export * from './UserAvatar';
 export * from './popover';
