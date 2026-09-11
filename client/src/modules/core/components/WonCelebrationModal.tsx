@@ -48,7 +48,7 @@ export const WonCelebrationModal: React.FC<WonCelebrationModalProps> = ({
         particleCount: 80,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ['#0F6B4F', '#6BBF3E', '#F59E0B', '#10B981'],
+        colors: ['#EB661F', '#F59E0B', '#3B82F6', '#10B981'],
       });
     }
   }, [isOpen]);

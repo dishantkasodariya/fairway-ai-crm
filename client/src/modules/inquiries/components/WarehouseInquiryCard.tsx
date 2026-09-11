@@ -41,7 +41,7 @@ export const WarehouseInquiryCard: React.FC<WarehouseInquiryCardProps> = ({
       <div>
         {/* Top Row: Code Badge + Stage Pill */}
         <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border">
-          <span className="font-mono text-xs font-bold bg-fairway-100 text-fairway-900 px-2.5 py-0.5 rounded border border-fairway-300 dark:bg-fairway-950/70 dark:text-fairway-200 dark:border-fairway-700/60 shadow-xs">
+          <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40 shadow-xs">
             {inquiry.inquiryNumber}
           </span>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${stageStyle.className}`}>
@@ -51,7 +51,7 @@ export const WarehouseInquiryCard: React.FC<WarehouseInquiryCardProps> = ({
 
         {/* Company Name & Requirement */}
         <div className="mt-3">
-          <h3 className="text-base font-bold text-foreground group-hover:text-fairway-700 transition-colors truncate">
+          <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors truncate">
             {inquiry.companyName}
           </h3>
           <p className="text-xs text-foreground-muted line-clamp-2 mt-1 min-h-[32px] leading-relaxed">
@@ -74,7 +74,7 @@ export const WarehouseInquiryCard: React.FC<WarehouseInquiryCardProps> = ({
         {/* Location & Priority */}
         <div className="flex items-center justify-between gap-2 mt-3 text-[11px] text-foreground-muted">
           <div className="flex items-center gap-1 truncate">
-            <MapPin className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
+            <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
             <span className="truncate">{inquiry.location}</span>
           </div>
           <Badge
@@ -90,7 +90,7 @@ export const WarehouseInquiryCard: React.FC<WarehouseInquiryCardProps> = ({
       {/* Bottom Footer: Owner & Follow-up Action */}
       <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-foreground-muted">
         <div className="flex items-center gap-1.5 min-w-0">
-          <div className="w-5 h-5 rounded-full bg-fairway-100 text-fairway-800 font-bold text-[10px] flex items-center justify-center border border-fairway-300 dark:bg-fairway-950/70 dark:text-fairway-300 dark:border-fairway-700/60 shrink-0">
+          <div className="w-5 h-5 rounded-full bg-primary/10 text-primary dark:bg-primary/20 dark:text-white font-bold text-[10px] flex items-center justify-center border border-primary/25 dark:border-primary/40 shrink-0">
             {inquiry.salespersonName?.charAt(0) || 'U'}
           </div>
           <span className="truncate max-w-[110px] font-medium text-foreground">{inquiry.salespersonName}</span>
@@ -102,7 +102,7 @@ export const WarehouseInquiryCard: React.FC<WarehouseInquiryCardProps> = ({
             <span>{formatRelativeDate(inquiry.nextFollowUpDate)}</span>
           </div>
         ) : (
-          <span className="text-fairway-700 dark:text-fairway-400 group-hover:underline flex items-center gap-0.5 font-semibold">
+          <span className="text-primary dark:text-white group-hover:underline flex items-center gap-0.5 font-semibold">
             <span>View Details</span>
             <ChevronRight className="w-3 h-3" />
           </span>
@@ -132,17 +132,17 @@ export const WarehouseInquiryLineCard: React.FC<WarehouseInquiryCardProps> = ({
     >
       {/* Left: Code Badge + Company Name + Requirement */}
       <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className="shrink-0 font-mono text-xs font-bold bg-fairway-100 text-fairway-900 px-2.5 py-1 rounded-lg border border-fairway-300 flex items-center gap-1.5 shadow-xs whitespace-nowrap dark:bg-fairway-950/70 dark:text-fairway-200 dark:border-fairway-700/60">
-          <FileText className="w-3.5 h-3.5 text-fairway-700" />
+        <div className="shrink-0 font-mono text-xs font-bold px-2.5 py-1 rounded-lg border bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40 flex items-center gap-1.5 shadow-xs whitespace-nowrap">
+          <FileText className="w-3.5 h-3.5 text-primary dark:text-white" />
           <span>{inquiry.inquiryNumber}</span>
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 truncate">
-            <span className="font-bold text-sm text-foreground group-hover:text-fairway-700 transition-colors truncate">
+            <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">
               {inquiry.companyName}
             </span>
-            <span className="text-[11px] font-semibold text-fairway-700 bg-fairway-50 px-2 py-0.5 rounded border border-fairway-200 shrink-0 dark:bg-fairway-950/70 dark:text-fairway-300 dark:border-fairway-800/60">
+            <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 shrink-0 dark:bg-primary/20 dark:text-white dark:border-primary/30">
               {formatSqFt(inquiry.requiredAreaSqFt)}
             </span>
           </div>

@@ -12,6 +12,9 @@ import {
   BarChart3,
   UploadCloud,
   Settings,
+  Users,
+  FolderOpen,
+  MessageSquare,
   Search,
   Plus,
   ChevronDown,
@@ -51,13 +54,14 @@ import { useToast } from '@/modules/core/providers/ToastContext';
 
 export type ActiveNavView =
   | 'dashboard'
-  | 'inquiries'
-  | 'inquiry_detail'
-  | 'new_inquiry'
   | 'companies'
   | 'company_detail'
   | 'new_company'
   | 'edit_company'
+  | 'contacts'
+  | 'inquiries'
+  | 'inquiry_detail'
+  | 'new_inquiry'
   | 'pipeline'
   | 'tasks'
   | 'properties'
@@ -66,8 +70,11 @@ export type ActiveNavView =
   | 'property_matching'
   | 'proposals'
   | 'site_visits'
+  | 'documents'
+  | 'communications'
   | 'map'
   | 'reports'
+  | 'analytics'
   | 'import'
   | 'settings'
   | 'profile'
@@ -154,6 +161,8 @@ export const AppShell: React.FC<AppShellProps> = ({
     { id: 'dashboard' as ActiveNavView, label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'inquiries' as ActiveNavView, label: 'Inquiries / Leads', icon: <FileText className="w-4 h-4" /> },
     { id: 'companies' as ActiveNavView, label: 'Companies Master', icon: <Building2 className="w-4 h-4" /> },
+    // Hidden / commented out as requested (do not delete)
+    // { id: 'contacts' as ActiveNavView, label: 'Contacts', icon: <Users className="w-4 h-4" /> },
     { id: 'pipeline' as ActiveNavView, label: 'Pipeline Kanban', icon: <Kanban className="w-4 h-4" /> },
     {
       id: 'tasks' as ActiveNavView,
@@ -165,6 +174,9 @@ export const AppShell: React.FC<AppShellProps> = ({
     { id: 'properties' as ActiveNavView, label: 'Warehouse Parks', icon: <Warehouse className="w-4 h-4" /> },
     { id: 'proposals' as ActiveNavView, label: 'Proposals', icon: <FileSpreadsheet className="w-4 h-4" /> },
     { id: 'site_visits' as ActiveNavView, label: 'Site Visits', icon: <Calendar className="w-4 h-4" /> },
+    // Hidden / commented out as requested (do not delete)
+    // { id: 'documents' as ActiveNavView, label: 'Documents', icon: <FolderOpen className="w-4 h-4" /> },
+    // { id: 'communications' as ActiveNavView, label: 'Communications', icon: <MessageSquare className="w-4 h-4" /> },
     { id: 'map' as ActiveNavView, label: 'India Corridors Map', icon: <MapIcon className="w-4 h-4" /> },
     { id: 'import' as ActiveNavView, label: 'Excel/CSV Import', icon: <UploadCloud className="w-4 h-4" /> },
     { id: 'reports' as ActiveNavView, label: 'Analytics & Reports', icon: <BarChart3 className="w-4 h-4" /> },
@@ -244,8 +256,8 @@ export const AppShell: React.FC<AppShellProps> = ({
                 <div className="truncate">
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-black tracking-tight text-foreground leading-none">FAIRWAY</span>
-                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-accent-100 text-accent-900 border border-accent-300 dark:bg-accent-950/70 dark:text-accent-300 dark:border-accent-800/60 shadow-2xs">
-                      AI CRM
+                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-muted text-foreground-muted border border-border shadow-2xs">
+                      CRM
                     </span>
                   </div>
                 </div>
@@ -268,7 +280,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         </div>
 
         {/* Navigation Items */}
-        <div className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
+        <div className="flex-1 overflow-y-auto py-3 px-3 space-y-1">
           {navItems.map((item) => {
             const isActive =
               currentView === item.id ||
@@ -503,7 +515,8 @@ export const AppShell: React.FC<AppShellProps> = ({
 
           {/* Right: Quick actions, Notifications, Role Switcher */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-            {/* Quick New Action Dropdown */}
+            {/* Quick New Action Dropdown - Hidden / commented out as requested per reference image (do not delete) */}
+            {/*
             <div className="relative">
               <button
                 onClick={() => setIsQuickMenuOpen(!isQuickMenuOpen)}
@@ -551,6 +564,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                 </div>
               )}
             </div>
+            */}
 
             {/* Quick Dark / Light Mode Toggle Button */}
             <TooltipProvider delayDuration={150}>
@@ -605,7 +619,13 @@ export const AppShell: React.FC<AppShellProps> = ({
 
 
         {/* Page Content Body (Responsive Mobile/Tablet/Laptop Container) */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background p-3 sm:p-5 lg:p-8 min-w-0">
+        <main
+          className={`flex-1 min-w-0 bg-background ${
+            currentView === 'pipeline'
+              ? 'overflow-hidden p-2 sm:p-3 lg:p-4 flex flex-col h-[calc(100vh-61px)]'
+              : 'overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-8'
+          }`}
+        >
           {children}
         </main>
       </div>

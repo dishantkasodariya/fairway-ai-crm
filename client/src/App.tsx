@@ -9,7 +9,6 @@ import { AppShell, ActiveNavView } from '@/modules/core/ui/AppShell';
 
 // Auth Pages
 import { LoginPage } from '@/modules/auth/pages/LoginPage';
-import { SignUpPage } from '@/modules/auth/pages/SignUpPage';
 
 // Feature Pages
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
@@ -26,6 +25,9 @@ import { PropertyDetailPage } from '@/modules/properties/pages/PropertyDetailPag
 import { NewPropertyPage } from '@/modules/properties/pages/NewPropertyPage';
 import { ProposalsPage } from '@/modules/proposals/pages/ProposalsPage';
 import { SiteVisitsPage } from '@/modules/site-visits/pages/SiteVisitsPage';
+import { ContactsPage } from '@/modules/contacts/pages/ContactsPage';
+import { DocumentsPage } from '@/modules/documents/pages/DocumentsPage';
+import { CommunicationsPage } from '@/modules/communications/pages/CommunicationsPage';
 import { MapPage } from '@/modules/map/pages/MapPage';
 import { ImportWizardPage } from '@/modules/import-export/pages/ImportWizardPage';
 import { ReportsPage } from '@/modules/reports/pages/ReportsPage';
@@ -33,12 +35,11 @@ import { SettingsPage } from '@/modules/settings/pages/SettingsPage';
 import { ProfilePage } from '@/modules/profile/pages/ProfilePage';
 import { NotFoundPage } from '@/modules/core/pages/NotFoundPage';
 
-
 import { StorageService } from '@/modules/core/services/storageService';
 
 const AppRouter: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-  const { activeView, selectedEntityId, navigate, pathname, isAuthRoute, authView } = useRouter();
+  const { isAuthenticated, logout } = useAuth();
+  const { activeView, selectedEntityId, navigate, pathname } = useRouter();
 
   // Global Quick Action State
   const [defaultInquiryCompanyId, setDefaultInquiryCompanyId] = useState<string | undefined>(undefined);
@@ -47,12 +48,12 @@ const AppRouter: React.FC = () => {
     navigate({ view, id: entityId });
   };
 
-  const openNewInquiryForCompany = (companyId: string) => {
+  const openNewInquiryForCompany = (companyId?: string) => {
     setDefaultInquiryCompanyId(companyId);
     handleNavigate('new_inquiry');
   };
 
-  // Redirect root URL '/' to '/dashboard' if authenticated or '/login' if not authenticated
+  // Route redirection handling
   useEffect(() => {
     if (pathname === '/' || pathname === '') {
       if (isAuthenticated) {
@@ -60,29 +61,21 @@ const AppRouter: React.FC = () => {
       } else {
         navigate('/login', true);
       }
+    } else if (isAuthenticated && (pathname === '/login' || pathname === '/signup')) {
+      // If already authenticated and trying to view /login or /signup, go straight to dashboard
+      navigate('/dashboard', true);
     }
   }, [isAuthenticated, pathname]);
 
   // Handle unknown/not-found routes for unauthenticated users
-  if (!isAuthenticated && activeView === 'not_found' && pathname !== '/login' && pathname !== '/signup') {
+  if (!isAuthenticated && activeView === 'not_found' && pathname !== '/login') {
     return <NotFoundPage onGoHome={() => navigate('/login')} />;
   }
 
-  // Auth routes (/login, /signup) or Unauthenticated: Render ONLY Auth Pages (No AppShell, No Dashboard)
-  if (isAuthRoute || pathname === '/login' || pathname === '/signup' || !isAuthenticated) {
-    if (pathname === '/signup' || authView === 'signup') {
-      return (
-        <SignUpPage
-          onNavigateToLogin={() => navigate('/login')}
-          onSignUpSuccess={() => {
-            navigate('/dashboard');
-          }}
-        />
-      );
-    }
+  // Unauthenticated or visiting /login: Render ONLY Login Page
+  if (!isAuthenticated || pathname === '/login' || pathname === '/signup') {
     return (
       <LoginPage
-        onNavigateToSignUp={() => navigate('/signup')}
         onLoginSuccess={() => {
           navigate('/dashboard');
         }}
@@ -248,7 +241,27 @@ const AppRouter: React.FC = () => {
           />
         );
 
+      case 'contacts':
+        return (
+          <ContactsPage
+            onSelectCompany={(id) => handleNavigate('company_detail', id)}
+            onOpenNewInquiry={openNewInquiryForCompany}
+          />
+        );
+
+      case 'documents':
+        return (
+          <DocumentsPage
+            onSelectCompany={(id) => handleNavigate('company_detail', id)}
+            onSelectInquiry={(id) => handleNavigate('inquiry_detail', id)}
+          />
+        );
+
+      case 'communications':
+        return <CommunicationsPage />;
+
       case 'reports':
+      case 'analytics':
         return <ReportsPage />;
 
       case 'settings':
@@ -274,7 +287,10 @@ const AppRouter: React.FC = () => {
       }}
       onOpenNewCompany={() => handleNavigate('new_company')}
       onOpenNewTask={() => handleNavigate('tasks')}
-      onSignOut={() => navigate('/login')}
+      onSignOut={() => {
+        logout();
+        navigate('/login');
+      }}
     >
       {renderActiveView()}
     </AppShell>

@@ -31,7 +31,7 @@ L.Icon.Default.mergeOptions({
 // Custom HTML Icons for Fairway Properties and Client Facilities
 const propertyIcon = L.divIcon({
   className: 'custom-property-marker',
-  html: `<div style="background:var(--fw-600, #0F6B4F); color:white; width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.3);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/></svg></div>`,
+  html: `<div style="background:var(--fw-600, #EB661F); color:white; width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.3);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/></svg></div>`,
   iconSize: [34, 34],
   iconAnchor: [17, 34],
   popupAnchor: [0, -34],

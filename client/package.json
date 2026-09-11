@@ -40,6 +40,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@esbuild/win32-x64": "0.25.12",
     "@types/canvas-confetti": "^1.9.0",
     "@types/leaflet": "^1.9.16",
     "@types/node": "^22.13.5",

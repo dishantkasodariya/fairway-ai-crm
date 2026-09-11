@@ -29,11 +29,16 @@ import {
   RotateCcw,
   ChevronDown,
   X,
+  MoreHorizontal,
+  Edit3,
+  Trash2,
+  Eye,
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -47,12 +52,15 @@ import {
 import { StorageService } from '@/modules/core/services/storageService';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
+import { useToast } from '@/modules/core/providers/ToastContext';
 import { cn } from '@/modules/core/lib/utils';
 import { Inquiry, PipelineStageKey } from '@/modules/core/types';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { Card } from '@/modules/core/components/ui/Card';
+import { Modal } from '@/modules/core/components/ui/Modal';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
+import { EditInquiryModal } from '../components/EditInquiryModal';
 import {
   WarehouseInquiryCard,
   WarehouseInquiryLineCard,
@@ -217,6 +225,8 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
+  const { success: toastSuccess, error: toastError } = useToast();
+
   // Controlled Table Grid State (Persisted)
   const [pagination, setPagination] = useState<PaginationState>(() => initialTableState.pagination || {
     pageIndex: 0,
@@ -225,17 +235,40 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
   const [sorting, setSorting] = useState<SortingState>(() => initialTableState.sorting || []);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityMap>(() => initialTableState.columnVisibility || {});
   const [columnPinning, setColumnPinning] = useState<ColumnPinningMap>(
-    () => ({
-      start: Array.isArray(initialTableState.columnPinning?.start)
-        ? initialTableState.columnPinning.start
-        : ['inquiryNumber'],
-      end: Array.isArray(initialTableState.columnPinning?.end)
-        ? initialTableState.columnPinning.end
-        : ['actions'],
-    })
+    () => {
+      const savedStart = (initialTableState.columnPinning?.start || []).filter((col: string) => col !== 'select');
+      return {
+        start: savedStart.length > 0 ? savedStart : ['actions', 'inquiryNumber'],
+        end: Array.isArray(initialTableState.columnPinning?.end) ? initialTableState.columnPinning.end : [],
+      };
+    }
   );
   const [columnOrder, setColumnOrder] = useState<string[]>(() => initialTableState.columnOrder || []);
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>(() => initialTableState.columnSizing || {});
+
+  // Action Modals State
+  const [inquiryToEdit, setInquiryToEdit] = useState<Inquiry | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [inquiryToDelete, setInquiryToDelete] = useState<Inquiry | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const executeDeleteInquiry = async () => {
+    if (!inquiryToDelete) return;
+    setIsDeleting(true);
+    try {
+      await InquiryService.deleteInquiry(inquiryToDelete.id);
+      StorageService.deleteInquiry(inquiryToDelete.id);
+      toastSuccess('Inquiry Deleted', `Removed ${inquiryToDelete.inquiryNumber} (${inquiryToDelete.companyName}) from CRM.`);
+      setIsDeleteModalOpen(false);
+      setInquiryToDelete(null);
+      loadInquiries();
+    } catch (err: any) {
+      toastError('Delete Failed', err.message || 'Failed to delete inquiry');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Persist View Mode
   useEffect(() => {
@@ -501,12 +534,75 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
   });
 
   const pagedInquiries = useMemo(() => {
+    // If backend already paginated (server returned single page where totalCount > inquiries.length)
+    if (totalCount > inquiries.length && inquiries.length <= pagination.pageSize && filteredInquiries.length === inquiries.length) {
+      return filteredInquiries;
+    }
     const start = pagination.pageIndex * pagination.pageSize;
     return filteredInquiries.slice(start, start + pagination.pageSize);
-  }, [filteredInquiries, pagination.pageIndex, pagination.pageSize]);
+  }, [filteredInquiries, inquiries.length, pagination.pageIndex, pagination.pageSize, totalCount]);
 
   const inquiryColumns = useMemo<ColumnDef<DataGridFeatures, Inquiry>[]>(
     () => [
+      {
+        id: 'actions',
+        header: () => <span className="text-[11px] font-semibold text-foreground-muted pl-1 sr-only">Actions</span>,
+        cell: ({ row }) => {
+          const inq = row.original;
+          return (
+            <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                    title="Actions"
+                    aria-label="Actions"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44 bg-surface border border-border shadow-dialog z-50">
+                  <DropdownMenuItem
+                    onClick={() => onSelectInquiry(inq.id)}
+                    className="flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-fairway-600" />
+                    <span>View Inquiry</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setInquiryToEdit(inq);
+                      setIsEditModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Edit Inquiry</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setInquiryToDelete(inq);
+                      setIsDeleteModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Inquiry</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+        size: 55,
+        minSize: 50,
+        maxSize: 65,
+        enableSorting: false,
+        enableResizing: false,
+        enablePinning: true,
+      },
       {
         accessorKey: 'inquiryNumber',
         id: 'inquiryNumber',
@@ -515,7 +611,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
           <button
             type="button"
             onClick={() => onSelectInquiry(row.original.id)}
-            className="font-mono font-bold text-fairway-800 dark:text-fairway-300 bg-fairway-50 dark:bg-fairway-950/70 px-2.5 py-1 rounded-md border border-fairway-200 dark:border-fairway-800/60 hover:bg-fairway-100 dark:hover:bg-fairway-900/60 hover:border-fairway-300 transition-colors text-xs text-left cursor-pointer inline-flex items-center"
+            className="font-mono font-bold text-primary dark:text-white bg-primary/10 dark:bg-primary/20 px-2.5 py-1 rounded-full border border-primary/25 dark:border-primary/40 hover:bg-primary/20 dark:hover:bg-primary/30 transition-colors text-xs text-left cursor-pointer inline-flex items-center shadow-xs"
           >
             {row.original.inquiryNumber}
           </button>
@@ -638,8 +734,8 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
   const table = useTable({
     features: dataGridFeatures,
     columns: inquiryColumns,
-    data: filteredInquiries,
-    pageCount: Math.ceil((totalCount || filteredInquiries.length || 0) / (pagination.pageSize || 10)),
+    data: pagedInquiries,
+    pageCount: Math.max(1, Math.ceil(filteredInquiries.length / (pagination.pageSize || 10))),
     manualPagination: true,
     manualSorting: true,
     getRowId: (row: Inquiry) => row.id,
@@ -671,42 +767,128 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     return new Date(i.nextFollowUpDate) < new Date(new Date().toDateString());
   }).length;
 
-  const exportCSV = () => {
-    const headers = [
-      'Inquiry Number',
-      'Company Name',
-      'Requirement',
-      'Required Area (sq.ft)',
-      'Location',
-      'Corridor',
-      'Stage',
-      'Owner',
-      'Monthly Budget (INR)',
-      'Priority',
-      'Next Follow-up',
-    ];
-    const rows = filteredInquiries.map((i) => [
-      `"${i.inquiryNumber}"`,
-      `"${i.companyName}"`,
-      `"${i.requirement.replace(/"/g, '""')}"`,
-      `"${i.requiredAreaSqFt}"`,
-      `"${i.location}"`,
-      `"${i.targetCorridor || ''}"`,
-      `"${i.stage}"`,
-      `"${i.salespersonName}"`,
-      `"${i.budgetMonthlyINR}"`,
-      `"${i.priority}"`,
-      `"${i.nextFollowUpDate || ''}"`,
-    ]);
+  const [isExporting, setIsExporting] = useState(false);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Fairway_CRM_Inquiries_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const exportCSV = async () => {
+    setIsExporting(true);
+    try {
+      // 1. Fetch all inquiries from backend without pagination limits
+      let allData: Inquiry[] = [];
+      try {
+        const res = await InquiryService.getInquiries({
+          search: debouncedSearchQuery || undefined,
+          stage: stageFilter !== 'all' ? stageFilter : undefined,
+          corridor: corridorFilter !== 'all' ? corridorFilter : undefined,
+          pageNumber: 1,
+          pageSize: 10000,
+        });
+        if (res.success && res.data && res.data.length > 0) {
+          allData = res.data;
+        }
+      } catch {
+        // Fallback to local
+      }
+
+      // 2. If backend didn't return all data, load from local storage
+      if (allData.length === 0) {
+        allData = StorageService.getInquiries();
+      }
+
+      // 3. Apply active filters to full dataset
+      const q = searchQuery.toLowerCase().trim();
+      const exportList = allData.filter((inq) => {
+        const matchesQuery =
+          !q ||
+          inq.inquiryNumber?.toLowerCase().includes(q) ||
+          inq.companyName?.toLowerCase().includes(q) ||
+          inq.location?.toLowerCase().includes(q) ||
+          inq.requirement?.toLowerCase().includes(q) ||
+          (inq.contactName && inq.contactName.toLowerCase().includes(q));
+
+        const matchesStage = stageFilter === 'all' || inq.stage === stageFilter;
+        const matchesPriority = priorityFilter === 'all' || inq.priority === priorityFilter;
+        const matchesOwner = ownerFilter === 'all' || inq.salespersonId === ownerFilter;
+        const matchesCorridor = corridorFilter === 'all' || (inq.targetCorridor || inq.location) === corridorFilter;
+
+        const matchesArea =
+          areaFilter === 'all' ||
+          (areaFilter === 'under_25k' && (inq.requiredAreaSqFt || 0) < 25000) ||
+          (areaFilter === '25k_50k' && (inq.requiredAreaSqFt || 0) >= 25000 && (inq.requiredAreaSqFt || 0) <= 50000) ||
+          (areaFilter === '50k_100k' && (inq.requiredAreaSqFt || 0) > 50000 && (inq.requiredAreaSqFt || 0) <= 100000) ||
+          (areaFilter === 'over_100k' && (inq.requiredAreaSqFt || 0) > 100000);
+
+        const matchesBudget =
+          budgetFilter === 'all' ||
+          (budgetFilter === 'under_5L' && (inq.budgetMonthlyINR || 0) < 500000) ||
+          (budgetFilter === '5L_15L' && (inq.budgetMonthlyINR || 0) >= 500000 && (inq.budgetMonthlyINR || 0) <= 1500000) ||
+          (budgetFilter === '15L_30L' && (inq.budgetMonthlyINR || 0) > 1500000 && (inq.budgetMonthlyINR || 0) <= 3000000) ||
+          (budgetFilter === 'over_30L' && (inq.budgetMonthlyINR || 0) > 3000000);
+
+        const matchesIndustry =
+          industryFilter === 'all' ||
+          (inq.industry && inq.industry.toLowerCase().includes(industryFilter.toLowerCase())) ||
+          (inq.requirement && inq.requirement.toLowerCase().includes(industryFilter.toLowerCase()));
+
+        return matchesQuery && matchesStage && matchesPriority && matchesOwner && matchesCorridor && matchesArea && matchesBudget && matchesIndustry;
+      });
+
+      const finalRecords = exportList.length > 0 ? exportList : filteredInquiries;
+
+      const headers = [
+        'Inquiry Number',
+        'Customer Company',
+        'Contact Person',
+        'Phone',
+        'Email',
+        'Requirement / Specs',
+        'Required Area (sq.ft)',
+        'Location',
+        'Target Corridor',
+        'Industry',
+        'Stage',
+        'Owner',
+        'Monthly Budget (INR)',
+        'Priority',
+        'Next Action',
+        'Next Follow-up Date',
+        'Created Date',
+      ];
+
+      const rows = finalRecords.map((i) => [
+        `"${(i.inquiryNumber || '').replace(/"/g, '""')}"`,
+        `"${(i.companyName || '').replace(/"/g, '""')}"`,
+        `"${(i.contactName || '').replace(/"/g, '""')}"`,
+        `"${(i.contactPhone || '').replace(/"/g, '""')}"`,
+        `"${(i.contactEmail || '').replace(/"/g, '""')}"`,
+        `"${(i.requirement || '').replace(/"/g, '""')}"`,
+        `"${i.requiredAreaSqFt || 0}"`,
+        `"${(i.location || '').replace(/"/g, '""')}"`,
+        `"${(i.targetCorridor || '').replace(/"/g, '""')}"`,
+        `"${(i.industry || '').replace(/"/g, '""')}"`,
+        `"${(i.stage || '').replace(/"/g, '""')}"`,
+        `"${(i.salespersonName || '').replace(/"/g, '""')}"`,
+        `"${i.budgetMonthlyINR || 0}"`,
+        `"${(i.priority || '').replace(/"/g, '""')}"`,
+        `"${(i.nextAction || '').replace(/"/g, '""')}"`,
+        `"${(i.nextFollowUpDate || '').replace(/"/g, '""')}"`,
+        `"${(i.createdAt ? new Date(i.createdAt).toISOString().split('T')[0] : '').replace(/"/g, '""')}"`,
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Fairway_CRM_Inquiries_All_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export CSV', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -724,8 +906,14 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" variant="outline" onClick={exportCSV} leftIcon={<Download className="w-3.5 h-3.5" />}>
-            Export CSV
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={exportCSV}
+            disabled={isExporting}
+            leftIcon={isExporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+          >
+            {isExporting ? 'Exporting...' : 'Export CSV'}
           </Button>
           <Button size="sm" variant="outline" onClick={onOpenImport} leftIcon={<UploadCloud className="w-3.5 h-3.5" />}>
             Import
@@ -1030,7 +1218,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                 </DataGridContainer>
               </Card>
             )}
-            {filteredInquiries.length > 0 && <DataGridPagination sizes={[10, 20, 50, 100]} />}
+            {filteredInquiries.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
           </div>
         </DataGrid>
       ) : viewMode === 'line' ? (
@@ -1066,7 +1254,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             )}
 
             {/* Pagination for Single-Line View */}
-            {pagedInquiries.length > 0 && <DataGridPagination sizes={[10, 20, 50, 100]} />}
+            {pagedInquiries.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
           </div>
         </DataGrid>
       ) : (
@@ -1102,7 +1290,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             )}
 
             {/* Pagination for Card View */}
-            {pagedInquiries.length > 0 && <DataGridPagination sizes={[10, 20, 50, 100]} />}
+            {pagedInquiries.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
           </div>
         </DataGrid>
       )}
@@ -1250,6 +1438,77 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Inquiry Modal */}
+      {isEditModalOpen && inquiryToEdit && (
+        <EditInquiryModal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setInquiryToEdit(null);
+          }}
+          inquiry={inquiryToEdit}
+          onSuccess={() => {
+            setIsEditModalOpen(false);
+            setInquiryToEdit(null);
+            loadInquiries();
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && inquiryToDelete && (
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setInquiryToDelete(null);
+          }}
+          title={
+            <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+              <AlertTriangle className="w-5 h-5" />
+              <span className="font-bold">Delete Inquiry</span>
+            </div>
+          }
+          description="Are you sure you want to permanently delete this inquiry record?"
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 rounded-xl space-y-1.5 text-foreground">
+              <p className="font-semibold text-rose-900 dark:text-rose-200">
+                You are deleting: <span className="font-bold underline">{inquiryToDelete.inquiryNumber}</span> ({inquiryToDelete.companyName})
+              </p>
+              <p className="text-[11px] text-foreground-muted">
+                This will remove the inquiry record ({inquiryToDelete.requirement}) from the active pipeline and local CRM database. This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setInquiryToDelete(null);
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={executeDeleteInquiry}
+                disabled={isDeleting}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Inquiry'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

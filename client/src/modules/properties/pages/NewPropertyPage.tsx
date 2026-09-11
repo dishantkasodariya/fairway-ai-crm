@@ -345,7 +345,7 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                 size="sm"
                 className="bg-sky-600 hover:bg-sky-700 text-white font-semibold shadow-xs"
                 onClick={() => handleApplyTemplate('grade_a')}
-                leftIcon={<Sparkles className="w-3.5 h-3.5" />}
+                leftIcon={<Layers className="w-3.5 h-3.5" />}
               >
                 Apply Template
               </Button>
@@ -367,7 +367,7 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
         {/* Quick Template Switcher Chips */}
         <div className="flex items-center gap-2 flex-wrap text-xs bg-surface border border-border rounded-xl p-2.5 shadow-subtle">
           <span className="text-foreground-muted font-semibold px-1 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-sky-500" />
+            <Layers className="w-3.5 h-3.5 text-fairway-600" />
             Quick Presets:
           </span>
           <button

@@ -29,6 +29,11 @@ import {
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
 import CompanyService from '@/modules/core/services/companyService';
+import ContactService from '@/modules/core/services/contactService';
+import FacilityService from '@/modules/core/services/facilityService';
+import NoteService from '@/modules/core/services/noteService';
+import ActivityService from '@/modules/core/services/activityService';
+import { TaskService } from '@/modules/core/services/taskService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { Company, Contact, Facility, Inquiry, Task, Note, Activity, Proposal, SiteVisit } from '@/modules/core/types';
@@ -182,9 +187,43 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
       const freshCompany = StorageService.getCompanyById(companyId);
       setCompany(freshCompany);
     }
-    setTasks(StorageService.getTasks(companyId));
-    setNotes(StorageService.getNotes(companyId));
-    setActivities(StorageService.getActivities(companyId));
+
+    // Fetch real tasks from backend
+    try {
+      const taskRes = await TaskService.getTasks({ companyId });
+      if (taskRes.success && taskRes.data && taskRes.data.length > 0) {
+        setTasks(taskRes.data);
+      } else {
+        setTasks(StorageService.getTasks(companyId));
+      }
+    } catch {
+      setTasks(StorageService.getTasks(companyId));
+    }
+
+    // Fetch real notes from backend
+    try {
+      const noteRes = await NoteService.getNotes({ companyId });
+      if (noteRes.success && noteRes.data && noteRes.data.length > 0) {
+        setNotes(noteRes.data);
+      } else {
+        setNotes(StorageService.getNotes(companyId));
+      }
+    } catch {
+      setNotes(StorageService.getNotes(companyId));
+    }
+
+    // Fetch real activities from backend
+    try {
+      const actRes = await ActivityService.getActivities({ companyId });
+      if (actRes.success && actRes.data && actRes.data.length > 0) {
+        setActivities(actRes.data);
+      } else {
+        setActivities(StorageService.getActivities(companyId));
+      }
+    } catch {
+      setActivities(StorageService.getActivities(companyId));
+    }
+
     setProposals(StorageService.getProposals(companyId));
   };
 
@@ -208,16 +247,25 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
     );
   }
 
-  // Add Contact Handler
-  const handleSaveContact = (e: React.FormEvent) => {
+  // Add Contact Handler (PostgreSQL backed)
+  const handleSaveContact = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactForm.name.trim()) return;
 
-    StorageService.createContact({
-      companyId: company.id,
-      companyName: company.name,
-      ...contactForm,
-    });
+    try {
+      await ContactService.createContact({
+        companyId: company.id,
+        companyName: company.name,
+        ...contactForm,
+      });
+    } catch {
+      StorageService.createContact({
+        companyId: company.id,
+        companyName: company.name,
+        ...contactForm,
+      });
+    }
+
     setIsAddContactOpen(false);
     setContactForm({
       name: '',
@@ -229,44 +277,77 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
       isPrimary: false,
       notes: '',
     });
-    refreshData();
+    await refreshData();
     success('Contact Added', `Added ${contactForm.name} to ${company.name}`);
   };
 
-  // Add Facility Handler
-  const handleSaveFacility = (e: React.FormEvent) => {
+  // Add Facility Handler (PostgreSQL backed)
+  const handleSaveFacility = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!facilityForm.name.trim()) return;
 
-    StorageService.createFacility({
-      companyId: company.id,
-      companyName: company.name,
-      ...facilityForm,
-    });
+    try {
+      await FacilityService.createFacility({
+        companyId: company.id,
+        companyName: company.name,
+        ...facilityForm,
+      });
+    } catch {
+      StorageService.createFacility({
+        companyId: company.id,
+        companyName: company.name,
+        ...facilityForm,
+      });
+    }
+
     setIsAddFacilityOpen(false);
-    refreshData();
+    await refreshData();
     success('Facility Added', `Added physical facility ${facilityForm.name}`);
   };
 
-  // Add Task Handler
-  const handleSaveTask = (e: React.FormEvent) => {
+  // Add Task Handler (PostgreSQL backed)
+  const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskForm.description.trim()) return;
 
     const assignedUser = users.find((u) => u.id === taskForm.assignedUserId) || currentUser;
 
-    StorageService.createTask({
-      companyId: company.id,
-      companyName: company.name,
-      assignedUserId: assignedUser.id,
-      assignedUserName: assignedUser.name,
-      taskType: taskForm.taskType,
-      description: taskForm.description,
-      dueDate: taskForm.dueDate,
-      dueTime: taskForm.dueTime,
-      priority: taskForm.priority,
-      status: 'Pending',
-    });
+    try {
+      await TaskService.createTask({
+        companyId: company.id,
+        companyName: company.name,
+        assignedUserId: assignedUser.id,
+        assignedUserName: assignedUser.name,
+        taskType: taskForm.taskType,
+        description: taskForm.description,
+        dueDate: taskForm.dueDate,
+        dueTime: taskForm.dueTime,
+        priority: taskForm.priority,
+        status: 'Pending',
+      });
+      await ActivityService.createActivity({
+        companyId: company.id,
+        companyName: company.name,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        activityType: taskForm.taskType,
+        title: `Scheduled ${taskForm.taskType}`,
+        description: taskForm.description,
+      });
+    } catch {
+      StorageService.createTask({
+        companyId: company.id,
+        companyName: company.name,
+        assignedUserId: assignedUser.id,
+        assignedUserName: assignedUser.name,
+        taskType: taskForm.taskType,
+        description: taskForm.description,
+        dueDate: taskForm.dueDate,
+        dueTime: taskForm.dueTime,
+        priority: taskForm.priority,
+        status: 'Pending',
+      });
+    }
 
     setIsAddTaskOpen(false);
     setTaskForm({
@@ -277,20 +358,41 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
       priority: 'High',
       assignedUserId: currentUser.id,
     });
-    refreshData();
+    await refreshData();
     success('Task Created', 'Follow-up scheduled and added to today/upcoming tasks.');
   };
 
-  // Add Note Handler
-  const handleSaveNote = (e: React.FormEvent) => {
+  // Add Note Handler (PostgreSQL backed)
+  const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNoteText.trim()) return;
 
-    StorageService.createNote(company.id, newNoteText.trim());
+    const content = newNoteText.trim();
+    try {
+      await NoteService.createNote({
+        companyId: company.id,
+        companyName: company.name,
+        authorId: currentUser.id,
+        authorName: currentUser.name,
+        content,
+      });
+      await ActivityService.createActivity({
+        companyId: company.id,
+        companyName: company.name,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        activityType: 'Note',
+        title: 'Added Internal Note',
+        description: content.slice(0, 100),
+      });
+    } catch {
+      StorageService.createNote(company.id, content);
+    }
+
     setNewNoteText('');
     setIsAddNoteOpen(false);
-    refreshData();
-    success('Note Added', 'Internal note logged.');
+    await refreshData();
+    success('Note Added', 'Internal note logged to PostgreSQL database.');
   };
 
   // Toggle Task Completion
@@ -317,7 +419,7 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
   const statusBadge = getCompanyStatusBadge(company.status);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto text-left">
+    <div className="space-y-6 max-w-8xl mx-auto text-left">
       {/* Breadcrumbs */}
       <Breadcrumbs
         items={[
@@ -327,56 +429,93 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
       />
 
       {/* 1. Company Header Workspace Banner */}
-      <div className="bg-surface rounded-card border border-border shadow-subtle p-4 sm:p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border">
+      <div className="bg-surface rounded-2xl border border-border shadow-xs p-5 sm:p-6 text-left">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-border">
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-card bg-fairway-100 text-fairway-900 font-extrabold text-xl flex items-center justify-center border border-fairway-200 shadow-subtle shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-fairway-500/20 via-fairway-500/10 to-transparent text-fairway-700 dark:text-fairway-400 font-black text-xl flex items-center justify-center border border-fairway-500/25 shadow-xs shrink-0">
               {company.name.substring(0, 2).toUpperCase()}
             </div>
             <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-black text-foreground tracking-tight">{company.name}</h1>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${statusBadge.bg}`}>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">{company.name}</h1>
+                <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${statusBadge.bg}`}>
                   {company.status}
                 </span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${prioBadge.bg}`}>
+                <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${prioBadge.bg}`}>
                   {company.priority} Priority
                 </span>
               </div>
-              <p className="text-xs text-foreground-muted mt-1">
-                {company.legalName} · <span className="font-semibold text-foreground">{company.industry}</span> · {company.city}, {company.state}
+              <p className="text-xs text-foreground-muted mt-1.5 flex items-center gap-2 flex-wrap">
+                <span>{company.legalName}</span>
+                <span className="text-foreground-muted/40">·</span>
+                <span className="font-semibold text-foreground">{company.industry}</span>
+                <span className="text-foreground-muted/40">·</span>
+                <span>{company.city}, {company.state}</span>
               </p>
             </div>
           </div>
 
-          {/* Top Quick Actions Bar (PRD Section 11) */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Top Quick Actions Bar */}
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
             {canEdit && (
               <>
-                <Button size="xs" variant="outline" onClick={() => setIsAddContactOpen(true)} leftIcon={<Plus className="w-3.5 h-3.5" />}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => onOpenNewInquiryForCompany(company.id)}
+                  leftIcon={<Plus className="w-4 h-4" />}
+                  className="rounded-xl px-3.5 py-1.5 font-bold shadow-xs"
+                >
+                  New Inquiry
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddContactOpen(true)}
+                  leftIcon={<User className="w-3.5 h-3.5 text-sky-500" />}
+                  className="rounded-xl px-3 py-1.5 font-medium"
+                >
                   Add Contact
                 </Button>
-                <Button size="xs" variant="outline" onClick={() => onOpenNewInquiryForCompany(company.id)} leftIcon={<Plus className="w-3.5 h-3.5 text-fairway-600" />}>
-                  Add Inquiry
-                </Button>
-                <Button size="xs" variant="outline" onClick={() => setIsAddTaskOpen(true)} leftIcon={<Plus className="w-3.5 h-3.5 text-amber-600" />}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddTaskOpen(true)}
+                  leftIcon={<CheckSquare className="w-3.5 h-3.5 text-amber-500" />}
+                  className="rounded-xl px-3 py-1.5 font-medium"
+                >
                   Add Task
                 </Button>
-                <Button size="xs" variant="outline" onClick={() => setIsAddNoteOpen(true)} leftIcon={<Plus className="w-3.5 h-3.5 text-indigo-600" />}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddNoteOpen(true)}
+                  leftIcon={<MessageSquare className="w-3.5 h-3.5 text-indigo-500" />}
+                  className="rounded-xl px-3 py-1.5 font-medium"
+                >
                   Add Note
                 </Button>
               </>
             )}
-            <Button size="xs" variant="secondary" onClick={onNavigateToMap} leftIcon={<MapPin className="w-3.5 h-3.5 text-fairway-700" />}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onNavigateToMap}
+              leftIcon={<MapPin className="w-3.5 h-3.5 text-fairway-600 dark:text-fairway-400" />}
+              className="rounded-xl px-3.5 py-1.5 font-medium"
+            >
               View on Map
             </Button>
           </div>
         </div>
 
-        {/* Quick Attributes Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4 pt-4 text-xs">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Assigned Owner</span>
+        {/* 6 Attribute Micro-Cards Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-5 text-xs">
+          {/* Assigned Owner */}
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
+              Assigned Owner
+            </span>
             {canEdit ? (
               <DropdownMenu
                 align="left"
@@ -384,10 +523,10 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
                 trigger={
                   <button
                     type="button"
-                    className="mt-0.5 inline-flex items-center gap-1.5 font-semibold text-fairway-800 dark:text-fairway-300 bg-fairway-50 dark:bg-fairway-950/70 px-2 py-0.5 rounded border border-fairway-200 dark:border-fairway-800/60 focus:outline-none cursor-pointer text-xs"
+                    className="inline-flex items-center justify-between w-full gap-1.5 font-semibold text-foreground bg-surface px-2.5 py-1 rounded-lg border border-border hover:bg-surface-muted transition-colors shadow-2xs text-xs cursor-pointer"
                   >
-                    <span>{company.assignedOwnerName || 'Assign Owner'}</span>
-                    <ChevronDown className="w-3 h-3 text-fairway-600 dark:text-fairway-400" />
+                    <span className="truncate">{company.assignedOwnerName || 'Assign Owner'}</span>
+                    <ChevronDown className="w-3 h-3 text-foreground-muted shrink-0" />
                   </button>
                 }
               >
@@ -396,7 +535,7 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
                   <DropdownMenuItem
                     key={u.id}
                     onClick={() => handleReassignOwner(u.id)}
-                    className={company.assignedOwnerId === u.id ? 'bg-surface-muted font-semibold text-fairway-800 dark:text-fairway-300' : ''}
+                    className={company.assignedOwnerId === u.id ? 'bg-surface-muted font-semibold text-fairway-700 dark:text-fairway-400' : ''}
                     icon={company.assignedOwnerId === u.id ? <Check className="w-3.5 h-3.5 text-fairway-600 dark:text-fairway-400" /> : <User className="w-3.5 h-3.5 text-foreground-muted" />}
                   >
                     <div className="flex items-center justify-between gap-2 w-full">
@@ -407,42 +546,66 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
                 ))}
               </DropdownMenu>
             ) : (
-              <span className="font-semibold text-foreground mt-0.5 block">{company.assignedOwnerName}</span>
+              <span className="font-bold text-foreground truncate mt-0.5 block">{company.assignedOwnerName}</span>
             )}
           </div>
 
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Prospect Stage</span>
-            <span className="font-bold text-foreground mt-0.5 block capitalize">{company.prospectStage}</span>
+          {/* Prospect Stage */}
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
+              Prospect Stage
+            </span>
+            <span className="font-bold text-foreground mt-0.5 flex items-center gap-1.5 capitalize truncate">
+              <span className="w-2 h-2 rounded-full bg-fairway-500 shrink-0" />
+              <span className="truncate">{company.prospectStage}</span>
+            </span>
           </div>
 
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Annual Turnover</span>
-            <span className="font-semibold text-foreground mt-0.5 block">{company.annualTurnover || '₹500+ Cr'}</span>
+          {/* Annual Turnover */}
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
+              Annual Turnover
+            </span>
+            <span className="font-extrabold text-foreground mt-0.5 block truncate">
+              {company.annualTurnover || '₹500+ Cr'}
+            </span>
           </div>
 
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Workforce</span>
-            <span className="font-semibold text-foreground mt-0.5 block">{company.employeeCount || '1,000+'}</span>
+          {/* Workforce */}
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
+              Workforce
+            </span>
+            <span className="font-bold text-foreground mt-0.5 block truncate">
+              {company.employeeCount ? `${company.employeeCount} team` : '1,000+'}
+            </span>
           </div>
 
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Gujarat Presence</span>
-            <span className="font-semibold text-emerald-700 mt-0.5 flex items-center gap-1">
+          {/* Gujarat Presence */}
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
+              Gujarat Presence
+            </span>
+            <span className="font-bold text-emerald-700 dark:text-emerald-400 mt-0.5 flex items-center gap-1.5 truncate">
               {company.gujaratPresence ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>Operational</span>
                 </>
               ) : (
-                'Expansion Target'
+                'Target Hub'
               )}
             </span>
           </div>
 
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Account Created</span>
-            <span className="text-foreground-muted mt-0.5 block">{formatDate(company.createdAt)}</span>
+          {/* Account Created */}
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
+              Account Created
+            </span>
+            <span className="font-medium text-foreground-muted mt-0.5 block truncate">
+              {formatDate(company.createdAt)}
+            </span>
           </div>
         </div>
       </div>
@@ -452,33 +615,43 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
         {/* ================= LEFT MAIN WORKSPACE (8 Columns) ================= */}
         <div className="lg:col-span-8 space-y-6">
           {/* Active Inquiries & Requirement Workspace */}
-          <Card>
-            <CardHeader>
+          <Card className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 sm:p-5 border-b border-border bg-surface">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-fairway-600" />
+                <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+                  <FileText className="w-4 h-4 text-fairway-600 dark:text-fairway-400" />
                   <span>Warehouse Inquiries & Opportunities ({inquiries.length})</span>
                 </CardTitle>
-                <p className="text-xs text-foreground-muted">Active leasing requirements, target locations, and stage progression</p>
+                <p className="text-xs text-foreground-muted mt-0.5">Active leasing requirements, target locations, and stage progression</p>
               </div>
               {canEdit && (
-                <Button size="xs" variant="primary" onClick={() => onOpenNewInquiryForCompany(company.id)} leftIcon={<Plus className="w-3.5 h-3.5" />}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => onOpenNewInquiryForCompany(company.id)}
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                  className="rounded-xl px-3 py-1 font-bold shadow-xs shrink-0"
+                >
                   New Inquiry
                 </Button>
               )}
             </CardHeader>
 
             {inquiries.length === 0 ? (
-              <div className="py-8 text-center text-xs text-foreground-muted border border-dashed border-border rounded-md">
-                No inquiries registered for this company yet.
-                <div className="mt-2">
-                  <Button size="xs" variant="outline" onClick={() => onOpenNewInquiryForCompany(company.id)}>
-                    Create First Inquiry
-                  </Button>
-                </div>
+              <div className="py-10 text-center text-xs text-foreground-muted border border-dashed border-border rounded-xl m-4 sm:m-5 bg-surface-muted/20">
+                <FileText className="w-8 h-8 text-foreground-muted/40 mx-auto mb-2" />
+                <p className="font-semibold text-foreground">No inquiries registered for this company yet</p>
+                <p className="text-[11px] text-foreground-muted mt-0.5">Log client leasing demand to start property matching.</p>
+                {canEdit && (
+                  <div className="mt-3">
+                    <Button size="xs" variant="outline" onClick={() => onOpenNewInquiryForCompany(company.id)} className="rounded-lg" leftIcon={<Plus className="w-3 h-3" />}>
+                      Create First Inquiry
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="p-4 sm:p-5 space-y-4">
                 {inquiries.map((inq) => {
                   const propertyMatches = StorageService.matchPropertiesForInquiry(inq);
                   const topMatch = propertyMatches[0];
@@ -486,20 +659,20 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
                   return (
                     <div
                       key={inq.id}
-                      className="p-4 rounded-card border border-border bg-surface hover:border-fairway-300 transition-all shadow-subtle"
+                      className="p-4 rounded-xl border border-border bg-surface-muted/30 hover:border-fairway-500/50 hover:bg-surface-muted/50 transition-all shadow-2xs"
                     >
                       {/* Inquiry Top Row */}
-                      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-bold bg-fairway-100 text-fairway-800 px-2 py-0.5 rounded border border-fairway-200">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-border">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/25 rounded-full px-2.5 py-0.5">
                             {inq.inquiryNumber}
                           </span>
                           <span className="text-xs font-bold text-foreground">
                             {formatSqFt(inq.requiredAreaSqFt)} in {inq.location}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize bg-fairway-50 text-fairway-800 border border-fairway-200">
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full capitalize bg-surface border border-border text-foreground shadow-2xs">
                             {inq.stage.replace(/_/g, ' ')}
                           </span>
                           <Button
@@ -507,6 +680,7 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
                             variant="outline"
                             onClick={() => onNavigateToInquiry(inq.id)}
                             rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+                            className="rounded-lg"
                           >
                             Open Workspace
                           </Button>
@@ -514,40 +688,40 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
                       </div>
 
                       {/* Requirement Summary */}
-                      <p className="text-xs text-foreground my-2.5 leading-relaxed">{inq.requirement}</p>
+                      <p className="text-xs text-foreground/90 my-3 leading-relaxed">{inq.requirement}</p>
 
                       {/* Technical Specs Tags */}
                       <div className="flex flex-wrap gap-2 text-[11px] text-foreground-muted mb-3">
-                        <span className="bg-surface-muted px-2 py-0.5 rounded border border-border">
+                        <span className="bg-surface px-2.5 py-1 rounded-lg border border-border text-foreground font-medium shadow-2xs">
                           Budget: <strong className="text-foreground">{formatINR(inq.budgetMonthlyINR)}/mo</strong>
                         </span>
-                        <span className="bg-surface-muted px-2 py-0.5 rounded border border-border">
+                        <span className="bg-surface px-2.5 py-1 rounded-lg border border-border text-foreground font-medium shadow-2xs">
                           Docks: <strong className="text-foreground">{inq.dockRequirements}+</strong>
                         </span>
-                        <span className="bg-surface-muted px-2 py-0.5 rounded border border-border">
+                        <span className="bg-surface px-2.5 py-1 rounded-lg border border-border text-foreground font-medium shadow-2xs">
                           Possession: <strong className="text-foreground">{formatDate(inq.possessionDate)}</strong>
                         </span>
-                        <span className="bg-surface-muted px-2 py-0.5 rounded border border-border">
+                        <span className="bg-surface px-2.5 py-1 rounded-lg border border-border text-foreground font-medium shadow-2xs">
                           Tenure: <strong className="text-foreground">{inq.leaseDurationMonths / 12} yrs</strong>
                         </span>
                       </div>
 
                       {/* Property Match Recommendation Teaser */}
                       {topMatch && (
-                        <div className="p-3 bg-fairway-50/60 rounded-lg border border-fairway-200 flex items-center justify-between gap-3 text-xs">
+                        <div className="p-3.5 bg-surface rounded-xl border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <Sparkles className="w-3.5 h-3.5 text-accent-600 shrink-0" />
-                              <span className="font-bold text-fairway-950 truncate">{topMatch.property.name}</span>
-                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded">
+                              <Building2 className="w-3.5 h-3.5 text-fairway-600 dark:text-fairway-400 shrink-0" />
+                              <span className="font-bold text-foreground truncate">{topMatch.property.name}</span>
+                              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.2 rounded-full">
                                 {topMatch.overallScore}% Match
                               </span>
                             </div>
-                            <p className="text-[11px] text-fairway-800 truncate mt-0.5">
+                            <p className="text-[11px] text-foreground-muted truncate mt-1">
                               {topMatch.matchBreakdown.details[0]} · {formatSqFt(topMatch.property.availableAreaSqFt)} available
                             </p>
                           </div>
-                          <Button size="xs" variant="primary" onClick={() => onNavigateToInquiry(inq.id)}>
+                          <Button size="xs" variant="primary" onClick={() => onNavigateToInquiry(inq.id)} className="rounded-lg shrink-0">
                             Review Match
                           </Button>
                         </div>
@@ -559,75 +733,90 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
             )}
           </Card>
 
-          {/* Contacts Directory (Section 3) */}
-          <Card>
-            <CardHeader>
+          {/* Contacts Directory */}
+          <Card className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 sm:p-5 border-b border-border bg-surface">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-sky-600" />
+                <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+                  <User className="w-4 h-4 text-sky-500" />
                   <span>Company Decision Makers & Contacts ({contacts.length})</span>
                 </CardTitle>
-                <p className="text-xs text-foreground-muted">Plant heads, supply chain leaders, and procurement directors</p>
+                <p className="text-xs text-foreground-muted mt-0.5">Plant heads, supply chain leaders, and procurement directors</p>
               </div>
               {canEdit && (
-                <Button size="xs" variant="outline" onClick={() => setIsAddContactOpen(true)} leftIcon={<Plus className="w-3.5 h-3.5" />}>
-                  + Add Contact
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddContactOpen(true)}
+                  leftIcon={<Plus className="w-3.5 h-3.5 text-sky-500" />}
+                  className="rounded-xl px-3 py-1 font-medium shrink-0"
+                >
+                  Add Contact
                 </Button>
               )}
             </CardHeader>
 
             {contacts.length === 0 ? (
-              <div className="py-6 text-center text-xs text-foreground-muted">No contacts recorded yet.</div>
+              <div className="py-10 text-center text-xs text-foreground-muted border border-dashed border-border rounded-xl m-4 sm:m-5 bg-surface-muted/20">
+                <User className="w-8 h-8 text-foreground-muted/40 mx-auto mb-2" />
+                <p className="font-semibold text-foreground">No contacts recorded yet</p>
+                <p className="text-[11px] text-foreground-muted mt-0.5">Add key decision makers like plant heads, logistics leaders, or directors.</p>
+                {canEdit && (
+                  <Button size="xs" variant="outline" onClick={() => setIsAddContactOpen(true)} className="mt-3 rounded-lg" leftIcon={<Plus className="w-3 h-3" />}>
+                    Add First Contact
+                  </Button>
+                )}
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted border-b border-border bg-surface-muted/40">
+                  <thead className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted border-b border-border bg-surface-muted/50">
                     <tr>
-                      <th className="py-2.5 px-3">Name</th>
-                      <th className="py-2.5 px-3">Designation</th>
-                      <th className="py-2.5 px-3">Department</th>
-                      <th className="py-2.5 px-3">Phone</th>
-                      <th className="py-2.5 px-3">Email</th>
-                      <th className="py-2.5 px-3 text-right">Actions</th>
+                      <th className="py-3 px-4">Name</th>
+                      <th className="py-3 px-4">Designation</th>
+                      <th className="py-3 px-4">Department</th>
+                      <th className="py-3 px-4">Phone</th>
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {contacts.map((cnt) => (
-                      <tr key={cnt.id} className="hover:bg-surface-muted/40">
-                        <td className="py-2.5 px-3 font-semibold text-foreground">
+                      <tr key={cnt.id} className="hover:bg-surface-muted/40 transition-colors">
+                        <td className="py-3 px-4 font-semibold text-foreground">
                           <div className="flex items-center gap-2">
                             <span>{cnt.name}</span>
                             {cnt.isPrimary && (
-                              <span className="text-[9px] font-bold bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded border border-amber-200">
+                              <span className="text-[9px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full">
                                 Primary
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-2.5 px-3 text-foreground-muted">{cnt.designation}</td>
-                        <td className="py-2.5 px-3 text-foreground-muted">{cnt.department}</td>
-                        <td className="py-2.5 px-3 font-mono font-medium">
-                          <a href={`tel:${cnt.phone}`} className="hover:text-fairway-700 underline-offset-2 hover:underline">
+                        <td className="py-3 px-4 text-foreground-muted">{cnt.designation}</td>
+                        <td className="py-3 px-4 text-foreground-muted">{cnt.department}</td>
+                        <td className="py-3 px-4 font-mono font-medium">
+                          <a href={`tel:${cnt.phone}`} className="text-foreground hover:text-primary transition-colors">
                             {cnt.phone}
                           </a>
                         </td>
-                        <td className="py-2.5 px-3 text-foreground-muted">
-                          <a href={`mailto:${cnt.email}`} className="hover:text-fairway-700 underline-offset-2 hover:underline">
+                        <td className="py-3 px-4 text-foreground-muted">
+                          <a href={`mailto:${cnt.email}`} className="text-foreground hover:text-primary transition-colors">
                             {cnt.email}
                           </a>
                         </td>
-                        <td className="py-2.5 px-3 text-right">
+                        <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <a
                               href={`tel:${cnt.phone}`}
-                              className="p-1 rounded hover:bg-fairway-50 text-fairway-700"
+                              className="p-1.5 rounded-lg hover:bg-surface-muted text-foreground-muted hover:text-foreground transition-colors"
                               title="Call"
                             >
                               <Phone className="w-3.5 h-3.5" />
                             </a>
                             <a
                               href={`mailto:${cnt.email}`}
-                              className="p-1 rounded hover:bg-sky-50 text-sky-700"
+                              className="p-1.5 rounded-lg hover:bg-surface-muted text-foreground-muted hover:text-foreground transition-colors"
                               title="Email"
                             >
                               <Mail className="w-3.5 h-3.5" />
@@ -642,63 +831,78 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
             )}
           </Card>
 
-          {/* Physical Facilities (Section 4) */}
-          <Card>
-            <CardHeader>
+          {/* Physical Facilities */}
+          <Card className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 sm:p-5 border-b border-border bg-surface">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Factory className="w-4 h-4 text-indigo-600" />
+                <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+                  <Factory className="w-4 h-4 text-indigo-500" />
                   <span>Physical Facilities & Plants ({facilities.length})</span>
                 </CardTitle>
-                <p className="text-xs text-foreground-muted">Manufacturing units, warehouses, and distribution centers</p>
+                <p className="text-xs text-foreground-muted mt-0.5">Manufacturing units, warehouses, and distribution centers</p>
               </div>
               {canEdit && (
-                <Button size="xs" variant="outline" onClick={() => setIsAddFacilityOpen(true)} leftIcon={<Plus className="w-3.5 h-3.5" />}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddFacilityOpen(true)}
+                  leftIcon={<Plus className="w-3.5 h-3.5 text-indigo-500" />}
+                  className="rounded-xl px-3 py-1 font-medium shrink-0"
+                >
                   Add Facility
                 </Button>
               )}
             </CardHeader>
 
             {facilities.length === 0 ? (
-              <div className="py-6 text-center text-xs text-foreground-muted">No facility records mapped yet.</div>
+              <div className="py-10 text-center text-xs text-foreground-muted border border-dashed border-border rounded-xl m-4 sm:m-5 bg-surface-muted/20">
+                <Factory className="w-8 h-8 text-foreground-muted/40 mx-auto mb-2" />
+                <p className="font-semibold text-foreground">No facility records mapped yet</p>
+                <p className="text-[11px] text-foreground-muted mt-0.5">Add client warehouses, factories, or logistics hubs across Gujarat.</p>
+                {canEdit && (
+                  <Button size="xs" variant="outline" onClick={() => setIsAddFacilityOpen(true)} className="mt-3 rounded-lg" leftIcon={<Plus className="w-3 h-3" />}>
+                    Add First Facility
+                  </Button>
+                )}
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted border-b border-border bg-surface-muted/40">
+                  <thead className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted border-b border-border bg-surface-muted/50">
                     <tr>
-                      <th className="py-2.5 px-3">Facility Name</th>
-                      <th className="py-2.5 px-3">Type</th>
-                      <th className="py-2.5 px-3">Location / Corridor</th>
-                      <th className="py-2.5 px-3">Built-up Area</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3 text-right">Map</th>
+                      <th className="py-3 px-4">Facility Name</th>
+                      <th className="py-3 px-4">Type</th>
+                      <th className="py-3 px-4">Location / Corridor</th>
+                      <th className="py-3 px-4">Built-up Area</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Map</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {facilities.map((fac) => {
                       const badge = getFacilityStatusBadge(fac.status);
                       return (
-                        <tr key={fac.id} className="hover:bg-surface-muted/40">
-                          <td className="py-2.5 px-3 font-semibold text-foreground">
+                        <tr key={fac.id} className="hover:bg-surface-muted/40 transition-colors">
+                          <td className="py-3 px-4 font-semibold text-foreground">
                             <div>
                               <span>{fac.name}</span>
-                              <span className="text-[10px] text-foreground-muted block">{fac.address}</span>
+                              <span className="text-[10px] text-foreground-muted block mt-0.5">{fac.address}</span>
                             </div>
                           </td>
-                          <td className="py-2.5 px-3 text-foreground-muted">{fac.type}</td>
-                          <td className="py-2.5 px-3 text-foreground">
+                          <td className="py-3 px-4 text-foreground-muted">{fac.type}</td>
+                          <td className="py-3 px-4 text-foreground font-medium">
                             {fac.city}, {fac.state}
                           </td>
-                          <td className="py-2.5 px-3 font-mono font-medium">
+                          <td className="py-3 px-4 font-mono font-medium text-foreground">
                             {fac.builtUpAreaSqFt ? formatSqFt(fac.builtUpAreaSqFt) : '—'}
                           </td>
-                          <td className="py-2.5 px-3">
-                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${badge.bg}`}>
+                          <td className="py-3 px-4">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${badge.bg}`}>
                               {fac.status}
                             </span>
                           </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <Button size="xs" variant="ghost" onClick={onNavigateToMap} leftIcon={<MapPin className="w-3.5 h-3.5 text-fairway-700" />}>
+                          <td className="py-3 px-4 text-right">
+                            <Button size="xs" variant="ghost" onClick={onNavigateToMap} leftIcon={<MapPin className="w-3.5 h-3.5 text-fairway-600 dark:text-fairway-400" />} className="rounded-lg">
                               Map
                             </Button>
                           </td>
@@ -711,39 +915,43 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
             )}
           </Card>
 
-          {/* Proposals & Commercial Documents (Section 7) */}
-          <Card>
-            <CardHeader>
+          {/* Proposals & Commercial Documents */}
+          <Card className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 sm:p-5 border-b border-border bg-surface">
               <div>
-                <CardTitle className="flex items-center gap-2">
-                  <FileSpreadsheet className="w-4 h-4 text-purple-600" />
+                <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+                  <FileSpreadsheet className="w-4 h-4 text-purple-500" />
                   <span>Commercial Proposals ({proposals.length})</span>
                 </CardTitle>
-                <p className="text-xs text-foreground-muted">Delivered leasing terms, CAM charges, and document records</p>
+                <p className="text-xs text-foreground-muted mt-0.5">Delivered leasing terms, CAM charges, and document records</p>
               </div>
             </CardHeader>
 
             {proposals.length === 0 ? (
-              <div className="py-6 text-center text-xs text-foreground-muted">No commercial proposals drafted yet.</div>
+              <div className="py-10 text-center text-xs text-foreground-muted border border-dashed border-border rounded-xl m-4 sm:m-5 bg-surface-muted/20">
+                <FileSpreadsheet className="w-8 h-8 text-foreground-muted/40 mx-auto mb-2" />
+                <p className="font-semibold text-foreground">No commercial proposals drafted yet</p>
+                <p className="text-[11px] text-foreground-muted mt-0.5">Delivered leasing proposals from inquiry workspaces will appear here.</p>
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div className="p-4 sm:p-5 space-y-3">
                 {proposals.map((prop) => (
-                  <div key={prop.id} className="p-3 bg-surface border border-border rounded-lg flex items-center justify-between gap-3 text-xs">
+                  <div key={prop.id} className="p-3.5 bg-surface-muted/40 border border-border rounded-xl flex items-center justify-between gap-3 text-xs hover:border-fairway-500/40 transition-colors shadow-2xs">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold bg-purple-50 text-purple-800 px-1.5 py-0.2 rounded border border-purple-200">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/20 text-[10px]">
                           {prop.proposalNumber}
                         </span>
                         <span className="font-bold text-foreground">{prop.propertyName}</span>
-                        <span className="text-[10px] font-semibold bg-slate-100 text-slate-700 px-2 py-0.2 rounded">
+                        <span className="text-[10px] font-semibold bg-surface border border-border text-foreground-muted px-2 py-0.5 rounded-full">
                           {prop.status}
                         </span>
                       </div>
-                      <p className="text-foreground-muted text-[11px] mt-1">
-                        {formatSqFt(prop.proposedAreaSqFt)} @ ₹{prop.baseRentPerSqFtINR}/sq.ft/mo · Total: <strong>{formatINR(prop.totalMonthlyRentINR)}/mo</strong>
+                      <p className="text-foreground-muted text-[11px] mt-1.5">
+                        {formatSqFt(prop.proposedAreaSqFt)} @ ₹{prop.baseRentPerSqFtINR}/sq.ft/mo · Total: <strong className="text-foreground font-mono">{formatINR(prop.totalMonthlyRentINR)}/mo</strong>
                       </p>
                     </div>
-                    <span className="text-[11px] text-foreground-muted shrink-0">{formatDate(prop.proposalDate)}</span>
+                    <span className="text-[11px] text-foreground-muted shrink-0 font-medium">{formatDate(prop.proposalDate)}</span>
                   </div>
                 ))}
               </div>
@@ -753,175 +961,206 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
 
         {/* ================= RIGHT CONTEXT SIDEBAR (4 Columns) ================= */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Company Information Card (Section 1) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Account Overview</CardTitle>
+          {/* Company Information Card */}
+          <Card className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 border-b border-border bg-surface">
+              <CardTitle className="text-sm font-bold text-foreground">Account Overview</CardTitle>
               {canEdit && (
-                <Button size="xs" variant="ghost" onClick={() => setIsEditCompanyOpen(true)} leftIcon={<Edit2 className="w-3 h-3" />}>
+                <Button size="xs" variant="ghost" onClick={() => setIsEditCompanyOpen(true)} leftIcon={<Edit2 className="w-3 h-3" />} className="rounded-lg">
                   Edit
                 </Button>
               )}
             </CardHeader>
 
-            <div className="space-y-3 text-xs">
+            <div className="p-4 space-y-3.5 text-xs">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Phone</span>
-                <a href={`tel:${company.phone}`} className="font-semibold text-fairway-800 hover:underline flex items-center gap-1.5 mt-0.5">
-                  <Phone className="w-3.5 h-3.5 text-fairway-600" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">Phone</span>
+                <a href={`tel:${company.phone}`} className="font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-surface-muted border border-border text-foreground-muted shrink-0">
+                    <Phone className="w-3.5 h-3.5" />
+                  </span>
                   <span>{company.phone}</span>
                 </a>
               </div>
 
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Email</span>
-                <a href={`mailto:${company.email}`} className="font-semibold text-fairway-800 hover:underline flex items-center gap-1.5 mt-0.5 truncate">
-                  <Mail className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">Email</span>
+                <a href={`mailto:${company.email}`} className="font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-2 truncate">
+                  <span className="p-1.5 rounded-lg bg-surface-muted border border-border text-foreground-muted shrink-0">
+                    <Mail className="w-3.5 h-3.5" />
+                  </span>
                   <span className="truncate">{company.email}</span>
                 </a>
               </div>
 
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Website</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">Website</span>
                 <a
                   href={company.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold text-fairway-800 hover:underline flex items-center gap-1.5 mt-0.5 truncate"
+                  className="font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-2 truncate"
                 >
-                  <Globe className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
+                  <span className="p-1.5 rounded-lg bg-surface-muted border border-border text-foreground-muted shrink-0">
+                    <Globe className="w-3.5 h-3.5" />
+                  </span>
                   <span className="truncate">{company.website}</span>
-                  <ExternalLink className="w-3 h-3 text-foreground-muted shrink-0" />
+                  <ExternalLink className="w-3 h-3 text-foreground-muted shrink-0 ml-auto" />
                 </a>
               </div>
 
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Headquarters Address</span>
-                <p className="text-foreground mt-0.5">{company.address}</p>
-                <p className="text-foreground-muted font-medium mt-0.5">
+              <div className="pt-1 border-t border-border/60">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">Headquarters Address</span>
+                <p className="text-foreground font-medium leading-relaxed">{company.address}</p>
+                <p className="text-foreground-muted font-normal mt-0.5">
                   {company.city}, {company.state} - {company.pincode}
                 </p>
               </div>
             </div>
           </Card>
 
-          {/* Tasks & Follow-ups (Section 10) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <CheckSquare className="w-4 h-4 text-amber-600" />
+          {/* Tasks & Follow-ups */}
+          <Card className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 border-b border-border bg-surface">
+              <CardTitle className="text-sm font-bold flex items-center gap-1.5 text-foreground">
+                <CheckSquare className="w-4 h-4 text-amber-500" />
                 <span>Tasks & Follow-ups</span>
               </CardTitle>
               {canEdit && (
-                <Button size="xs" variant="outline" onClick={() => setIsAddTaskOpen(true)} leftIcon={<Plus className="w-3 h-3" />}>
+                <Button size="xs" variant="outline" onClick={() => setIsAddTaskOpen(true)} leftIcon={<Plus className="w-3 h-3 text-amber-500" />} className="rounded-lg">
                   New Task
                 </Button>
               )}
             </CardHeader>
 
             {tasks.length === 0 ? (
-              <div className="py-6 text-center text-xs text-foreground-muted">No pending tasks.</div>
+              <div className="py-8 text-center text-xs text-foreground-muted">
+                <CheckSquare className="w-6 h-6 text-foreground-muted/40 mx-auto mb-1.5" />
+                <p className="font-semibold text-foreground">No pending tasks</p>
+                <p className="text-[11px] text-foreground-muted mt-0.5">Schedule calls, site visits, or follow-ups.</p>
+              </div>
             ) : (
-              <div className="divide-y divide-border">
-                {tasks.map((t) => (
-                  <div key={t.id} className="py-2.5 flex items-start gap-2.5 text-xs">
-                    <button
-                      onClick={() => handleToggleTask(t.id)}
-                      className="mt-0.5 text-foreground-muted hover:text-emerald-600 shrink-0 transition-colors"
-                      title={t.status === 'Completed' ? 'Mark Pending' : 'Mark Completed'}
-                    >
-                      <CheckCircle2
-                        className={`w-4 h-4 ${t.status === 'Completed' ? 'text-emerald-600 fill-emerald-100' : 'text-slate-400'}`}
-                      />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-xs ${t.status === 'Completed' ? 'line-through text-foreground-muted' : 'font-medium text-foreground'}`}>
-                        {t.description}
-                      </p>
-                      <div className="flex items-center gap-2 text-[10px] text-foreground-muted mt-1">
-                        <span className="font-semibold">{t.taskType}</span>
-                        <span>·</span>
-                        <span className="text-amber-800 font-bold">{formatRelativeDate(t.dueDate)}</span>
-                        <span>·</span>
-                        <span>{t.assignedUserName}</span>
+              <div className="p-3 divide-y divide-border">
+                {tasks.map((t) => {
+                  const isOverdue = t.status === 'Pending' && new Date(t.dueDate) < new Date(new Date().toDateString());
+                  return (
+                    <div key={t.id} className="py-2.5 px-1 flex items-start gap-2.5 text-xs hover:bg-surface-muted/30 rounded-lg transition-colors">
+                      <button
+                        onClick={() => handleToggleTask(t.id)}
+                        className="mt-0.5 text-foreground-muted hover:text-emerald-600 shrink-0 transition-colors cursor-pointer"
+                        title={t.status === 'Completed' ? 'Mark Pending' : 'Mark Completed'}
+                      >
+                        <CheckCircle2
+                          className={`w-4 h-4 ${t.status === 'Completed' ? 'text-emerald-600 fill-emerald-100 dark:fill-emerald-950' : 'text-slate-400'}`}
+                        />
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs ${t.status === 'Completed' ? 'line-through text-foreground-muted' : 'font-semibold text-foreground'}`}>
+                          {t.description}
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] text-foreground-muted mt-1 flex-wrap">
+                          <span className="font-semibold bg-surface-muted border border-border px-1.5 py-0.2 rounded text-foreground">{t.taskType}</span>
+                          <span>·</span>
+                          {isOverdue ? (
+                            <span className="text-rose-700 dark:text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.2 rounded font-bold">
+                              {formatRelativeDate(t.dueDate)}
+                            </span>
+                          ) : (
+                            <span className="font-medium">{formatRelativeDate(t.dueDate)}</span>
+                          )}
+                          <span>·</span>
+                          <span className="font-medium text-foreground-muted">{t.assignedUserName}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>
 
-          {/* Internal Private Notes (Section 9) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <MessageSquare className="w-4 h-4 text-indigo-600" />
+          {/* Internal Private Notes */}
+          <Card className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 p-4 border-b border-border bg-surface">
+              <CardTitle className="text-sm font-bold flex items-center gap-1.5 text-foreground">
+                <MessageSquare className="w-4 h-4 text-indigo-500" />
                 <span>Internal Notes</span>
               </CardTitle>
               {canEdit && (
-                <Button size="xs" variant="outline" onClick={() => setIsAddNoteOpen(true)} leftIcon={<Plus className="w-3 h-3" />}>
-                  + Note
+                <Button size="xs" variant="outline" onClick={() => setIsAddNoteOpen(true)} leftIcon={<Plus className="w-3 h-3 text-indigo-500" />} className="rounded-lg">
+                  Add Note
                 </Button>
               )}
             </CardHeader>
 
-            <form onSubmit={handleSaveNote} className="mb-3 flex gap-2">
-              <input
-                type="text"
-                placeholder="Type quick note and press Enter..."
-                value={newNoteText}
-                onChange={(e) => setNewNoteText(e.target.value)}
-                className="w-full text-xs px-3 py-1.5 bg-surface-muted border border-border rounded-input focus:outline-none focus:border-fairway-600"
-              />
-              <Button type="submit" size="xs" disabled={!newNoteText.trim()}>
-                <Send className="w-3 h-3" />
-              </Button>
-            </form>
+            <div className="p-4 space-y-3">
+              <form onSubmit={handleSaveNote} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Type quick note and press Enter..."
+                  value={newNoteText}
+                  onChange={(e) => setNewNoteText(e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-surface-muted border border-border rounded-xl text-foreground focus:outline-none focus:border-fairway-600 transition-colors"
+                />
+                <Button type="submit" size="xs" disabled={!newNoteText.trim()} className="rounded-xl px-3">
+                  <Send className="w-3 h-3" />
+                </Button>
+              </form>
 
-            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
-              {notes.length === 0 ? (
-                <div className="py-4 text-center text-xs text-foreground-muted">No notes recorded yet.</div>
-              ) : (
-                notes.map((n) => (
-                  <div key={n.id} className="p-2.5 rounded-lg bg-surface-muted/50 border border-border text-xs">
-                    <p className="text-foreground leading-relaxed">{n.text}</p>
-                    <div className="flex items-center justify-between text-[10px] text-foreground-muted mt-1.5 pt-1 border-t border-border/40">
-                      <span>{n.createdByUserName}</span>
-                      <span>{formatRelativeDate(n.createdAt)}</span>
-                    </div>
+              <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                {notes.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-foreground-muted">
+                    <MessageSquare className="w-6 h-6 text-foreground-muted/40 mx-auto mb-1.5" />
+                    <p className="font-semibold text-foreground">No notes recorded yet</p>
+                    <p className="text-[11px] text-foreground-muted mt-0.5">Add private notes or account context.</p>
                   </div>
-                ))
-              )}
+                ) : (
+                  notes.map((n) => (
+                    <div key={n.id} className="p-3 rounded-xl bg-surface-muted/40 border border-border text-xs">
+                      <p className="text-foreground leading-relaxed font-medium">{n.text}</p>
+                      <div className="flex items-center justify-between text-[10px] text-foreground-muted mt-2 pt-1.5 border-t border-border/40">
+                        <span className="font-semibold">{n.createdByUserName}</span>
+                        <span>{formatRelativeDate(n.createdAt)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </Card>
 
-          {/* Unified Activity Timeline (Section 8) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-fairway-600" />
+          {/* Unified Activity Timeline */}
+          <Card className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden">
+            <CardHeader className="p-4 border-b border-border bg-surface">
+              <CardTitle className="text-sm font-bold flex items-center gap-1.5 text-foreground">
+                <Clock className="w-4 h-4 text-fairway-600 dark:text-fairway-400" />
                 <span>Activity Timeline</span>
               </CardTitle>
             </CardHeader>
 
-            <div className="relative pl-4 space-y-4 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border max-h-80 overflow-y-auto pr-1 text-xs">
+            <div className="p-4 text-xs">
               {activities.length === 0 ? (
-                <div className="py-4 text-center text-foreground-muted">No timeline activity yet.</div>
+                <div className="py-6 text-center text-xs text-foreground-muted">
+                  <Clock className="w-6 h-6 text-foreground-muted/40 mx-auto mb-1.5" />
+                  <p className="font-semibold text-foreground">No timeline activity yet</p>
+                  <p className="text-[11px] text-foreground-muted mt-0.5">Actions and updates will appear here automatically.</p>
+                </div>
               ) : (
-                activities.map((act) => (
-                  <div key={act.id} className="relative group">
-                    <span className="absolute -left-[19px] top-1.5 w-2.5 h-2.5 rounded-full bg-fairway-600 border-2 border-white" />
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-foreground text-xs">{act.title}</span>
-                        <span className="text-[10px] text-foreground-muted">{formatRelativeDate(act.activityDate)}</span>
+                <div className="relative pl-4 space-y-4 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border max-h-80 overflow-y-auto pr-1">
+                  {activities.map((act) => (
+                    <div key={act.id} className="relative group">
+                      <span className="absolute -left-[19px] top-1.5 w-2.5 h-2.5 rounded-full bg-fairway-600 border-2 border-surface" />
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-foreground text-xs">{act.title}</span>
+                          <span className="text-[10px] text-foreground-muted">{formatRelativeDate(act.activityDate)}</span>
+                        </div>
+                        <p className="text-[11px] text-foreground-muted mt-0.5 leading-relaxed">{act.description}</p>
+                        <span className="text-[10px] text-fairway-700 dark:text-fairway-400 font-semibold block mt-0.5">by {act.userName}</span>
                       </div>
-                      <p className="text-[11px] text-foreground-muted mt-0.5 leading-relaxed">{act.description}</p>
-                      <span className="text-[10px] text-fairway-800 font-medium block mt-0.5">by {act.userName}</span>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
           </Card>

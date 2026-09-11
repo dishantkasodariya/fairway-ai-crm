@@ -23,10 +23,18 @@ export interface UpdateUserPayload {
   birthDate?: string;
 }
 
+const getAuthToken = (): string | null => {
+  try {
+    return localStorage.getItem('fw_auth_token') || localStorage.getItem('fairway_token');
+  } catch {
+    return null;
+  }
+};
+
 export const UserService = {
   async getUsers(): Promise<{ success: boolean; data?: User[]; error?: string }> {
     try {
-      const token = localStorage.getItem('fairway_token');
+      const token = getAuthToken();
       const response = await fetch(`${API_BASE_URL}/users`, {
         headers: {
           'Content-Type': 'application/json',
@@ -48,7 +56,7 @@ export const UserService = {
 
   async createUser(payload: CreateUserPayload): Promise<{ success: boolean; data?: User; error?: string }> {
     try {
-      const token = localStorage.getItem('fairway_token');
+      const token = getAuthToken();
       const response = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: {
@@ -71,7 +79,7 @@ export const UserService = {
 
   async updateUser(id: string, payload: UpdateUserPayload): Promise<{ success: boolean; data?: User; error?: string }> {
     try {
-      const token = localStorage.getItem('fairway_token');
+      const token = getAuthToken();
       const response = await fetch(`${API_BASE_URL}/users/${id}`, {
         method: 'PUT',
         headers: {
@@ -94,7 +102,7 @@ export const UserService = {
 
   async toggleUserStatus(id: string): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
-      const token = localStorage.getItem('fairway_token');
+      const token = getAuthToken();
       const response = await fetch(`${API_BASE_URL}/users/${id}/status`, {
         method: 'PATCH',
         headers: {
@@ -116,7 +124,7 @@ export const UserService = {
 
   async deleteUser(id: string): Promise<{ success: boolean; message?: string; error?: string }> {
     try {
-      const token = localStorage.getItem('fairway_token');
+      const token = getAuthToken();
       const response = await fetch(`${API_BASE_URL}/users/${id}`, {
         method: 'DELETE',
         headers: {

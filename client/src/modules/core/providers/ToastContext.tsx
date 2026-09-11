@@ -49,30 +49,31 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ toast, success, error, info }}>
       {children}
       {/* Fixed bottom-right toast stack */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
+      <div className="fixed bottom-5 right-5 z-[99999] flex flex-col gap-2.5 max-w-sm pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-card border shadow-dialog bg-white animate-fade-in transition-all ${
+            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border-2 shadow-2xl animate-fade-in transition-all ${
               t.type === 'success'
-                ? 'border-emerald-200 text-emerald-950'
+                ? 'bg-surface border-emerald-500 text-foreground dark:text-foreground'
                 : t.type === 'error'
-                ? 'border-rose-200 text-rose-950'
-                : 'border-slate-200 text-slate-900'
+                ? 'bg-surface border-rose-500 text-foreground dark:text-foreground'
+                : 'bg-surface border-sky-500 text-foreground dark:text-foreground'
             }`}
           >
-            {t.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />}
-            {t.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />}
-            {t.type === 'info' && <Info className="w-5 h-5 text-sky-600 shrink-0 mt-0.5" />}
+            {t.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />}
+            {t.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />}
+            {t.type === 'info' && <Info className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />}
             <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-semibold leading-tight">{t.title}</h4>
-              {t.message && <p className="text-xs text-foreground-muted mt-1 leading-relaxed">{t.message}</p>}
+              <h4 className="text-xs font-bold leading-tight">{t.title}</h4>
+              {t.message && <p className="text-[11px] text-foreground-muted mt-1 leading-relaxed">{t.message}</p>}
             </div>
             <button
+              type="button"
               onClick={() => removeToast(t.id)}
-              className="text-foreground-muted hover:text-foreground shrink-0 p-1"
+              className="text-foreground-muted hover:text-foreground shrink-0 p-1 rounded-md hover:bg-surface-muted transition-colors cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         ))}

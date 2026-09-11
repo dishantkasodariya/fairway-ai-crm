@@ -25,6 +25,7 @@ import {
   CheckCircle,
   Briefcase,
   SlidersHorizontal,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
@@ -529,52 +530,71 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-fairway-500/10 text-fairway-600 dark:text-fairway-400 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
+                  <Building2 className="w-4 h-4" />
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-foreground">
                     Corridor Match Assets ({propertyMatches.length})
                   </h2>
                   <p className="text-xs text-foreground-muted">
-                    Instant AI match based on area ({formatSqFt(createdInquiry.requiredAreaSqFt)}), corridor ({createdInquiry.targetCorridor}), and clear height
+                    Compatible inventory based on area ({formatSqFt(createdInquiry.requiredAreaSqFt)}), corridor ({createdInquiry.targetCorridor}), and clear height
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {propertyMatches.map((m) => (
-                <div
-                  key={m.property.id}
-                  className="bg-surface-muted/50 border border-border rounded-xl p-4 space-y-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-bold text-foreground text-sm truncate">
-                        {m.property.name}
-                      </h3>
-                      <p className="text-xs text-foreground-muted flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3 text-fairway-600 shrink-0" />
-                        <span>{m.property.location}</span>
-                      </p>
-                    </div>
-                    <Badge variant={m.overallScore >= 80 ? 'success' : 'default'} size="sm">
-                      {m.overallScore}% Match
-                    </Badge>
-                  </div>
+              {propertyMatches.map((m) => {
+                const badgeStyle =
+                  m.overallScore >= 80
+                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                    : m.overallScore >= 60
+                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30'
+                    : m.overallScore >= 40
+                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                    : 'bg-surface-muted text-foreground-muted border-border';
 
-                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-2 border-t border-border">
-                    <div>
-                      <span className="text-foreground-muted block text-[10px]">Available Area</span>
-                      <span className="font-bold text-foreground">{formatSqFt(m.property.totalAreaSqFt)}</span>
+                return (
+                  <div
+                    key={m.property.id}
+                    onClick={() => onSuccess(createdInquiry.id)}
+                    className="bg-surface hover:bg-surface-muted/30 border border-border hover:border-primary/50 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors line-clamp-1" title={m.property.name}>
+                            {m.property.name}
+                          </h3>
+                          <p className="text-xs text-foreground-muted flex items-center gap-1.5 mt-1 truncate">
+                            <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="truncate">{m.property.location}</span>
+                          </p>
+                        </div>
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 whitespace-nowrap shadow-2xs ${badgeStyle}`}>
+                          {m.overallScore}% Match
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-foreground-muted block text-[10px]">Rate</span>
-                      <span className="font-bold text-foreground">₹{m.property.rentPerSqFtINR}/sq.ft</span>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-border">
+                      <div className="bg-surface-muted/50 rounded-lg p-2 border border-border/50">
+                        <span className="text-foreground-muted block text-[10px] uppercase font-semibold">Available Area</span>
+                        <span className="font-bold text-foreground text-xs mt-0.5 block">{formatSqFt(m.property.totalAreaSqFt)}</span>
+                      </div>
+                      <div className="bg-surface-muted/50 rounded-lg p-2 border border-border/50">
+                        <span className="text-foreground-muted block text-[10px] uppercase font-semibold">Rate</span>
+                        <span className="font-bold text-foreground text-xs mt-0.5 block">₹{m.property.rentPerSqFtINR}/sq.ft</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-1 flex items-center justify-between text-[11px] text-foreground-muted group-hover:text-primary transition-colors font-semibold">
+                      <span>Review in Workspace</span>
+                      <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -917,10 +937,10 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 </div>
                 <input
                   type="number"
-                  min="1000"
-                  step="5000"
+                  min="0"
+                  step="any"
                   required
-                  value={inquiryData.requiredAreaSqFt}
+                  value={inquiryData.requiredAreaSqFt || ''}
                   onChange={(e) => setInquiryData({ ...inquiryData, requiredAreaSqFt: Number(e.target.value) || 0 })}
                   className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs font-bold text-foreground p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
                 />
@@ -1268,9 +1288,10 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 </div>
                 <input
                   type="number"
-                  step="25000"
+                  min="0"
+                  step="any"
                   required
-                  value={inquiryData.budgetMonthlyINR}
+                  value={inquiryData.budgetMonthlyINR || ''}
                   onChange={(e) => setInquiryData({ ...inquiryData, budgetMonthlyINR: Number(e.target.value) || 0 })}
                   className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs font-bold text-foreground p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
                 />
@@ -1399,7 +1420,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               isLoading={isSubmitting}
               disabled={!isValid}
               className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs px-6 shadow-xs flex items-center gap-2"
-              leftIcon={<Sparkles className="w-3.5 h-3.5" />}
+              leftIcon={<Building2 className="w-3.5 h-3.5" />}
             >
               Register Warehouse Inquiry & Match Assets
             </Button>

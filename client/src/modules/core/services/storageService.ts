@@ -373,7 +373,14 @@ export class StorageService {
   // --- Inquiries ---
   public static getInquiries(companyId?: string): Inquiry[] {
     this.init();
-    const inquiries = getStorageItem<Inquiry[]>(STORAGE_KEYS.INQUIRIES, INITIAL_INQUIRIES);
+    let inquiries = getStorageItem<Inquiry[]>(STORAGE_KEYS.INQUIRIES, INITIAL_INQUIRIES);
+    // Ensure newly added seed inquiries are seamlessly merged into existing localStorage sessions
+    const existingIds = new Set(inquiries.map((i) => i.inquiryNumber || i.id));
+    const missingSeed = INITIAL_INQUIRIES.filter((i) => !existingIds.has(i.inquiryNumber) && !existingIds.has(i.id));
+    if (missingSeed.length > 0) {
+      inquiries = [...inquiries, ...missingSeed];
+      setStorageItem(STORAGE_KEYS.INQUIRIES, inquiries);
+    }
     return companyId ? inquiries.filter((i) => i.companyId === companyId) : inquiries;
   }
 
@@ -468,6 +475,25 @@ export class StorageService {
       });
     }
     return updatedInquiry;
+  }
+
+  public static deleteInquiry(id: string): boolean {
+    const inquiries = this.getInquiries();
+    const target = inquiries.find((i) => i.id === id || i.inquiryNumber === id);
+    if (!target) return false;
+
+    const remaining = inquiries.filter((i) => i.id !== target.id);
+    setStorageItem(STORAGE_KEYS.INQUIRIES, remaining);
+
+    this.logAudit({
+      action: 'DELETE',
+      entityType: 'Inquiry',
+      entityId: target.id,
+      entityName: target.inquiryNumber,
+      details: `Deleted inquiry ${target.inquiryNumber} (${target.companyName})`,
+    });
+
+    return true;
   }
 
   public static changeInquiryStage(id: string, newStage: PipelineStageKey): Inquiry | undefined {
@@ -609,17 +635,6 @@ export class StorageService {
     });
 
     return updated;
-  }
-
-  public static deleteInquiry(id: string): void {
-    const inquiries = this.getInquiries().filter((i) => i.id !== id);
-    setStorageItem(STORAGE_KEYS.INQUIRIES, inquiries);
-    this.logAudit({
-      action: 'DELETE',
-      entityType: 'Inquiry',
-      entityId: id,
-      details: `Deleted inquiry record`,
-    });
   }
 
   // --- Pipeline Stages Configuration ---

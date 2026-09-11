@@ -19,6 +19,10 @@ import {
   Mail,
   Loader2,
   Download,
+  IndianRupee,
+  Layers,
+  ExternalLink,
+  User,
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
 import { InquiryService } from '@/modules/core/services/inquiryService';
@@ -434,7 +438,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
   const prioBadge = getPriorityBadge(inquiry.priority);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto text-left">
+    <div className="space-y-6 max-w-7xl mx-auto text-left pb-10">
       {/* Breadcrumbs */}
       <Breadcrumbs
         items={[
@@ -445,16 +449,16 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
       />
 
       {/* 1. Header Operational Workspace Banner */}
-      <div className="bg-surface rounded-card border border-border shadow-subtle p-4 sm:p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border">
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-base font-mono font-bold bg-fairway-100 text-fairway-800 dark:bg-fairway-950/70 dark:text-fairway-200 dark:border-fairway-700/60 px-2.5 py-1 rounded border border-fairway-200">
+      <div className="bg-surface rounded-2xl border border-border shadow-subtle p-5 sm:p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-border">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-sm font-mono font-bold bg-primary/10 text-primary dark:bg-primary/20 dark:text-white border border-primary/25 dark:border-primary/40 px-2.5 py-0.5 rounded-full">
                 {inquiry.inquiryNumber}
               </span>
               <h1
                 onClick={() => onNavigateToCompany(inquiry.companyId)}
-                className="text-2xl font-black text-foreground tracking-tight hover:text-fairway-800 dark:hover:text-fairway-400 cursor-pointer"
+                className="text-2xl sm:text-3xl font-black text-foreground tracking-tight hover:text-primary transition-colors cursor-pointer"
               >
                 {inquiry.companyName}
               </h1>
@@ -465,13 +469,18 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
                 {inquiry.stage.replace(/_/g, ' ')}
               </span>
             </div>
-            <p className="text-xs text-foreground-muted mt-1.5 flex items-center gap-2">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" />
-              <span>{inquiry.location} ({inquiry.targetCorridor})</span>
-              <span>·</span>
-              <span>Inquiry Date: {formatDate(inquiry.inquiryDate)}</span>
-              <span>·</span>
-              <span>Owner: <strong>{inquiry.salespersonName}</strong></span>
+            <p className="text-xs text-foreground-muted flex items-center gap-2.5 flex-wrap">
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span>{inquiry.location} ({inquiry.targetCorridor})</span>
+              </span>
+              <span className="opacity-40">·</span>
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                <span>Inquiry Date: {formatDate(inquiry.inquiryDate)}</span>
+              </span>
+              <span className="opacity-40">·</span>
+              <span>Owner: <strong className="text-foreground">{inquiry.salespersonName}</strong></span>
             </p>
           </div>
 
@@ -479,29 +488,34 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             {canEdit && (
               <>
-                <Button size="xs" variant="outline" onClick={() => setIsProposalModalOpen(true)} leftIcon={<FileSpreadsheet className="w-3.5 h-3.5 text-purple-600" />}>
+                <Button size="sm" variant="outline" onClick={() => setIsProposalModalOpen(true)} leftIcon={<FileSpreadsheet className="w-4 h-4 text-purple-600 dark:text-purple-400" />}>
                   Draft Proposal
                 </Button>
-                <Button size="xs" variant="outline" onClick={() => setIsSiteVisitModalOpen(true)} leftIcon={<Calendar className="w-3.5 h-3.5 text-orange-600" />}>
+                <Button size="sm" variant="outline" onClick={() => setIsSiteVisitModalOpen(true)} leftIcon={<Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400" />}>
                   Schedule Site Visit
                 </Button>
-                <Button size="xs" variant="outline" onClick={() => setIsTaskModalOpen(true)} leftIcon={<Plus className="w-3.5 h-3.5 text-amber-600" />}>
+                <Button size="sm" variant="outline" onClick={() => setIsTaskModalOpen(true)} leftIcon={<Plus className="w-4 h-4 text-amber-600 dark:text-amber-400" />}>
                   Add Task
                 </Button>
               </>
             )}
-            <Button size="xs" variant="secondary" onClick={onNavigateToMap} leftIcon={<MapPin className="w-3.5 h-3.5 text-fairway-700" />}>
+            <Button size="sm" variant="secondary" onClick={onNavigateToMap} leftIcon={<MapPin className="w-4 h-4 text-primary" />}>
               Corridor Map
             </Button>
           </div>
         </div>
 
         {/* 2. Interactive Pipeline Stages Stepper */}
-        <div className="pt-4">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-2">
-            Pipeline Progression Workflow
-          </span>
-          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-1.5">
+        <div className="pt-5">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
+              Pipeline Progression Workflow
+            </span>
+            <span className="text-xs text-foreground-muted">
+              Current: <strong className="text-foreground capitalize">{inquiry.stage.replace(/_/g, ' ')}</strong>
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
             {pipelineStages.map((stage) => {
               const isCurrent = inquiry.stage === stage.key;
               const currentStageOrder = pipelineStages.find((s) => s.key === inquiry.stage)?.order || 1;
@@ -512,16 +526,16 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
                   key={stage.id}
                   disabled={!canEdit}
                   onClick={() => handleStageChange(stage.key)}
-                  className={`p-2 rounded-md border text-center transition-all text-xs select-none ${
+                  className={`py-2 px-1.5 rounded-lg border text-center transition-all text-xs select-none relative ${
                     isCurrent
-                      ? 'bg-fairway-700 text-white font-bold border-fairway-800 shadow-subtle scale-102'
+                      ? 'bg-primary text-white font-bold border-primary shadow-sm ring-2 ring-primary/20 scale-[1.02]'
                       : isPassed
-                      ? 'bg-fairway-100/70 text-fairway-900 font-semibold border-fairway-300'
-                      : 'bg-surface-muted/60 text-foreground-muted border-border hover:border-slate-300'
+                      ? 'bg-primary/10 text-primary dark:text-fairway-300 font-semibold border-primary/25 hover:bg-primary/20'
+                      : 'bg-surface-muted text-foreground-muted border-border hover:border-border-focus hover:text-foreground'
                   }`}
                   title={stage.description}
                 >
-                  <span className="text-[10px] block font-mono">0{stage.order}</span>
+                  <span className="text-[10px] block font-mono opacity-75">0{stage.order}</span>
                   <span className="truncate block font-medium leading-tight mt-0.5">{stage.label}</span>
                 </button>
               );
@@ -535,115 +549,191 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
         {/* ================= LEFT COLUMN: SPECS & PROPERTY MATCHES (8 cols) ================= */}
         <div className="lg:col-span-8 space-y-6">
           {/* Requirement Summary Card */}
-          <Card>
-            <CardHeader>
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/60">
               <CardTitle className="text-sm flex items-center gap-2">
-                <FileText className="w-4 h-4 text-fairway-600" />
+                <FileText className="w-4 h-4 text-primary" />
                 <span>Customer Requirement Summary</span>
               </CardTitle>
             </CardHeader>
 
-            <div className="space-y-4 text-xs">
-              <p className="text-sm text-foreground font-medium leading-relaxed bg-surface-muted/40 p-3.5 rounded-lg border border-border">
-                &ldquo;{inquiry.requirement}&rdquo;
-              </p>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="p-3 bg-surface border border-border rounded-lg">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Required Area</span>
-                  <span className="text-lg font-black text-foreground mt-1 block">{formatSqFt(inquiry.requiredAreaSqFt)}</span>
-                </div>
-
-                <div className="p-3 bg-surface border border-border rounded-lg">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Monthly Budget</span>
-                  <span className="text-lg font-black text-fairway-800 mt-1 block">{formatINR(inquiry.budgetMonthlyINR, true)}</span>
-                  <span className="text-[10px] text-foreground-muted">~ ₹{(inquiry.budgetMonthlyINR / (inquiry.requiredAreaSqFt || 1)).toFixed(1)}/sq.ft</span>
-                </div>
-
-                <div className="p-3 bg-surface border border-border rounded-lg">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Dock Levelers</span>
-                  <span className="text-lg font-black text-foreground mt-1 block">{inquiry.dockRequirements} Docks</span>
-                </div>
-
-                <div className="p-3 bg-surface border border-border rounded-lg">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Possession Date</span>
-                  <span className="text-sm font-bold text-foreground mt-1 block">{formatDate(inquiry.possessionDate)}</span>
+            <div className="p-4 sm:p-5 space-y-4 text-xs">
+              <div className="p-4 rounded-xl bg-surface-muted/60 border border-border flex items-start gap-3">
+                <FileText className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
+                    Client Requirement Note
+                  </span>
+                  <p className="text-sm text-foreground font-medium leading-relaxed italic">
+                    &ldquo;{inquiry.requirement}&rdquo;
+                  </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-foreground-muted">
-                <span className="bg-surface-muted/60 p-2 rounded border border-border">
-                  Clear Height: <strong className="text-foreground">{inquiry.clearHeightFt || 12} Meters</strong>
-                </span>
-                <span className="bg-surface-muted/60 p-2 rounded border border-border">
-                  Floor Load: <strong className="text-foreground">{inquiry.floorLoadCapacity || '6 MT/sq.m'}</strong>
-                </span>
-                <span className="bg-surface-muted/60 p-2 rounded border border-border">
-                  Power: <strong className="text-foreground">{inquiry.powerKVA || 1000} KVA</strong>
-                </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                <div className="p-4 bg-surface rounded-xl border border-border shadow-subtle hover:border-border-focus transition-all flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-foreground-muted">
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Required Area</span>
+                    <Warehouse className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-xl font-black text-foreground block">{formatSqFt(inquiry.requiredAreaSqFt)}</span>
+                    <span className="text-[10px] text-foreground-muted">Floor plate</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-surface rounded-xl border border-border shadow-subtle hover:border-border-focus transition-all flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-foreground-muted">
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Monthly Budget</span>
+                    <IndianRupee className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-xl font-black text-primary block">{formatINR(inquiry.budgetMonthlyINR, true)}</span>
+                    <span className="text-[10px] text-foreground-muted font-medium">~ ₹{(inquiry.budgetMonthlyINR / (inquiry.requiredAreaSqFt || 1)).toFixed(1)}/sq.ft/mo</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-surface rounded-xl border border-border shadow-subtle hover:border-border-focus transition-all flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-foreground-muted">
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Dock Levelers</span>
+                    <Layers className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-xl font-black text-foreground block">{inquiry.dockRequirements} Docks</span>
+                    <span className="text-[10px] text-foreground-muted">With hydraulic levelers</span>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-surface rounded-xl border border-border shadow-subtle hover:border-border-focus transition-all flex flex-col justify-between">
+                  <div className="flex items-center justify-between text-foreground-muted">
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Possession Date</span>
+                    <Calendar className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-base font-bold text-foreground block">{formatDate(inquiry.possessionDate)}</span>
+                    <span className="text-[10px] text-foreground-muted">Target move-in</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Technical Specifications Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
+                <div className="bg-surface-muted/60 p-3 rounded-xl border border-border flex items-center justify-between">
+                  <span className="text-foreground-muted text-[11px] font-medium">Clear Height:</span>
+                  <strong className="text-foreground font-semibold">{inquiry.clearHeightFt || 12} Meters</strong>
+                </div>
+                <div className="bg-surface-muted/60 p-3 rounded-xl border border-border flex items-center justify-between">
+                  <span className="text-foreground-muted text-[11px] font-medium">Floor Load:</span>
+                  <strong className="text-foreground font-semibold">{inquiry.floorLoadCapacity || '6 MT/sq.m'}</strong>
+                </div>
+                <div className="bg-surface-muted/60 p-3 rounded-xl border border-border flex items-center justify-between">
+                  <span className="text-foreground-muted text-[11px] font-medium">Power Infrastructure:</span>
+                  <strong className="text-foreground font-semibold">{inquiry.powerKVA || 1000} KVA</strong>
+                </div>
               </div>
 
               {inquiry.specialRequirements && (
-                <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-md text-amber-900 text-xs">
-                  <strong>Special Conditions:</strong> {inquiry.specialRequirements}
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="font-bold">Special Conditions:</strong> {inquiry.specialRequirements}
+                  </div>
                 </div>
               )}
             </div>
           </Card>
 
-          {/* Explainable Property Matching Engine (PRD Section 13 / Design Brief Section 13.12) */}
-          <Card>
-            <CardHeader>
+          {/* Explainable Property Matching Engine */}
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/60">
               <div>
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-accent-600" />
+                  <Warehouse className="w-4 h-4 text-primary" />
                   <span>Rule-Based Matching Warehouse Inventory</span>
                 </CardTitle>
-                <p className="text-xs text-foreground-muted">
+                <p className="text-xs text-foreground-muted mt-0.5">
                   Explainable multi-criteria compatibility ranking based on Area, Location, Docks & Timeline
                 </p>
               </div>
             </CardHeader>
 
-            <div className="space-y-4">
+            <div className="p-4 sm:p-5 space-y-4">
               {propertyMatches.map((match) => {
                 const prop = match.property;
+                const photoUrl = prop.photos?.[0] || 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=80';
+
                 return (
                   <div
                     key={prop.id}
-                    className={`p-4 rounded-card border transition-all ${
+                    className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${
                       match.overallScore >= 85
-                        ? 'border-emerald-300 bg-emerald-50/20 shadow-subtle'
-                        : 'border-border bg-surface'
+                        ? 'border-emerald-500/30 bg-emerald-500/[0.02] dark:bg-emerald-950/[0.12] shadow-sm'
+                        : 'border-border bg-surface hover:border-border-focus'
                     }`}
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-fairway-100 text-fairway-800 font-black text-xs flex items-center justify-center border border-fairway-200 shrink-0">
-                          {prop.code.split('-')[1]}
+                    {/* Top Row: Warehouse Image Thumbnail + Information + Actions */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-border">
+                      <div className="flex items-start gap-3.5 min-w-0">
+                        {/* Property Warehouse Thumbnail with Code Badge */}
+                        <div
+                          className="relative w-28 h-20 sm:w-36 sm:h-24 rounded-xl overflow-hidden border border-border shrink-0 bg-surface-muted shadow-sm group cursor-pointer"
+                          onClick={() => onNavigateToProperty(prop.id)}
+                        >
+                          <img
+                            src={photoUrl}
+                            alt={prop.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=600&auto=format&fit=crop&q=80';
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent pointer-events-none" />
+                          <span className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-black/75 text-white backdrop-blur-sm">
+                            {prop.code.split('-')[1] || prop.code}
+                          </span>
                         </div>
-                        <div>
+
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4
                               onClick={() => onNavigateToProperty(prop.id)}
-                              className="text-sm font-bold text-foreground hover:text-fairway-800 cursor-pointer"
+                              className="text-base font-bold text-foreground hover:text-primary transition-colors cursor-pointer"
                             >
                               {prop.name}
                             </h4>
-                            <span className="text-[11px] font-extrabold bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded border border-emerald-200">
+                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
                               {match.overallScore}% Match
                             </span>
                           </div>
-                          <span className="text-[11px] text-foreground-muted block mt-0.5">
-                            {prop.location} · {prop.city} ({prop.corridor})
-                          </span>
+                          <p className="text-xs text-foreground-muted mt-1 flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 shrink-0 text-primary" />
+                            <span className="truncate">{prop.location} · {prop.city} ({prop.corridor})</span>
+                          </p>
+
+                          {/* Commercial Specs Pills */}
+                          <div className="flex items-center gap-1.5 mt-2.5 flex-wrap text-xs">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-muted text-foreground font-medium border border-border text-[11px]">
+                              <Warehouse className="w-3 h-3 text-primary" />
+                              {formatSqFt(prop.availableAreaSqFt)} avail
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-muted text-foreground font-medium border border-border text-[11px]">
+                              ₹{prop.rentPerSqFtINR}/sq.ft/mo
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-muted text-foreground font-medium border border-border text-[11px]">
+                              {prop.clearHeightFt}m height
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-muted text-foreground font-medium border border-border text-[11px]">
+                              {prop.docksCount} docks
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                         {canEdit && (
                           <Button
-                            size="xs"
+                            size="sm"
                             variant="primary"
                             onClick={() => {
                               setProposalForm({
@@ -657,49 +747,38 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
                             Draft Proposal
                           </Button>
                         )}
-                        <Button size="xs" variant="outline" onClick={() => onNavigateToProperty(prop.id)}>
+                        <Button size="sm" variant="outline" onClick={() => onNavigateToProperty(prop.id)}>
                           View Specs
                         </Button>
                       </div>
                     </div>
 
-                    {/* Explainability Badges (Mandated by Section 13.12) */}
-                    <div className="py-3">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1.5">
+                    {/* Matching Criteria Explainability Badges */}
+                    <div className="pt-3">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-2">
                         Matching Criteria Explainability:
                       </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
-                        {match.matchBreakdown.details.map((detail, idx) => (
-                          <div
-                            key={idx}
-                            className={`p-1.5 rounded text-[11px] flex items-center gap-1.5 ${
-                              detail.startsWith('✓')
-                                ? 'bg-emerald-50 text-emerald-800 font-medium'
-                                : detail.startsWith('~')
-                                ? 'bg-amber-50 text-amber-800 font-medium'
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            <span>{detail}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {match.matchBreakdown.details.map((detail, idx) => {
+                          const isSuccess = detail.startsWith('✓');
+                          const isPartial = detail.startsWith('~');
 
-                    {/* Key property commercial numbers */}
-                    <div className="flex items-center justify-between text-xs pt-2 border-t border-border/70 text-foreground-muted">
-                      <span>
-                        Available: <strong className="text-foreground">{formatSqFt(prop.availableAreaSqFt)}</strong>
-                      </span>
-                      <span>
-                        Base Rent: <strong className="text-foreground">₹{prop.rentPerSqFtINR}/sq.ft/mo</strong>
-                      </span>
-                      <span>
-                        Clear Height: <strong className="text-foreground">{prop.clearHeightFt}m</strong>
-                      </span>
-                      <span>
-                        Docks: <strong className="text-foreground">{prop.docksCount}</strong>
-                      </span>
+                          return (
+                            <div
+                              key={idx}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-2 border transition-colors ${
+                                isSuccess
+                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 font-medium'
+                                  : isPartial
+                                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20 font-medium'
+                                  : 'bg-surface-muted text-foreground-muted border-border font-medium'
+                              }`}
+                            >
+                              <span>{detail}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 );
@@ -708,11 +787,11 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
           </Card>
 
           {/* Proposals & Commercial Deals */}
-          <Card>
-            <CardHeader>
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/60">
               <div>
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <FileSpreadsheet className="w-4 h-4 text-purple-600" />
+                  <FileSpreadsheet className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   <span>Proposals for this Inquiry ({proposals.length})</span>
                 </CardTitle>
               </div>
@@ -723,82 +802,96 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
               )}
             </CardHeader>
 
-            {proposals.length === 0 ? (
-              <div className="py-6 text-center text-xs text-foreground-muted">No formal proposals generated yet.</div>
-            ) : (
-              <div className="space-y-3">
-                {proposals.map((prp) => (
-                  <div key={prp.id} className="p-3.5 bg-surface border border-border rounded-lg flex items-center justify-between gap-3 text-xs">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold bg-purple-50 text-purple-900 px-2 py-0.5 rounded border border-purple-200">
-                          {prp.proposalNumber}
-                        </span>
-                        <span className="font-bold text-foreground">{prp.propertyName}</span>
-                        <span className="text-[10px] font-bold bg-slate-100 text-slate-800 px-2 py-0.2 rounded">
-                          {prp.status}
-                        </span>
+            <div className="p-4 sm:p-5">
+              {proposals.length === 0 ? (
+                <div className="py-8 text-center text-xs text-foreground-muted bg-surface-muted/30 rounded-xl border border-dashed border-border">
+                  No formal proposals generated yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {proposals.map((prp) => (
+                    <div key={prp.id} className="p-4 bg-surface border border-border rounded-xl flex items-center justify-between gap-3 text-xs hover:border-border-focus transition-all shadow-subtle">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold bg-purple-500/10 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded border border-purple-500/20">
+                            {prp.proposalNumber}
+                          </span>
+                          <span className="font-bold text-foreground text-sm">{prp.propertyName}</span>
+                          <span className="text-[10px] font-bold bg-surface-muted text-foreground-muted border border-border px-2 py-0.5 rounded">
+                            {prp.status}
+                          </span>
+                        </div>
+                        <p className="text-foreground-muted text-xs mt-1.5">
+                          {formatSqFt(prp.proposedAreaSqFt)} @ ₹{prp.baseRentPerSqFtINR}/sq.ft · Total Monthly: <strong className="text-foreground">{formatINR(prp.totalMonthlyRentINR)}</strong>
+                        </p>
                       </div>
-                      <p className="text-foreground-muted text-[11px] mt-1">
-                        {formatSqFt(prp.proposedAreaSqFt)} @ ₹{prp.baseRentPerSqFtINR}/sq.ft · Total Monthly: <strong>{formatINR(prp.totalMonthlyRentINR)}</strong>
-                      </p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          leftIcon={<Download className="w-3.5 h-3.5" />}
+                          onClick={() => {
+                            downloadProposalPDF(prp);
+                            success('Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'} for print/download`);
+                          }}
+                        >
+                          Download PDF
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        leftIcon={<Download className="w-3.5 h-3.5" />}
-                        onClick={() => {
-                          downloadProposalPDF(prp);
-                          success('Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'} for print/download`);
-                        }}
-                      >
-                        Download PDF
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </Card>
         </div>
 
         {/* ================= RIGHT COLUMN: CONTEXT & ACTIVITY (4 cols) ================= */}
         <div className="lg:col-span-4 space-y-6">
           {/* Contact & Company Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Decision Maker Context</CardTitle>
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/60">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <User className="w-4 h-4 text-primary" />
+                <span>Decision Maker Context</span>
+              </CardTitle>
             </CardHeader>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Contact Person</span>
-                <span className="font-bold text-foreground text-sm block mt-0.5">{inquiry.contactName || 'Plant Operations Head'}</span>
+            <div className="p-4 sm:p-5 space-y-4 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary dark:text-fairway-300 font-black text-sm flex items-center justify-center border border-primary/20 shrink-0">
+                  {(inquiry.contactName || inquiry.companyName).charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Contact Person</span>
+                  <span className="font-bold text-foreground text-sm block mt-0.5">{inquiry.contactName || 'Plant Operations Head'}</span>
+                </div>
               </div>
 
-              {inquiry.contactPhone && (
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Direct Phone</span>
-                  <a href={`tel:${inquiry.contactPhone}`} className="font-semibold text-fairway-800 hover:underline flex items-center gap-1 mt-0.5">
-                    <Phone className="w-3.5 h-3.5 text-fairway-600" />
-                    <span>{inquiry.contactPhone}</span>
-                  </a>
-                </div>
-              )}
+              <div className="space-y-2.5 pt-2 border-t border-border/60">
+                {inquiry.contactPhone && (
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Direct Phone</span>
+                    <a href={`tel:${inquiry.contactPhone}`} className="font-semibold text-primary hover:underline flex items-center gap-2 mt-1">
+                      <Phone className="w-3.5 h-3.5 shrink-0" />
+                      <span>{inquiry.contactPhone}</span>
+                    </a>
+                  </div>
+                )}
 
-              {inquiry.contactEmail && (
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Email</span>
-                  <a href={`mailto:${inquiry.contactEmail}`} className="font-semibold text-fairway-800 hover:underline flex items-center gap-1 mt-0.5 truncate">
-                    <Mail className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
-                    <span className="truncate">{inquiry.contactEmail}</span>
-                  </a>
-                </div>
-              )}
+                {inquiry.contactEmail && (
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Email Address</span>
+                    <a href={`mailto:${inquiry.contactEmail}`} className="font-semibold text-primary hover:underline flex items-center gap-2 mt-1 truncate">
+                      <Mail className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{inquiry.contactEmail}</span>
+                    </a>
+                  </div>
+                )}
+              </div>
 
-              <div className="pt-2 border-t border-border">
-                <Button size="xs" variant="outline" className="w-full" onClick={() => onNavigateToCompany(inquiry.companyId)}>
+              <div className="pt-3 border-t border-border">
+                <Button size="sm" variant="outline" className="w-full justify-center" onClick={() => onNavigateToCompany(inquiry.companyId)}>
                   Open Company Profile →
                 </Button>
               </div>
@@ -806,10 +899,10 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
           </Card>
 
           {/* Follow-up Tasks */}
-          <Card>
-            <CardHeader>
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/60">
               <CardTitle className="text-sm flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-amber-600" />
+                <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                 <span>Follow-ups ({tasks.length})</span>
               </CardTitle>
               {canEdit && (
@@ -819,17 +912,21 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
               )}
             </CardHeader>
 
-            <div className="space-y-2.5">
+            <div className="p-4 sm:p-5 space-y-3">
               {tasks.length === 0 ? (
-                <div className="py-4 text-center text-xs text-foreground-muted">No pending tasks for this inquiry.</div>
+                <div className="py-6 text-center text-xs text-foreground-muted bg-surface-muted/30 rounded-xl border border-dashed border-border">
+                  No pending tasks for this inquiry.
+                </div>
               ) : (
                 tasks.map((t) => (
-                  <div key={t.id} className="p-2.5 bg-surface-muted/50 rounded-lg border border-border text-xs">
-                    <div className="flex items-center justify-between">
+                  <div key={t.id} className="p-3 bg-surface rounded-xl border border-border text-xs hover:border-border-focus transition-all shadow-subtle">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-bold text-foreground">{t.taskType}</span>
-                      <span className="text-[10px] font-bold text-amber-800">{formatRelativeDate(t.dueDate)}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                        {formatRelativeDate(t.dueDate)}
+                      </span>
                     </div>
-                    <p className="text-foreground-muted text-[11px] mt-0.5">{t.description}</p>
+                    <p className="text-foreground-muted text-xs mt-1.5 leading-relaxed">{t.description}</p>
                   </div>
                 ))
               )}
@@ -837,35 +934,36 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
           </Card>
 
           {/* Site Visits Scheduled */}
-          <Card>
-            <CardHeader>
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-3 border-b border-border/60">
               <CardTitle className="text-sm flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-orange-600" />
+                <Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                 <span>Site Inspections ({siteVisits.length})</span>
               </CardTitle>
             </CardHeader>
 
-            <div className="space-y-2.5">
+            <div className="p-4 sm:p-5 space-y-3">
               {siteVisits.length === 0 ? (
-                <div className="py-4 text-center text-xs text-foreground-muted">No site visits scheduled.</div>
+                <div className="py-6 text-center text-xs text-foreground-muted bg-surface-muted/30 rounded-xl border border-dashed border-border">
+                  No site visits scheduled.
+                </div>
               ) : (
                 siteVisits.map((sv) => (
-                  <div key={sv.id} className="p-2.5 bg-orange-50/40 rounded-lg border border-orange-200 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-orange-950">{sv.propertyName}</span>
-                      <span className="text-[10px] font-bold bg-orange-100 text-orange-800 px-1.5 py-0.2 rounded">
+                  <div key={sv.id} className="p-3.5 bg-surface rounded-xl border border-border text-xs hover:border-border-focus transition-all shadow-subtle">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-foreground">{sv.propertyName}</span>
+                      <span className="text-[10px] font-bold bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/20 px-2 py-0.5 rounded-full">
                         {sv.status}
                       </span>
                     </div>
-                    <p className="text-[11px] text-foreground-muted mt-1">
-                      Date: <strong>{formatDate(sv.visitDate)} at {sv.visitTime}</strong>
+                    <p className="text-xs text-foreground-muted mt-1.5">
+                      Date: <strong className="text-foreground">{formatDate(sv.visitDate)} at {sv.visitTime}</strong>
                     </p>
                     {sv.clientFeedback && (
-                      <p className="text-[11px] text-foreground mt-1 bg-surface p-1.5 rounded border border-border">
+                      <p className="text-xs text-foreground mt-2 bg-surface-muted/60 p-2.5 rounded-lg border border-border">
                         Feedback: {sv.clientFeedback}
                       </p>
                     )}
-
                   </div>
                 ))
               )}
@@ -970,9 +1068,9 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
             rows={2}
           />
 
-          <div className="p-3 bg-fairway-50 rounded-lg border border-fairway-200">
-            <span className="text-[11px] font-bold text-fairway-900 block">Total Monthly Commercial Value:</span>
-            <span className="text-base font-extrabold text-fairway-800">
+          <div className="p-3.5 bg-primary/10 rounded-xl border border-primary/25">
+            <span className="text-[11px] font-bold text-primary dark:text-fairway-300 block">Total Monthly Commercial Value:</span>
+            <span className="text-base font-extrabold text-primary dark:text-fairway-300">
               {formatINR(proposalForm.proposedAreaSqFt * (proposalForm.baseRentPerSqFtINR + proposalForm.maintenancePerSqFtINR))} / month
             </span>
           </div>

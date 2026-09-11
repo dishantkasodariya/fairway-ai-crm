@@ -35,8 +35,42 @@ export interface ThemeDefinition {
   chartColors: [string, string, string, string, string];
 }
 
-// 20 Full Standard Themes matching the UI reference matrix
+// Themes matching the UI reference matrix
 export const THEMES: ThemeDefinition[] = [
+  {
+    id: 'fairway',
+    name: 'Fairway Orange',
+    category: 'Brand',
+    description: 'Fairway CRM industrial signature orange theme',
+    previewColor: '#EB661F',
+    previewAccent: '#FB923C',
+    shades: {
+      50: '#FFF7ED',
+      100: '#FFEDD5',
+      200: '#FED7AA',
+      300: '#FDBA74',
+      400: '#FB923C',
+      500: '#F97316',
+      600: '#EB661F',
+      700: '#C94F10',
+      800: '#A43E0B',
+      900: '#7C2E08',
+      950: '#431603',
+    },
+    accentShades: {
+      50: '#FFFBEB',
+      100: '#FEF3C7',
+      200: '#FDE68A',
+      300: '#FCD34D',
+      400: '#FBBF24',
+      500: '#F59E0B',
+      600: '#D97706',
+      700: '#B45309',
+      800: '#92400E',
+      900: '#78350F',
+    },
+    chartColors: ['#EB661F', '#F59E0B', '#3B82F6', '#10B981', '#6366F1'],
+  },
   {
     id: 'slate',
     name: 'Slate',
@@ -762,17 +796,18 @@ function hexToRgb(hex: string): string {
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themeId, setThemeIdState] = useState<string>(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY) || 'blue';
+      return localStorage.getItem(STORAGE_KEY) || 'fairway';
     } catch {
-      return 'blue';
+      return 'fairway';
     }
   });
 
   const [colorMode, setColorModeState] = useState<ColorMode>(() => {
     try {
-      return (localStorage.getItem(MODE_STORAGE_KEY) as ColorMode) || 'dark';
+      const saved = localStorage.getItem(MODE_STORAGE_KEY) as ColorMode;
+      return saved === 'dark' ? 'dark' : 'light';
     } catch {
-      return 'dark';
+      return 'light';
     }
   });
 
@@ -813,7 +848,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const isDark = colorMode === 'dark' || (colorMode === 'system' && systemIsDark);
-  const currentTheme = THEMES.find((t) => t.id === themeId) || THEMES.find((t) => t.id === 'blue') || THEMES[0];
+  const currentTheme = THEMES.find((t) => t.id === themeId) || THEMES.find((t) => t.id === 'fairway') || THEMES[0];
 
   const applyThemeToDOM = (theme: ThemeDefinition, darkMode: boolean, currentRadius: number) => {
     const root = document.documentElement;
@@ -1196,7 +1231,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [systemIsDark]);
 
   const resetTheme = () => {
-    setThemeId('blue');
+    setThemeId('fairway');
     setColorMode('dark');
     setNavStyle('vertical');
     setRadius(10);

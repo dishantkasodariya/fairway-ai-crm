@@ -4,18 +4,24 @@ export default {
   theme: {
     extend: {
       colors: {
+        primary: {
+          DEFAULT: 'rgb(var(--primary) / <alpha-value>)',
+          hover: 'rgb(var(--primary-hover) / <alpha-value>)',
+          soft: 'rgb(var(--primary-soft) / <alpha-value>)',
+          foreground: 'var(--text-foreground, #FFFFFF)',
+        },
         fairway: {
-          50: 'var(--fw-50, #F0F9F5)',
-          100: 'var(--fw-100, #E8F4EF)',
-          200: 'var(--fw-200, #D1EAE0)',
-          300: 'var(--fw-300, #A3D5C1)',
-          400: 'var(--fw-400, #5BAFA1)',
-          500: 'var(--fw-500, #2A8F70)',
-          600: 'var(--fw-600, #0F6B4F)', // Primary Brand
-          700: 'var(--fw-700, #0B5741)', // Primary Hover
-          800: 'var(--fw-800, #084332)',
-          900: 'var(--fw-900, #052F23)',
-          950: 'var(--fw-950, #021B14)',
+          50: 'var(--fw-50, #FFF7ED)',
+          100: 'var(--fw-100, #FFEDD5)',
+          200: 'var(--fw-200, #FED7AA)',
+          300: 'var(--fw-300, #FDBA74)',
+          400: 'var(--fw-400, #FB923C)',
+          500: 'var(--fw-500, #F97316)',
+          600: 'var(--fw-600, #EB661F)', // Primary Brand
+          700: 'var(--fw-700, #C94F10)', // Primary Hover
+          800: 'var(--fw-800, #A43E0B)',
+          900: 'var(--fw-900, #7C2E08)',
+          950: 'var(--fw-950, #431603)',
         },
         accent: {
           50: 'var(--accent-50, #F5FCF0)',

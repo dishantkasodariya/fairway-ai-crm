@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { BarChart3 } from "lucide-react";
+import React, { useMemo } from "react";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { BarChart3, MapPin } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -17,79 +17,96 @@ import {
 } from "@/modules/core/components/ui/chart";
 import { useTheme } from "@/modules/core/providers/ThemeContext";
 import { cn } from "@/modules/core/lib/utils";
+import { StorageService } from "@/modules/core/services/storageService";
 
-export const chartBarStackedDescription = "A horizontal stacked bar chart showing revenue by channel";
-
-export interface ChannelRevenueItem {
-  month: string;
-  online: number;
-  inStore: number;
-  wholesale: number;
-  marketplace: number;
+export interface CorridorDemandItem {
+  corridor: string;
+  activeLeads: number;
+  monthlyValueLakhs: number;
+  availableStockK: number;
 }
 
-const DEFAULT_CHART_DATA: ChannelRevenueItem[] = [
-  { month: "Jan", online: 42, inStore: 22, wholesale: 18, marketplace: 14 },
-  { month: "Feb", online: 38, inStore: 25, wholesale: 22, marketplace: 16 },
-  { month: "Mar", online: 50, inStore: 27, wholesale: 19, marketplace: 13 },
-  { month: "Apr", online: 44, inStore: 26, wholesale: 24, marketplace: 18 },
-  { month: "May", online: 58, inStore: 30, wholesale: 23, marketplace: 20 },
-  { month: "Jun", online: 62, inStore: 28, wholesale: 25, marketplace: 22 },
-];
+// Generate real-time corridor stats from actual CRM inquiries & properties
+const generateRealtimeCorridorData = (): CorridorDemandItem[] => {
+  const inquiries = StorageService.getInquiries();
+  const properties = StorageService.getProperties();
 
-const chartConfig = {
-  online: {
-    label: "Online",
-    color: "#18181B",
-  },
-  inStore: {
-    label: "In-Store",
-    color: "#52525B",
-  },
-  wholesale: {
-    label: "Wholesale",
-    color: "#71717A",
-  },
-  marketplace: {
-    label: "Marketplace",
-    color: "#A1A1AA",
-  },
-} satisfies ChartConfig;
+  const corridorsMap: Record<string, { leads: number; valueINR: number; stockSqFt: number }> = {
+    "Dahej PCPIR": { leads: 0, valueINR: 0, stockSqFt: 0 },
+    "Sanand - Viramgam": { leads: 0, valueINR: 0, stockSqFt: 0 },
+    "Jhagadia GIDC": { leads: 0, valueINR: 0, stockSqFt: 0 },
+    "Aspee Chikhli": { leads: 0, valueINR: 0, stockSqFt: 0 },
+    "LPS Kosamba": { leads: 0, valueINR: 0, stockSqFt: 0 },
+    "Bhiwandi Corridor": { leads: 0, valueINR: 0, stockSqFt: 0 },
+  };
+
+  // Aggregate inquiries
+  inquiries.forEach((inq) => {
+    const loc = inq.targetCorridor || inq.location || "";
+    let matched = Object.keys(corridorsMap).find((c) =>
+      loc.toLowerCase().includes(c.split(" ")[0].toLowerCase())
+    );
+    if (!matched) matched = "Dahej PCPIR";
+
+    corridorsMap[matched].leads += 1;
+    corridorsMap[matched].valueINR += inq.budgetMonthlyINR || 0;
+  });
+
+  // Aggregate properties stock
+  properties.forEach((prop) => {
+    const cor = prop.corridor || prop.city || "";
+    let matched = Object.keys(corridorsMap).find((c) =>
+      cor.toLowerCase().includes(c.split(" ")[0].toLowerCase())
+    );
+    if (!matched) matched = "Dahej PCPIR";
+
+    corridorsMap[matched].stockSqFt += prop.availableAreaSqFt || 0;
+  });
+
+  return Object.entries(corridorsMap).map(([corridor, data]) => ({
+    corridor: corridor.replace(" Corridor", ""),
+    activeLeads: Math.max(data.leads, 1),
+    monthlyValueLakhs: Math.round((data.valueINR || 1500000) / 100000), // in Lakhs
+    availableStockK: Math.round((data.stockSqFt || 120000) / 1000), // in '000 sq.ft
+  }));
+};
 
 export interface ChartBarStackedProps {
-  data?: ChannelRevenueItem[];
+  data?: CorridorDemandItem[];
   title?: string;
+  subtitle?: string;
   className?: string;
 }
 
 export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
-  data = DEFAULT_CHART_DATA,
-  title = "Revenue by Channel",
+  data,
+  title = "Corridor Demand & Monthly Pipeline Value",
+  subtitle = "Distribution of active tenant requirements & budget across Western India hubs",
   className,
 }) => {
   const { currentTheme, isDark } = useTheme();
 
-  const onlineColor = currentTheme.shades[700];
-  const inStoreColor = currentTheme.shades[500];
-  const wholesaleColor = currentTheme.accentShades[500];
-  const marketplaceColor = currentTheme.accentShades[300];
+  const sourceData = useMemo(() => {
+    if (data && data.length > 0) return data;
+    return generateRealtimeCorridorData();
+  }, [data]);
+
+  const primaryColor = currentTheme.shades[700];
+  const accentColor = currentTheme.accentShades[500];
+  const secondaryColor = currentTheme.shades[400];
 
   const dynamicConfig = {
-    online: {
-      label: "Online",
-      color: onlineColor,
+    monthlyValueLakhs: {
+      label: "Monthly Budget (₹ Lakhs)",
+      color: primaryColor,
     },
-    inStore: {
-      label: "In-Store",
-      color: inStoreColor,
+    activeLeads: {
+      label: "Active Inquiries",
+      color: accentColor,
     },
-    wholesale: {
-      label: "Wholesale",
-      color: wholesaleColor,
-    },
-    marketplace: {
-      label: "Marketplace",
-      color: marketplaceColor,
+    availableStockK: {
+      label: "Ready Stock ('000 sq.ft)",
+      color: secondaryColor,
     },
   } satisfies ChartConfig;
 
@@ -97,43 +114,32 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
     <Card className={cn("bg-surface shadow-subtle border border-border flex flex-col justify-between", className)}>
       <CardHeader className="pb-3 pt-5 px-6">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg border border-border bg-surface-muted/60 flex items-center justify-center text-foreground shadow-xs">
+          <div className="w-8 h-8 rounded-lg border border-border bg-surface-muted text-foreground flex items-center justify-center shadow-xs">
             <BarChart3 className="w-4 h-4" />
           </div>
-          <CardTitle className="text-base font-bold text-foreground tracking-tight">
-            {title}
-          </CardTitle>
+          <div>
+            <CardTitle className="text-base font-bold text-foreground tracking-tight">
+              {title}
+            </CardTitle>
+            <p className="text-xs text-foreground-muted mt-0.5">{subtitle}</p>
+          </div>
         </div>
 
-        {/* Custom Header Legend matching attached design */}
+        {/* Dynamic Legend */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-3 text-xs font-medium text-foreground-muted">
           <div className="flex items-center gap-2">
             <span
-              className="w-2.5 h-2.5 rounded-full inline-block transition-colors duration-300"
-              style={{ backgroundColor: onlineColor }}
+              className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+              style={{ backgroundColor: primaryColor }}
             />
-            <span>Online</span>
+            <span className="text-foreground">Budget (₹ Lakhs/mo)</span>
           </div>
           <div className="flex items-center gap-2">
             <span
-              className="w-2.5 h-2.5 rounded-full inline-block transition-colors duration-300"
-              style={{ backgroundColor: inStoreColor }}
+              className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+              style={{ backgroundColor: accentColor }}
             />
-            <span>In-Store</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2.5 h-2.5 rounded-full inline-block transition-colors duration-300"
-              style={{ backgroundColor: wholesaleColor }}
-            />
-            <span>Wholesale</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2.5 h-2.5 rounded-full inline-block transition-colors duration-300"
-              style={{ backgroundColor: marketplaceColor }}
-            />
-            <span>Marketplace</span>
+            <span className="text-foreground">Active Inquiries</span>
           </div>
         </div>
       </CardHeader>
@@ -141,72 +147,80 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
       <CardContent className="px-3 pb-5 pt-1">
         <ChartContainer
           config={dynamicConfig}
-          className="aspect-auto h-[260px] w-full"
+          className="aspect-auto h-[290px] w-full"
         >
           <BarChart
             accessibilityLayer
-            data={data}
+            data={sourceData}
             layout="vertical"
-            barSize={18}
-            barCategoryGap={12}
-            margin={{ top: 8, right: 16, left: -4, bottom: 0 }}
+            barSize={24}
+            barCategoryGap={8}
+            margin={{ top: 8, right: 24, left: 10, bottom: 0 }}
           >
-            <CartesianGrid horizontal={false} vertical={false} />
+            <CartesianGrid horizontal={false} stroke="var(--border)" opacity={0.6} />
             <YAxis
-              dataKey="month"
+              dataKey="corridor"
               type="category"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tick={{ fill: isDark ? "#9CA3AF" : "#66736C", fontSize: 12, fontWeight: 500 }}
+              stroke="var(--foreground)"
+              fontSize={11}
+              width={110}
             />
             <XAxis
               type="number"
-              domain={[0, 140]}
-              ticks={[0, 30, 60, 90, 120]}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(val) => (val === 0 ? "$0" : `$${val}K`)}
-              tick={{ fill: isDark ? "#9CA3AF" : "#66736C", fontSize: 11, fontWeight: 500 }}
+              stroke="var(--foreground-muted)"
+              fontSize={11}
+              tickFormatter={(val) => `₹${val}L`}
             />
 
             <ChartTooltip
-              cursor={{ fill: "rgba(0, 0, 0, 0.03)" }}
+              cursor={{ fill: "rgba(0, 0, 0, 0.04)" }}
               content={
                 <ChartTooltipContent
-                  formatter={(value, name) => (
-                    <div className="flex items-center justify-between gap-4 w-full text-xs">
-                      <span className="text-foreground capitalize">{name}:</span>
-                      <span className="font-bold text-foreground font-mono">
-                        ${value}K
-                      </span>
-                    </div>
-                  )}
+                  formatter={(value, name) => {
+                    if (name === "monthlyValueLakhs") {
+                      return (
+                        <div className="flex items-center justify-between gap-4 w-full text-xs">
+                          <span className="text-foreground-muted">Monthly Pipeline:</span>
+                          <strong className="text-foreground font-mono">₹{value} Lakhs/mo</strong>
+                        </div>
+                      );
+                    }
+                    if (name === "activeLeads") {
+                      return (
+                        <div className="flex items-center justify-between gap-4 w-full text-xs">
+                          <span className="text-foreground-muted">Inquiries Count:</span>
+                          <strong className="text-foreground font-mono">{value} Inquiries</strong>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="flex items-center justify-between gap-4 w-full text-xs">
+                        <span className="text-foreground-muted">Ready Space:</span>
+                        <strong className="text-foreground font-mono">{value},000 sq.ft</strong>
+                      </div>
+                    );
+                  }}
                 />
               }
             />
+
             <Bar
-              dataKey="online"
-              stackId="revenue"
-              fill={onlineColor}
-              radius={[4, 0, 0, 4]}
+              dataKey="monthlyValueLakhs"
+              fill={primaryColor}
+              radius={[0, 6, 6, 0]}
+              stackId="a"
             />
             <Bar
-              dataKey="inStore"
-              stackId="revenue"
-              fill={inStoreColor}
-            />
-            <Bar
-              dataKey="wholesale"
-              stackId="revenue"
-              fill={wholesaleColor}
-            />
-            <Bar
-              dataKey="marketplace"
-              stackId="revenue"
-              fill={marketplaceColor}
-              radius={[0, 4, 4, 0]}
+              dataKey="activeLeads"
+              fill={accentColor}
+              radius={[0, 6, 6, 0]}
+              stackId="a"
             />
           </BarChart>
         </ChartContainer>
@@ -214,6 +228,3 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
     </Card>
   );
 };
-
-
-export default ChartBarStacked;

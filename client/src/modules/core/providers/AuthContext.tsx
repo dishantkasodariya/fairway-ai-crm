@@ -40,37 +40,45 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUserState] = useState<User>(StorageService.getCurrentUser());
-  const [users, setUsers] = useState<User[]>(StorageService.getUsers());
+  const [currentUser, setCurrentUserState] = useState<User>(() => StorageService.getCurrentUser());
+  const [users, setUsers] = useState<User[]>(() => StorageService.getUsers());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
       const stored = localStorage.getItem('fw_auth_authenticated');
-      return stored === 'true';
+      const token = localStorage.getItem('fw_auth_token');
+      // Require explicit authenticated flag and presence of a token
+      if (stored === 'false' || !stored) return false;
+      return !!token;
     } catch {
       return false;
     }
   });
 
-  const refreshUsers = async (activeUserId?: string) => {
+  const refreshUsers = async (activeUserId?: string, activeEmail?: string) => {
     try {
       const res = await UserService.getUsers();
       if (res.success && res.data && res.data.length > 0) {
         setUsers(res.data);
         StorageService.saveUsers(res.data);
 
-        const currentSaved = StorageService.getCurrentUser();
-        const targetId = activeUserId || currentSaved?.id;
-        const me = res.data.find(
-          (u) =>
-            (targetId && u.id === targetId) ||
-            (currentSaved?.email && u.email.toLowerCase() === currentSaved.email.toLowerCase())
-        );
+        // Update currentUserState only if matching the authenticated user's email or ID
+        setCurrentUserState((prevUser) => {
+          const targetEmail = (activeEmail || prevUser?.email)?.trim().toLowerCase();
+          const targetId = activeUserId || prevUser?.id;
 
-        if (me) {
-          setCurrentUserState(me);
-          StorageService.setCurrentUser(me);
-        }
+          const me = res.data?.find(
+            (u) =>
+              (targetEmail && u.email?.trim().toLowerCase() === targetEmail) ||
+              (targetId && u.id === targetId)
+          );
+
+          if (me) {
+            StorageService.setCurrentUser(me);
+            return me;
+          }
+          return prevUser;
+        });
       }
     } catch (err) {
       console.warn('Could not refresh users from API, keeping cache:', err);
@@ -81,9 +89,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initAuth = async () => {
       const token = localStorage.getItem('fw_auth_token');
+      const storedAuth = localStorage.getItem('fw_auth_authenticated');
       let activeUser: User | null = null;
 
-      if (token) {
+      if (token && storedAuth === 'true') {
         try {
           const res = await AuthService.getMe();
           if (res.success && res.data?.user) {
@@ -91,14 +100,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setCurrentUserState(res.data.user);
             StorageService.setCurrentUser(res.data.user);
             setIsAuthenticated(true);
-            localStorage.setItem('fw_auth_authenticated', 'true');
+          } else {
+            // Token invalid or session expired
+            logout();
           }
         } catch {
-          // Keep existing cached user if backend offline
+          // If offline or network error, verify cached current user
+          const cached = StorageService.getCurrentUser();
+          if (cached && storedAuth === 'true') {
+            activeUser = cached;
+            setCurrentUserState(cached);
+            setIsAuthenticated(true);
+          } else {
+            logout();
+          }
         }
+      } else {
+        setIsAuthenticated(false);
       }
 
-      await refreshUsers(activeUser?.id);
+      if (activeUser) {
+        await refreshUsers(activeUser.id, activeUser.email);
+      } else {
+        await refreshUsers();
+      }
       setIsLoading(false);
     };
 
@@ -107,7 +132,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const handleStorageChange = () => {
-      setCurrentUserState(StorageService.getCurrentUser());
+      const savedUser = StorageService.getCurrentUser();
+      if (savedUser) {
+        setCurrentUserState(savedUser);
+      }
       setUsers(StorageService.getUsers());
     };
     window.addEventListener('fw_storage_change', handleStorageChange);
@@ -117,10 +145,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password?: string): Promise<AuthResult> => {
     const normalizedEmail = email.trim().toLowerCase();
 
+    if (!normalizedEmail) {
+      return {
+        success: false,
+        error: 'Please enter your work email address.',
+      };
+    }
+
+    if (!password) {
+      return {
+        success: false,
+        error: 'Please enter your password.',
+      };
+    }
+
     try {
       const res = await AuthService.login({
         email: normalizedEmail,
-        password: password || '',
+        password: password,
       });
 
       if (res.success && res.data) {
@@ -133,82 +175,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         StorageService.setCurrentUser(user);
         setCurrentUserState(user);
         setIsAuthenticated(true);
-        await refreshUsers(user.id);
+        await refreshUsers(user.id, user.email);
         window.dispatchEvent(new Event('fw_storage_change'));
 
         return { success: true, message: `Signed in as ${user.name}` };
       }
 
-      // If backend responded with error, check local users or demo account fallback
-      const localUsers = StorageService.getUsers();
-      const matchedUser = localUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
-
-      if (
-        matchedUser ||
-        normalizedEmail.includes('fairway') ||
-        normalizedEmail === 'bhavya@gmail.com'
-      ) {
-        const fallbackUser: User = matchedUser || {
-          id: normalizedEmail.includes('amit') ? 'usr_amit' : normalizedEmail.includes('aryan') ? 'usr_aryan' : `usr_${Date.now()}`,
-          name: normalizedEmail.includes('amit') ? 'Amit Patel' : normalizedEmail.includes('aryan') ? 'Aryan Verma' : 'Fairway User',
-          email: normalizedEmail,
-          role: normalizedEmail.includes('aryan') || normalizedEmail.includes('sales') ? 'sales' : 'super_admin',
-          status: 'Active',
-          assignedLeadsCount: 12,
-          lastActive: 'Just now',
-          department: normalizedEmail.includes('aryan') ? 'Gujarat Leasing Desk' : 'Executive Leadership',
-          avatar: normalizedEmail.includes('aryan')
-            ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        };
-
-        try {
-          localStorage.setItem('fw_auth_token', 'demo_jwt_token');
-          localStorage.setItem('fw_auth_authenticated', 'true');
-        } catch {}
-
-        StorageService.setCurrentUser(fallbackUser);
-        setCurrentUserState(fallbackUser);
-        setIsAuthenticated(true);
-        window.dispatchEvent(new Event('fw_storage_change'));
-
-        return { success: true, message: `Signed in as ${fallbackUser.name}` };
-      }
+      // Backend returned failure with invalid password or unregistered email
+      const errorMsg =
+        res.error?.message ||
+        res.message ||
+        'Invalid email or password. Please check your credentials.';
 
       return {
         success: false,
-        error: res.error?.message || 'Invalid email or password. If you do not have an account, please register first.',
+        error: errorMsg,
       };
     } catch (e: any) {
-      console.warn('Backend login request notice, using local auth handler:', e);
-
-      const localUsers = StorageService.getUsers();
-      const matchedUser = localUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
-      const fallbackUser: User = matchedUser || {
-        id: normalizedEmail.includes('amit') ? 'usr_amit' : normalizedEmail.includes('aryan') ? 'usr_aryan' : `usr_${Date.now()}`,
-        name: normalizedEmail.includes('amit') ? 'Amit Patel' : normalizedEmail.includes('aryan') ? 'Aryan Verma' : 'Fairway User',
-        email: normalizedEmail,
-        role: normalizedEmail.includes('aryan') || normalizedEmail.includes('sales') ? 'sales' : 'super_admin',
-        status: 'Active',
-        assignedLeadsCount: 12,
-        lastActive: 'Just now',
-        department: normalizedEmail.includes('aryan') ? 'Gujarat Leasing Desk' : 'Executive Leadership',
-        avatar: normalizedEmail.includes('aryan')
-          ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      console.error('Login error:', e);
+      return {
+        success: false,
+        error: e.message || 'Unable to connect to authentication server. Please try again.',
       };
-
-      try {
-        localStorage.setItem('fw_auth_token', 'demo_jwt_token');
-        localStorage.setItem('fw_auth_authenticated', 'true');
-      } catch {}
-
-      StorageService.setCurrentUser(fallbackUser);
-      setCurrentUserState(fallbackUser);
-      setIsAuthenticated(true);
-      window.dispatchEvent(new Event('fw_storage_change'));
-
-      return { success: true, message: `Signed in as ${fallbackUser.name}` };
     }
   };
 
@@ -232,7 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         StorageService.setCurrentUser(user);
         setCurrentUserState(user);
         setIsAuthenticated(true);
-        await refreshUsers(user.id);
+        await refreshUsers(user.id, user.email);
         window.dispatchEvent(new Event('fw_storage_change'));
 
         return { success: true, message: 'Account registered successfully.' };
@@ -301,7 +289,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.removeItem('fw_auth_token');
       localStorage.setItem('fw_auth_authenticated', 'false');
+      localStorage.removeItem('fw_crm_current_user');
     } catch {}
+    window.dispatchEvent(new Event('fw_storage_change'));
   };
 
   const switchUser = (userId: string) => {

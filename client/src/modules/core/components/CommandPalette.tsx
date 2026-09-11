@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Building2, FileText, User, Warehouse, Factory, ArrowRight, X, Sparkles } from 'lucide-react';
+import { Search, Building2, FileText, User, Warehouse, Factory, ArrowRight, X } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
 import { Company, Inquiry, Contact, Property, Facility } from '@/modules/core/types';
 import { formatINR, formatSqFt } from '@/modules/core/utils/formatters';
@@ -113,13 +113,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-10 sm:pt-20 px-3 sm:px-4">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-2xl bg-surface rounded-card border border-border shadow-dialog z-10 overflow-hidden flex flex-col max-h-[85vh] animate-fade-in">
-        {/* Search Input Bar - No border, seamlessly styled */}
-        <div className="flex items-center px-3 sm:px-4 py-3 border-b border-border bg-surface shrink-0">
-          <Search className="w-4 h-4 sm:w-5 sm:h-5 text-fairway-600 mr-2.5 sm:mr-3 shrink-0" />
+      <div className="relative w-full max-w-2xl bg-surface rounded-xl border border-border shadow-2xl z-10 overflow-hidden flex flex-col max-h-[85vh] animate-fade-in text-left">
+        {/* Search Input Bar - Seamlessly integrated */}
+        <div className="flex items-center px-3.5 sm:px-4 py-3 border-b border-border bg-surface shrink-0">
+          <Search className="w-4 h-4 sm:w-5 sm:h-5 text-foreground-muted mr-2.5 sm:mr-3 shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -127,19 +127,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="w-full bg-transparent text-xs sm:text-sm text-foreground placeholder:text-foreground-muted border-0 outline-none focus:outline-none focus:ring-0 ring-0 shadow-none border-none p-0"
-            style={{ border: 'none', outline: 'none', boxShadow: 'none' }}
+            className="w-full bg-transparent text-xs sm:text-sm text-foreground placeholder:text-foreground-muted border-0 outline-none focus:outline-none focus:ring-0 ring-0 shadow-none p-0"
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="p-1 text-foreground-muted hover:text-foreground mr-1 shrink-0"
+              className="p-1 text-foreground-muted hover:text-foreground mr-1.5 shrink-0 transition-colors"
               title="Clear search"
             >
               <X className="w-4 h-4" />
             </button>
           )}
-          <span className="hidden sm:inline-block text-[10px] font-semibold bg-surface-muted text-foreground-muted px-2 py-1 rounded border border-border shrink-0 select-none">
+          <span className="hidden sm:inline-block text-[10px] font-semibold bg-surface-muted text-foreground-muted px-2 py-0.5 rounded border border-border shrink-0 select-none font-mono">
             ESC to close
           </span>
           <button onClick={onClose} className="sm:hidden p-1 text-foreground-muted hover:text-foreground shrink-0">
@@ -148,7 +147,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
         </div>
 
         {/* Results Container */}
-        <div className="overflow-y-auto p-2 space-y-4 text-left flex-1">
+        <div className="overflow-y-auto p-2 space-y-3.5 flex-1">
           {!hasResults && (
             <div className="py-12 text-center text-foreground-muted">
               <p className="text-sm font-medium">No results found for &ldquo;{query}&rdquo;</p>
@@ -159,8 +158,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           {/* Inquiries */}
           {filteredInquiries.length > 0 && (
             <div>
-              <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-fairway-600" />
+              <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-foreground-muted" />
                 <span>Inquiries / Leads</span>
               </div>
               <div className="space-y-1 mt-1">
@@ -179,32 +178,32 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                       }}
                       className={`flex items-center justify-between p-2.5 sm:px-3 sm:py-2 rounded-lg cursor-pointer transition-all gap-2 border ${
                         isSelected
-                          ? 'bg-fairway-600 text-white border-fairway-500 font-semibold shadow-xs'
-                          : 'hover:bg-surface-muted border-transparent text-foreground'
+                          ? 'bg-surface-muted border-border font-semibold shadow-2xs text-foreground ring-1 ring-border'
+                          : 'hover:bg-surface-muted/60 border-transparent text-foreground'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                         <span className={`text-[11px] sm:text-xs font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded border shrink-0 ${
-                          isSelected ? 'bg-white/20 text-white border-white/30' : 'bg-surface-muted text-foreground border-border'
+                          isSelected
+                            ? 'bg-fairway-50 text-fairway-800 border-fairway-200 dark:bg-fairway-950/70 dark:text-fairway-300 dark:border-fairway-800'
+                            : 'bg-surface-muted text-foreground border-border'
                         }`}>
                           {inq.inquiryNumber}
                         </span>
                         <div className="truncate min-w-0 flex-1">
                           <div className="text-xs font-semibold flex items-center gap-1.5 truncate">
-                            <span className="truncate">{inq.companyName}</span>
-                            <span className={`text-[11px] font-normal shrink-0 ${isSelected ? 'text-white/80' : 'text-foreground-muted'}`}>· {formatSqFt(inq.requiredAreaSqFt)}</span>
+                            <span className="truncate text-foreground">{inq.companyName}</span>
+                            <span className="text-[11px] font-normal text-foreground-muted shrink-0">· {formatSqFt(inq.requiredAreaSqFt)}</span>
                           </div>
-                          <p className={`text-[11px] truncate mt-0.5 ${isSelected ? 'text-white/80' : 'text-foreground-muted'}`}>{inq.requirement}</p>
+                          <p className="text-[11px] text-foreground-muted truncate mt-0.5">{inq.requirement}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                        <span className={`text-[10px] sm:text-[11px] font-medium px-2 py-0.5 rounded-full capitalize whitespace-nowrap ${
-                          isSelected ? 'bg-white/20 text-white font-bold' : 'bg-surface-muted text-foreground-muted border border-border'
-                        }`}>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full capitalize whitespace-nowrap bg-surface-muted text-foreground-muted border border-border">
                           {inq.stage.replace(/_/g, ' ')}
                         </span>
                         <ArrowRight className={`w-3.5 h-3.5 transition-transform shrink-0 ${
-                          isSelected ? 'text-white translate-x-0.5' : 'text-foreground-muted'
+                          isSelected ? 'text-fairway-600 translate-x-0.5' : 'text-foreground-muted'
                         }`} />
                       </div>
                     </div>
@@ -217,8 +216,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           {/* Companies */}
           {filteredCompanies.length > 0 && (
             <div>
-              <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-fairway-600" />
+              <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-foreground-muted" />
                 <span>Companies</span>
               </div>
               <div className="space-y-1 mt-1">
@@ -237,25 +236,23 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                       }}
                       className={`flex items-center justify-between p-2.5 sm:px-3 sm:py-2 rounded-lg cursor-pointer transition-all gap-2 border ${
                         isSelected
-                          ? 'bg-fairway-600 text-white border-fairway-500 font-semibold shadow-xs'
-                          : 'hover:bg-surface-muted border-transparent text-foreground'
+                          ? 'bg-surface-muted border-border font-semibold shadow-2xs text-foreground ring-1 ring-border'
+                          : 'hover:bg-surface-muted/60 border-transparent text-foreground'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                        <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${
-                          isSelected ? 'bg-white/20 text-white' : 'bg-fairway-100 text-fairway-800 dark:bg-fairway-950/70 dark:text-fairway-200'
-                        }`}>
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 bg-surface-muted text-foreground border border-border">
                           {c.name.substring(0, 2).toUpperCase()}
                         </div>
                         <div className="truncate min-w-0 flex-1">
-                          <span className="text-xs font-semibold block truncate">{c.name}</span>
-                          <p className={`text-[11px] truncate ${isSelected ? 'text-white/80' : 'text-foreground-muted'}`}>{c.industry} · {c.city}, {c.state}</p>
+                          <span className="text-xs font-semibold block truncate text-foreground">{c.name}</span>
+                          <p className="text-[11px] text-foreground-muted truncate mt-0.5">{c.industry} · {c.city}, {c.state}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                        <span className={`hidden sm:inline-block text-[11px] ${isSelected ? 'text-white/80' : 'text-foreground-muted'}`}>Owner: {c.assignedOwnerName}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="hidden sm:inline-block text-[11px] text-foreground-muted">Owner: {c.assignedOwnerName}</span>
                         <ArrowRight className={`w-3.5 h-3.5 transition-transform shrink-0 ${
-                          isSelected ? 'text-white translate-x-0.5' : 'text-foreground-muted'
+                          isSelected ? 'text-fairway-600 translate-x-0.5' : 'text-foreground-muted'
                         }`} />
                       </div>
                     </div>
@@ -268,8 +265,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           {/* Warehouse Properties */}
           {filteredProperties.length > 0 && (
             <div>
-              <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
-                <Warehouse className="w-3.5 h-3.5 text-accent-600" />
+              <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
+                <Warehouse className="w-3.5 h-3.5 text-foreground-muted" />
                 <span>Warehouse Properties</span>
               </div>
               <div className="space-y-1 mt-1">
@@ -288,25 +285,23 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                       }}
                       className={`flex items-center justify-between p-2.5 sm:px-3 sm:py-2 rounded-lg cursor-pointer transition-all gap-2 border ${
                         isSelected
-                          ? 'bg-fairway-600 text-white border-fairway-500 font-semibold shadow-xs'
-                          : 'hover:bg-surface-muted border-transparent text-foreground'
+                          ? 'bg-surface-muted border-border font-semibold shadow-2xs text-foreground ring-1 ring-border'
+                          : 'hover:bg-surface-muted/60 border-transparent text-foreground'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                        <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md font-bold text-xs flex items-center justify-center shrink-0 ${
-                          isSelected ? 'bg-white/20 text-white' : 'bg-accent-100 text-accent-800 dark:bg-accent-950/70 dark:text-accent-200'
-                        }`}>
-                          {p.code.split('-')[1]}
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 bg-surface-muted text-foreground border border-border font-mono">
+                          {p.code.split('-')[1] || p.code}
                         </div>
                         <div className="truncate min-w-0 flex-1">
-                          <span className="text-xs font-semibold block truncate">{p.name}</span>
-                          <p className={`text-[11px] truncate ${isSelected ? 'text-white/80' : 'text-foreground-muted'}`}>
+                          <span className="text-xs font-semibold block truncate text-foreground">{p.name}</span>
+                          <p className="text-[11px] text-foreground-muted truncate mt-0.5">
                             {formatSqFt(p.availableAreaSqFt)} avail @ ₹{p.rentPerSqFtINR}/sq.ft · {p.city}
                           </p>
                         </div>
                       </div>
                       <ArrowRight className={`w-3.5 h-3.5 transition-transform shrink-0 ${
-                        isSelected ? 'text-white translate-x-0.5' : 'text-foreground-muted'
+                        isSelected ? 'text-fairway-600 translate-x-0.5' : 'text-foreground-muted'
                       }`} />
                     </div>
                   );
@@ -318,8 +313,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           {/* Contacts */}
           {filteredContacts.length > 0 && (
             <div>
-              <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-sky-600" />
+              <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-foreground-muted" />
                 <span>Contacts</span>
               </div>
               <div className="space-y-1 mt-1">
@@ -338,16 +333,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                       }}
                       className={`flex items-center justify-between p-2.5 sm:px-3 sm:py-2 rounded-lg cursor-pointer transition-all gap-2 border ${
                         isSelected
-                          ? 'bg-fairway-600 text-white border-fairway-500 font-semibold shadow-xs'
-                          : 'hover:bg-surface-muted border-transparent text-foreground'
+                          ? 'bg-surface-muted border-border font-semibold shadow-2xs text-foreground ring-1 ring-border'
+                          : 'hover:bg-surface-muted/60 border-transparent text-foreground'
                       }`}
                     >
                       <div className="truncate min-w-0 flex-1">
-                        <span className="text-xs font-semibold block truncate">{cnt.name}</span>
-                        <p className={`text-[11px] truncate ${isSelected ? 'text-white/80' : 'text-foreground-muted'}`}>{cnt.designation} · {cnt.companyName} ({cnt.phone})</p>
+                        <span className="text-xs font-semibold block truncate text-foreground">{cnt.name}</span>
+                        <p className="text-[11px] text-foreground-muted truncate mt-0.5">{cnt.designation} · {cnt.companyName} ({cnt.phone})</p>
                       </div>
                       <ArrowRight className={`w-3.5 h-3.5 shrink-0 ${
-                        isSelected ? 'text-white' : 'text-foreground-muted'
+                        isSelected ? 'text-fairway-600' : 'text-foreground-muted'
                       }`} />
                     </div>
                   );
@@ -359,8 +354,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           {/* Facilities */}
           {filteredFacilities.length > 0 && (
             <div>
-              <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
-                <Factory className="w-3.5 h-3.5 text-indigo-600" />
+              <div className="px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
+                <Factory className="w-3.5 h-3.5 text-foreground-muted" />
                 <span>Facilities</span>
               </div>
               <div className="space-y-1 mt-1">
@@ -379,18 +374,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                       }}
                       className={`flex items-center justify-between p-2.5 sm:px-3 sm:py-2 rounded-lg cursor-pointer transition-all gap-2 border ${
                         isSelected
-                          ? 'bg-fairway-600 text-white border-fairway-500 font-semibold shadow-xs'
-                          : 'hover:bg-surface-muted border-transparent text-foreground'
+                          ? 'bg-surface-muted border-border font-semibold shadow-2xs text-foreground ring-1 ring-border'
+                          : 'hover:bg-surface-muted/60 border-transparent text-foreground'
                       }`}
                     >
                       <div className="truncate min-w-0 flex-1">
-                        <span className="text-xs font-semibold block truncate">{fac.name}</span>
-                        <p className={`text-[11px] truncate ${isSelected ? 'text-white/80' : 'text-foreground-muted'}`}>
+                        <span className="text-xs font-semibold block truncate text-foreground">{fac.name}</span>
+                        <p className="text-[11px] text-foreground-muted truncate mt-0.5">
                           {fac.type} · {fac.city}, {fac.state} · {fac.companyName}
                         </p>
                       </div>
                       <ArrowRight className={`w-3.5 h-3.5 shrink-0 ${
-                        isSelected ? 'text-white' : 'text-foreground-muted'
+                        isSelected ? 'text-fairway-600' : 'text-foreground-muted'
                       }`} />
                     </div>
                   );
@@ -400,15 +395,14 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-3 sm:px-4 py-2 sm:py-2.5 bg-surface-muted/50 border-t border-border flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-[11px] text-foreground-muted shrink-0">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span>Navigation: <kbd className="font-mono bg-white px-1 sm:px-1.5 py-0.5 rounded border border-border shadow-2xs">↑</kbd> <kbd className="font-mono bg-white px-1 sm:px-1.5 py-0.5 rounded border border-border shadow-2xs">↓</kbd></span>
-            <span>Select: <kbd className="font-mono bg-white px-1 sm:px-1.5 py-0.5 rounded border border-border shadow-2xs">Enter</kbd></span>
+        {/* Clean Enterprise Footer */}
+        <div className="px-3.5 sm:px-4 py-2 sm:py-2.5 bg-surface-muted/40 border-t border-border flex flex-wrap items-center justify-between gap-2 text-[10px] sm:text-[11px] text-foreground-muted shrink-0">
+          <div className="flex items-center gap-3">
+            <span>Navigation: <kbd className="font-mono bg-surface px-1.5 py-0.5 rounded border border-border shadow-2xs text-foreground text-[10px]">↑</kbd> <kbd className="font-mono bg-surface px-1.5 py-0.5 rounded border border-border shadow-2xs text-foreground text-[10px]">↓</kbd></span>
+            <span>Select: <kbd className="font-mono bg-surface px-1.5 py-0.5 rounded border border-border shadow-2xs text-foreground text-[10px]">Enter</kbd></span>
           </div>
-          <div className="flex items-center gap-1 text-fairway-800 font-medium">
-            <Sparkles className="w-3.5 h-3.5 text-accent-500 shrink-0" />
-            <span>Fairway Instant Intelligence</span>
+          <div className="flex items-center gap-1.5 text-foreground-muted font-medium">
+            <span>Close: <kbd className="font-mono bg-surface px-1.5 py-0.5 rounded border border-border shadow-2xs text-foreground text-[10px]">ESC</kbd></span>
           </div>
         </div>
       </div>

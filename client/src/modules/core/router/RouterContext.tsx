@@ -12,7 +12,7 @@ interface RouterContextType {
   activeView: ActiveNavView;
   selectedEntityId?: string;
   isAuthRoute: boolean;
-  authView: 'login' | 'signup';
+  authView: 'login';
 }
 
 const RouterContext = createContext<RouterContextType | undefined>(undefined);
@@ -22,15 +22,12 @@ export function parseRoute(pathname: string): {
   view: ActiveNavView;
   entityId?: string;
   isAuth: boolean;
-  authType: 'login' | 'signup';
+  authType: 'login';
 } {
   const cleanPath = pathname.split('?')[0].replace(/\/+$/, '') || '/';
 
-  if (cleanPath === '/login') {
+  if (cleanPath === '/login' || cleanPath === '/signup') {
     return { view: 'dashboard', isAuth: true, authType: 'login' };
-  }
-  if (cleanPath === '/signup') {
-    return { view: 'dashboard', isAuth: true, authType: 'signup' };
   }
 
   // Exact or parameterized routes
@@ -141,6 +138,18 @@ export function parseRoute(pathname: string): {
     return { view: 'profile', isAuth: false, authType: 'login' };
   }
 
+  if (cleanPath === '/contacts' || cleanPath === '/stakeholders') {
+    return { view: 'contacts', isAuth: false, authType: 'login' };
+  }
+
+  if (cleanPath === '/documents' || cleanPath === '/files') {
+    return { view: 'documents', isAuth: false, authType: 'login' };
+  }
+
+  if (cleanPath === '/communications' || cleanPath === '/inbox' || cleanPath === '/messages') {
+    return { view: 'communications', isAuth: false, authType: 'login' };
+  }
+
   if (cleanPath === '/404' || cleanPath === '/not-found') {
     return { view: 'not_found', isAuth: false, authType: 'login' };
   }
@@ -154,16 +163,20 @@ export function pathToView(view: ActiveNavView, entityId?: string): string {
   switch (view) {
     case 'dashboard':
       return '/dashboard';
+    case 'companies':
+      return '/companies';
+    case 'company_detail':
+      return `/companies/${entityId || 'comp_1'}`;
+    case 'new_company':
+      return '/companies/new';
+    case 'contacts':
+      return '/contacts';
     case 'inquiries':
       return '/leads';
     case 'new_inquiry':
       return '/inquiries/new';
     case 'inquiry_detail':
       return `/leads/${entityId || 'inq_1048'}`;
-    case 'companies':
-      return '/companies';
-    case 'company_detail':
-      return `/companies/${entityId || 'comp_1'}`;
     case 'pipeline':
       return '/pipeline';
     case 'tasks':
@@ -178,11 +191,16 @@ export function pathToView(view: ActiveNavView, entityId?: string): string {
       return '/proposals';
     case 'site_visits':
       return '/site-visits';
+    case 'documents':
+      return '/documents';
+    case 'communications':
+      return '/communications';
     case 'map':
       return '/map';
     case 'import':
       return '/import';
     case 'reports':
+    case 'analytics':
       return '/reports';
     case 'settings':
       return `/setting/${entityId || 'user-management'}`;

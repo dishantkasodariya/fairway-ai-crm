@@ -112,14 +112,14 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
                   <span className="font-bold text-foreground text-sm hover:text-fairway-800 cursor-pointer" onClick={() => onNavigateToCompany(sv.companyId)}>
                     {sv.companyName}
                   </span>
-                  <span className="font-mono text-xs bg-slate-100 px-2 py-0.5 rounded border border-border">
+                  <span className="font-mono text-xs px-2.5 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40">
                     {sv.inquiryNumber}
                   </span>
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                       sv.status === 'Completed'
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        : 'bg-orange-50 text-orange-800 border-orange-200'
+                        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                        : 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20'
                     }`}
                   >
                     {sv.status}

@@ -6,19 +6,17 @@ import { Button } from '@/modules/core/components/ui/Button';
 import { Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
 
 interface LoginPageProps {
-  onNavigateToSignUp: () => void;
   onLoginSuccess: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({
-  onNavigateToSignUp,
   onLoginSuccess,
 }) => {
   const { login } = useAuth();
   const { success, error } = useToast();
 
-  const [email, setEmail] = useState('admin@fairway.co.in');
-  const [password, setPassword] = useState('fairway123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -46,13 +44,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
-
-  const handleSelectDemoAccount = async (demoEmail: string) => {
+  const handleSelectDemoAccount = async (demoEmail: string, demoPassword = 'fairway123') => {
     setEmail(demoEmail);
-    setPassword('fairway123');
+    setPassword(demoPassword);
     setIsLoading(true);
     try {
-      const result = await login(demoEmail, 'fairway123');
+      const result = await login(demoEmail, demoPassword);
       setIsLoading(false);
       if (result.success) {
         success('Welcome back', result.message || 'Signed in successfully to Fairway workspace.');
@@ -65,6 +62,39 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       error('Sign In Error', err.message || 'An unexpected error occurred.');
     }
   };
+
+  const demoAccounts = [
+    {
+      name: 'Dishant Patel',
+      email: 'admin@fairway.com',
+      role: 'Super Admin',
+      roleBadge: 'bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300',
+    },
+    {
+      name: 'Amit Patel',
+      email: 'amit@fairway.co.in',
+      role: 'Super Admin',
+      roleBadge: 'bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300',
+    },
+    {
+      name: 'Aryan Verma',
+      email: 'aryan@fairway.co.in',
+      role: 'Sales Lead',
+      roleBadge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300',
+    },
+    {
+      name: 'Rahul Sharma',
+      email: 'sales@fairway.com',
+      role: 'Sales Desk',
+      roleBadge: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300',
+    },
+    {
+      name: 'Aditya Mehta',
+      email: 'admin@fairway.co.in',
+      role: 'Admin',
+      roleBadge: 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300',
+    },
+  ];
 
   return (
     <AuthLayout
@@ -87,11 +117,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xl font-black tracking-tight text-foreground">FAIRWAY</span>
-              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-accent-100 text-accent-900 border border-accent-300 dark:bg-accent-950/70 dark:text-accent-300 dark:border-accent-800/60 shadow-2xs">
-                AI CRM
+              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-muted text-foreground-muted border border-border shadow-2xs">
+                CRM
               </span>
             </div>
-
           </div>
           <p className="text-xs text-foreground-muted">
             Enter your email and password to access your CRM workspace.
@@ -111,7 +140,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@fairway.co.in"
+                placeholder="e.g. admin@fairway.com"
                 className="w-full pl-9 pr-3 py-2.5 bg-surface border border-border hover:border-slate-300 focus:border-fairway-600 focus:ring-1 focus:ring-fairway-600 rounded-lg text-xs text-foreground placeholder:text-foreground-muted transition-colors outline-none shadow-xs"
               />
               <Mail className="w-4 h-4 text-foreground-muted absolute left-3 pointer-events-none" />
@@ -155,45 +184,38 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           >
             Sign in
           </Button>
-
-          {/* Switch Link */}
-          <div className="pt-1 text-center">
-            <p className="text-xs text-foreground-muted">
-              Don&apos;t have an account?{' '}
-              <button
-                type="button"
-                onClick={onNavigateToSignUp}
-                className="font-bold text-fairway-700 hover:text-fairway-900 underline underline-offset-2 transition-colors ml-0.5"
-              >
-                Sign up
-              </button>
-            </p>
-          </div>
         </form>
 
         {/* Demo Accounts Helper */}
         <div className="p-3.5 rounded-xl bg-surface-muted/60 border border-border space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-fairway-900">
-            <Shield className="w-3.5 h-3.5 text-fairway-700" />
-            <span>Instant Demo Accounts</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-fairway-900">
+              <Shield className="w-3.5 h-3.5 text-fairway-700" />
+              <span>Instant Demo Accounts</span>
+            </div>
+            <span className="text-[10px] text-foreground-muted font-mono">Password: fairway123</span>
           </div>
           <div className="space-y-1 text-xs">
-            <button
-              type="button"
-              onClick={() => handleSelectDemoAccount('amit@fairway.co.in')}
-              className="w-full text-left hover:text-fairway-800 hover:bg-surface p-1.5 rounded transition-colors flex items-center justify-between border border-transparent hover:border-border"
-            >
-              <span className="font-mono text-[11px] text-foreground">amit@fairway.co.in</span>
-              <span className="font-semibold text-purple-700 text-[10px] bg-purple-100 dark:bg-purple-950/70 dark:text-purple-300 px-1.5 py-0.5 rounded">Super Admin</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectDemoAccount('aryan@fairway.co.in')}
-              className="w-full text-left hover:text-fairway-800 hover:bg-surface p-1.5 rounded transition-colors flex items-center justify-between border border-transparent hover:border-border"
-            >
-              <span className="font-mono text-[11px] text-foreground">aryan@fairway.co.in</span>
-              <span className="font-semibold text-emerald-700 text-[10px] bg-emerald-100 dark:bg-emerald-950/70 dark:text-emerald-300 px-1.5 py-0.5 rounded">Sales Lead</span>
-            </button>
+            {demoAccounts.map((account) => (
+              <button
+                key={account.email}
+                type="button"
+                onClick={() => handleSelectDemoAccount(account.email)}
+                className="w-full text-left hover:text-fairway-800 hover:bg-surface p-1.5 rounded transition-colors flex items-center justify-between border border-transparent hover:border-border group"
+              >
+                <div className="min-w-0 flex items-center gap-2">
+                  <span className="font-semibold text-[11px] text-foreground group-hover:text-fairway-700 truncate">
+                    {account.name}
+                  </span>
+                  <span className="font-mono text-[10px] text-foreground-muted truncate">
+                    ({account.email})
+                  </span>
+                </div>
+                <span className={`font-semibold text-[9px] px-1.5 py-0.5 rounded shrink-0 ${account.roleBadge}`}>
+                  {account.role}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       </div>

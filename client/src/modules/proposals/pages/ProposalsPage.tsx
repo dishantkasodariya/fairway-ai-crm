@@ -104,7 +104,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
       label: 'Proposal #',
       width: 140,
       render: (prp) => (
-        <span className="font-mono font-bold text-purple-900 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
+        <span className="font-mono font-bold text-purple-700 dark:text-purple-300 bg-purple-500/10 dark:bg-purple-950/60 px-2 py-0.5 rounded border border-purple-500/20 dark:border-purple-800/60">
           {prp.proposalNumber}
         </span>
       ),
@@ -119,7 +119,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
             e.stopPropagation();
             onNavigateToCompany(prp.companyId);
           }}
-          className="font-bold text-foreground hover:text-fairway-800 hover:underline cursor-pointer"
+          className="font-bold text-foreground hover:text-primary hover:underline cursor-pointer"
         >
           {prp.companyName}
         </span>
@@ -131,7 +131,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
       width: 240,
       render: (prp) => (
         <div className="flex items-center gap-1.5 font-medium text-foreground">
-          <Warehouse className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <Warehouse className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
           <span className="truncate">{prp.propertyName}</span>
         </div>
       ),
@@ -147,8 +147,8 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
       label: 'Commercial Terms',
       width: 240,
       render: (prp) => (
-        <span className="text-foreground-muted">
-          Base: ₹{prp.baseRentPerSqFtINR} + CAM: ₹{prp.maintenancePerSqFtINR} ({prp.escalationPercentPerYear}% esc.)
+        <span className="text-foreground-muted text-xs">
+          Base: <span className="text-foreground font-semibold">₹{prp.baseRentPerSqFtINR}</span> + CAM: <span className="text-foreground font-semibold">₹{prp.maintenancePerSqFtINR}</span> ({prp.escalationPercentPerYear}% esc.)
         </span>
       ),
     },
@@ -156,7 +156,11 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
       key: 'totalMonthlyRentINR',
       label: 'Monthly Rent',
       width: 160,
-      render: (prp) => <span className="font-mono font-bold text-fairway-900">{formatINR(prp.totalMonthlyRentINR)}</span>,
+      render: (prp) => (
+        <span className="font-mono font-bold text-foreground dark:text-white text-sm tracking-tight">
+          {formatINR(prp.totalMonthlyRentINR)}
+        </span>
+      ),
     },
     {
       key: 'status',
@@ -188,7 +192,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
                   handleUpdateStatus(prp.id, st);
                 }}
                 className={prp.status === st ? 'bg-surface-muted font-semibold' : ''}
-                icon={prp.status === st ? <Check className="w-3.5 h-3.5 text-fairway-600" /> : undefined}
+                icon={prp.status === st ? <Check className="w-3.5 h-3.5 text-primary" /> : undefined}
               >
                 {st}
               </DropdownMenuItem>
@@ -204,41 +208,33 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
     {
       key: 'actions',
       label: 'PDF Document',
-      width: 170,
+      width: 160,
       render: (prp) => (
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
+        <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="xs"
+            variant="outline"
+            leftIcon={<Download className="w-3.5 h-3.5 text-primary shrink-0" />}
             onClick={() => {
               downloadProposalPDF(prp);
               success('Generating Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'} for print/download`);
             }}
-            className="p-1.5 text-fairway-700 dark:text-fairway-300 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950/60 rounded-md transition-colors border border-transparent hover:border-purple-200 cursor-pointer shadow-2xs"
-            title={`Download / Print ${prp.documentName || 'Commercial Proposal'}`}
+            className="bg-surface-muted/70 hover:bg-surface-muted text-foreground dark:text-white border-border hover:border-primary/50 text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+            title={`Download ${prp.documentName || 'Commercial Proposal'}`}
           >
-            <Download className="w-3.5 h-3.5" />
-          </button>
-          <span
-            onClick={() => {
-              downloadProposalPDF(prp);
-              success('Generating Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'} for print/download`);
-            }}
-            className="text-[11px] text-fairway-700 dark:text-fairway-300 hover:underline cursor-pointer font-medium truncate"
-            title={`Click to view & download ${prp.documentName}`}
-          >
-            {prp.documentName}
-          </span>
+            Download
+          </Button>
         </div>
       ),
     },
   ];
 
   return (
-    <div className="space-y-4 max-w-7xl mx-auto text-left">
+    <div className="space-y-4 max-w-8xl mx-auto text-left">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
-          <span className="text-xs font-semibold text-fairway-800 uppercase tracking-wider">CRM / Proposals</span>
+          <span className="text-xs font-semibold text-primary uppercase tracking-wider">CRM / Proposals</span>
           <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 mt-0.5">
             <FileSpreadsheet className="w-6 h-6 text-purple-600" />
             <span>Commercial Proposal Management</span>
@@ -251,7 +247,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">Total Quoted Value</span>
-            <span className="text-sm font-extrabold text-purple-900">{formatINR(totalProposalsMonthlyValue, true)} / month</span>
+            <span className="text-sm font-extrabold text-foreground dark:text-white">{formatINR(totalProposalsMonthlyValue, true)} / month</span>
           </div>
         </div>
       </div>
@@ -265,7 +261,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
             placeholder="Search proposals by number, company, or property..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 bg-surface-muted/60 border border-border rounded-input text-xs focus:outline-none focus:border-fairway-600"
+            className="w-full pl-9 pr-4 py-1.5 bg-surface-muted/60 border border-border rounded-input text-xs text-foreground focus:outline-none focus:border-primary"
           />
         </div>
 
@@ -273,7 +269,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-surface border border-border rounded-input px-2.5 py-1.5 font-medium text-foreground focus:outline-none"
+            className="bg-surface border border-border rounded-input px-2.5 py-1.5 font-medium text-foreground focus:outline-none focus:border-primary"
           >
             <option value="all">All Statuses</option>
             <option value="Draft">Draft</option>

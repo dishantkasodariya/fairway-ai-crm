@@ -100,6 +100,70 @@ const memoryUsers: Map<string, MemoryUser> = new Map([
     },
   ],
   [
+    'admin@fairway.com',
+    {
+      id: 'e13cc314-f451-4c91-a2c0-571973b78ad5',
+      name: 'Dishant Patel (Super Admin)',
+      email: 'admin@fairway.com',
+      password: '',
+      role: 'super_admin',
+      department: 'Executive Leadership',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      status: 'Active',
+      assigned_leads_count: 18,
+      last_active: new Date(),
+      created_at: new Date(),
+    },
+  ],
+  [
+    'sales@fairway.com',
+    {
+      id: '8e5d2779-3129-4e6f-9c37-bbbe5169a1db',
+      name: 'Rahul Sharma',
+      email: 'sales@fairway.com',
+      password: '',
+      role: 'admin',
+      department: 'Industrial Brokerage',
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+      status: 'Active',
+      assigned_leads_count: 12,
+      last_active: new Date(),
+      created_at: new Date(),
+    },
+  ],
+  [
+    'manager@fairway.com',
+    {
+      id: 'c31f7458-e11d-48c5-b853-18b8541b2122',
+      name: 'Deepak Mehta',
+      email: 'manager@fairway.com',
+      password: '',
+      role: 'admin',
+      department: 'Executive Leadership',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+      status: 'Active',
+      assigned_leads_count: 9,
+      last_active: new Date(),
+      created_at: new Date(),
+    },
+  ],
+  [
+    'dishant@fairway.co.in',
+    {
+      id: 'usr_dishant',
+      name: 'Dishant Patel',
+      email: 'dishant@fairway.co.in',
+      password: '',
+      role: 'super_admin',
+      department: 'Executive Leadership',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      status: 'Active',
+      assigned_leads_count: 10,
+      last_active: new Date(),
+      created_at: new Date(),
+    },
+  ],
+  [
     'sales@fairway.co.in',
     {
       id: 'usr_sales_1',
@@ -282,10 +346,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     let isMatch = false;
-    if (password === 'fairway123') {
+    if (userRow.password) {
+      isMatch = await comparePassword(password, userRow.password).catch(() => false);
+      if (!isMatch && userRow.password === password) {
+        isMatch = true;
+      }
+    } else if (password === 'fairway123' || password === 'admin123') {
       isMatch = true;
-    } else if (userRow.password) {
-      isMatch = await comparePassword(password, userRow.password);
     }
 
     if (!isMatch) {

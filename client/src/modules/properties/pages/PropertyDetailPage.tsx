@@ -238,7 +238,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
             {/* Top Badges */}
             <div className="absolute top-3 left-3 flex items-center gap-2 flex-wrap z-10">
               <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-black/70 backdrop-blur-md text-white border border-white/10 shadow-sm flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-fairway-400" />
+                <Building2 className="w-3.5 h-3.5 text-fairway-400" />
                 <span>Grade A Industrial Park</span>
               </span>
               {property.greenBuildingCert && (
@@ -428,7 +428,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
                 }
               }}
               className="w-full bg-fairway-600 hover:bg-fairway-700 text-white font-bold text-xs py-2.5 rounded-xl shadow-xs"
-              leftIcon={<Sparkles className="w-4 h-4" />}
+              leftIcon={<Building2 className="w-4 h-4" />}
             >
               Match Inquiries ({matchingInquiries.length} Active Leads)
             </Button>
@@ -716,7 +716,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
               <div>
                 <h2 className="text-base font-bold text-foreground tracking-tight flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-fairway-600" />
+                  <FileText className="w-4 h-4 text-fairway-600" />
                   <span>Compatible CRM Inquiries ({matchingInquiries.length})</span>
                 </h2>
                 <p className="text-xs text-foreground-muted mt-0.5">
@@ -747,7 +747,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
                         {inquiry.inquiryNumber}
                       </span>
                       <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-emerald-600" />
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                         <span>{score}% Fit</span>
                       </span>
                     </div>

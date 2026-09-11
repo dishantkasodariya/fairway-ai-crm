@@ -615,11 +615,20 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
     [onSelectCompany, users]
   );
 
+  const pagedCompanies = useMemo(() => {
+    // If backend already paginated (server returned single page where totalCount > companies.length)
+    if (totalCount > companies.length && companies.length <= pagination.pageSize) {
+      return companies;
+    }
+    const start = pagination.pageIndex * pagination.pageSize;
+    return companies.slice(start, start + pagination.pageSize);
+  }, [companies, pagination.pageIndex, pagination.pageSize, totalCount]);
+
   const table = useTable({
     features: dataGridFeatures,
     columns: companyColumns,
-    data: companies,
-    pageCount: Math.ceil((totalCount || companies.length || 0) / (pagination.pageSize || 10)),
+    data: pagedCompanies,
+    pageCount: Math.max(1, Math.ceil((totalCount || companies.length || 0) / (pagination.pageSize || 10))),
     manualPagination: true,
     manualSorting: true,
     manualFiltering: true,
@@ -640,27 +649,67 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
     onColumnSizingChange: setColumnSizing,
   });
 
-  const exportCSV = () => {
-    const headers = ['Company Name', 'Legal Name', 'Industry', 'Status', 'City', 'Owner', 'Priority', 'Prospect Stage'];
-    const rows = companies.map((c) => [
-      `"${c.name}"`,
-      `"${c.legalName || ''}"`,
-      `"${c.industry || ''}"`,
-      `"${c.status || ''}"`,
-      `"${c.city || ''}"`,
-      `"${c.assignedOwnerName || ''}"`,
-      `"${c.priority || ''}"`,
-      `"${c.prospectStage || ''}"`,
-    ]);
+  const [isExporting, setIsExporting] = useState(false);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Fairway_CRM_Companies_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const exportCSV = async () => {
+    setIsExporting(true);
+    try {
+      // 1. Fetch all companies without pagination limits
+      let allData: Company[] = [];
+      try {
+        const res = await CompanyService.getCompanies({
+          search: debouncedSearchQuery || undefined,
+          industry: industryFilter !== 'all' ? industryFilter : undefined,
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          priority: priorityFilter !== 'all' ? priorityFilter : undefined,
+          city: cityFilter !== 'all' ? cityFilter : undefined,
+          assignedOwnerId: ownerFilter !== 'all' ? ownerFilter : undefined,
+          pageNumber: 1,
+          pageSize: 10000,
+        });
+        if (res.success && res.data && res.data.length > 0) {
+          allData = res.data;
+        }
+      } catch {
+        // Fallback to local
+      }
+
+      if (allData.length === 0) {
+        allData = StorageService.getCompanies();
+      }
+
+      const headers = ['Company Name', 'Legal Name', 'Industry', 'Status', 'City', 'State', 'Phone', 'Email', 'Owner', 'Priority', 'Prospect Stage', 'Turnover', 'Employee Count'];
+      const rows = allData.map((c) => [
+        `"${(c.name || '').replace(/"/g, '""')}"`,
+        `"${(c.legalName || '').replace(/"/g, '""')}"`,
+        `"${(c.industry || '').replace(/"/g, '""')}"`,
+        `"${(c.status || '').replace(/"/g, '""')}"`,
+        `"${(c.city || '').replace(/"/g, '""')}"`,
+        `"${(c.state || '').replace(/"/g, '""')}"`,
+        `"${(c.phone || '').replace(/"/g, '""')}"`,
+        `"${(c.email || '').replace(/"/g, '""')}"`,
+        `"${(c.assignedOwnerName || '').replace(/"/g, '""')}"`,
+        `"${(c.priority || '').replace(/"/g, '""')}"`,
+        `"${(c.prospectStage || '').replace(/"/g, '""')}"`,
+        `"${(c.annualTurnover || '').replace(/"/g, '""')}"`,
+        `"${(c.employeeCount || '').replace(/"/g, '""')}"`,
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Fairway_CRM_Companies_All_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export companies CSV', err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (pageMode === 'form') {
@@ -697,8 +746,14 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
 
         {/* Action Toolbar */}
         <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" variant="outline" onClick={exportCSV} leftIcon={<Download className="w-3.5 h-3.5" />}>
-            Export CSV
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={exportCSV}
+            disabled={isExporting}
+            leftIcon={isExporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+          >
+            {isExporting ? 'Exporting...' : 'Export CSV'}
           </Button>
           <Button size="sm" variant="outline" onClick={onOpenImport} leftIcon={<UploadCloud className="w-3.5 h-3.5" />}>
             Import
@@ -1033,7 +1088,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                 </DataGridContainer>
               </Card>
             )}
-            {companies.length > 0 && <DataGridPagination sizes={[10, 20, 50, 100]} />}
+            {companies.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
           </div>
         </DataGrid>
       ) : (
@@ -1050,7 +1105,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                   <CompanyCardSkeleton key={i} mode="grid" />
                 ))}
               </div>
-            ) : companies.length === 0 ? (
+            ) : pagedCompanies.length === 0 ? (
               <CompanyEmptyState
                 hasFilters={activeFiltersCount > 0 || !!searchQuery}
                 onClearFilters={handleClearAllFilters}
@@ -1058,7 +1113,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {companies.map((comp) => (
+                {pagedCompanies.map((comp) => (
                   <CompanyCard
                     key={comp.id}
                     company={comp}
@@ -1071,7 +1126,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
             )}
 
             {/* Pagination for Card View */}
-            {companies.length > 0 && <DataGridPagination sizes={[10, 20, 50, 100]} />}
+            {pagedCompanies.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
           </div>
         </DataGrid>
       )}

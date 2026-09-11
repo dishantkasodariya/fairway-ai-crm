@@ -62,6 +62,23 @@ export const ProfilePage: React.FC = () => {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
+  // Sync form state whenever currentUser changes and not actively editing
+  useEffect(() => {
+    if (!isEditing) {
+      setName(currentUser.name || '');
+      const rawPhone = currentUser.phone || '+91 988496151';
+      const cleanPhone = rawPhone.replace('+91', '').trim();
+      setPhone(cleanPhone || '98849 6151');
+      setDepartment(currentUser.department || 'Industrial Leasing');
+      setTimezone(currentUser.timezone || 'Asia/Kolkata');
+      setWorkingHoursStart(currentUser.workingHoursStart || '10:00 AM');
+      setWorkingHoursEnd(currentUser.workingHoursEnd || '7:30 PM');
+      setBirthDate(currentUser.birthDate || '');
+      setAvatar(currentUser.avatar || '');
+      setTwoFactorEnabled(currentUser.twoFactorEnabled ?? false);
+    }
+  }, [currentUser, isEditing]);
+
   // Lock body scroll when modal is open
   useEffect(() => {
     if (isPasswordModalOpen) {

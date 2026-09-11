@@ -90,12 +90,24 @@ export const initDatabase = async () => {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'admin';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(255) DEFAULT 'Industrial Leasing';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50) DEFAULT '+91 988496151';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR(100) DEFAULT 'Asia/Kolkata';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS working_hours_start VARCHAR(50) DEFAULT '10:00 AM';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS working_hours_end VARCHAR(50) DEFAULT '7:30 PM';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT false;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Active';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_leads_count INT DEFAULT 0;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE users ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE users ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE users ALTER COLUMN "createdAt" DROP NOT NULL;
+      ALTER TABLE users ALTER COLUMN "updatedAt" DROP NOT NULL;
     `);
     console.log('✅ Table "users" verified / updated in PostgreSQL.');
 
@@ -240,18 +252,7 @@ export const initDatabase = async () => {
         'Active',
         8,
       ],
-      [
-        'usr_admin_1',
-        'Aditya Mehta',
-        'admin@fairway.co.in',
-        defaultPasswordHash,
-        'admin',
-        'Executive Leadership',
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        '+91 98250 67890',
-        'Active',
-        14,
-      ],
+      
       [
         'usr_sales_1',
         'Pooja Hegde',
@@ -271,7 +272,11 @@ export const initDatabase = async () => {
         `INSERT INTO users (id, name, email, password, role, department, avatar, phone, status, assigned_leads_count)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (email) DO UPDATE 
-         SET name = EXCLUDED.name, role = EXCLUDED.role, department = EXCLUDED.department, avatar = EXCLUDED.avatar;`,
+         SET name = EXCLUDED.name, 
+             password = EXCLUDED.password, 
+             role = EXCLUDED.role, 
+             department = EXCLUDED.department, 
+             avatar = EXCLUDED.avatar;`,
         u
       );
     }
@@ -401,11 +406,129 @@ export const initDatabase = async () => {
       ALTER TABLE inquiries ALTER COLUMN lead_score TYPE BIGINT;
       ALTER TABLE inquiries ALTER COLUMN opportunity_score TYPE BIGINT;
 
+      -- Auto-migrate companies columns
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS legal_name VARCHAR(255);
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS assigned_owner_id VARCHAR(255);
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS assigned_owner_name VARCHAR(255);
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS prospect_stage VARCHAR(100) DEFAULT 'New';
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS annual_turnover VARCHAR(100);
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS employee_count VARCHAR(100);
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS gujarat_presence BOOLEAN DEFAULT true;
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+
+      -- Auto-migrate contacts columns
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS company_id VARCHAR(255);
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS linkedin_url VARCHAR(255);
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT false;
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS notes TEXT;
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE contacts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+
+      -- Auto-migrate facilities columns
+      ALTER TABLE facilities ADD COLUMN IF NOT EXISTS company_id VARCHAR(255);
+      ALTER TABLE facilities ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
+      ALTER TABLE facilities ADD COLUMN IF NOT EXISTS pincode VARCHAR(20);
+      ALTER TABLE facilities ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+      ALTER TABLE facilities ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+      ALTER TABLE facilities ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Active';
+      ALTER TABLE facilities ADD COLUMN IF NOT EXISTS built_up_area_sq_ft NUMERIC;
+      ALTER TABLE facilities ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE facilities ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
       ALTER TABLE facilities ALTER COLUMN latitude TYPE NUMERIC;
       ALTER TABLE facilities ALTER COLUMN longitude TYPE NUMERIC;
       ALTER TABLE facilities ALTER COLUMN built_up_area_sq_ft TYPE NUMERIC;
+
+      -- Auto-migrate inquiries columns
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS inquiry_number VARCHAR(50);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS company_id VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS contact_id VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS contact_email VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS whatsapp VARCHAR(50);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS linkedin VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS source VARCHAR(100) DEFAULT 'Direct';
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS inquiry_date VARCHAR(50) DEFAULT CURRENT_DATE;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS salesperson_id VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS salesperson_name VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS requirement TEXT;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS required_area_sq_ft NUMERIC;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS location VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS target_corridor VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS industry VARCHAR(100);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS possession_date VARCHAR(50);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS lease_duration_months BIGINT DEFAULT 36;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS budget_monthly_inr NUMERIC;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS dock_requirements BIGINT DEFAULT 2;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS clear_height_ft NUMERIC DEFAULT 30;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS floor_load_capacity VARCHAR(100) DEFAULT '5 MT/Sq.M';
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS power_kva NUMERIC DEFAULT 50;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS fire_systems_required BOOLEAN DEFAULT true;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS special_requirements TEXT;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'Medium';
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS lead_score BIGINT DEFAULT 80;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS opportunity_score BIGINT DEFAULT 90;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS stage VARCHAR(100) DEFAULT 'new';
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Active';
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS next_action TEXT;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS next_follow_up_date VARCHAR(50);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+
+      -- Relax legacy camelCase NOT NULL constraints if they exist
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'contacts' AND column_name = 'companyId') THEN
+          ALTER TABLE contacts ALTER COLUMN "companyId" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'contacts' AND column_name = 'updatedAt') THEN
+          ALTER TABLE contacts ALTER COLUMN "updatedAt" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'contacts' AND column_name = 'createdAt') THEN
+          ALTER TABLE contacts ALTER COLUMN "createdAt" DROP NOT NULL;
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'facilities' AND column_name = 'companyId') THEN
+          ALTER TABLE facilities ALTER COLUMN "companyId" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'facilities' AND column_name = 'name') THEN
+          ALTER TABLE facilities ALTER COLUMN "name" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'facilities' AND column_name = 'updatedAt') THEN
+          ALTER TABLE facilities ALTER COLUMN "updatedAt" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'facilities' AND column_name = 'createdAt') THEN
+          ALTER TABLE facilities ALTER COLUMN "createdAt" DROP NOT NULL;
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'inquiries' AND column_name = 'companyId') THEN
+          ALTER TABLE inquiries ALTER COLUMN "companyId" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'inquiries' AND column_name = 'stageId') THEN
+          ALTER TABLE inquiries ALTER COLUMN "stageId" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'inquiries' AND column_name = 'inquiryNumber') THEN
+          ALTER TABLE inquiries ALTER COLUMN "inquiryNumber" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'inquiries' AND column_name = 'updatedAt') THEN
+          ALTER TABLE inquiries ALTER COLUMN "updatedAt" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'inquiries' AND column_name = 'createdAt') THEN
+          ALTER TABLE inquiries ALTER COLUMN "createdAt" DROP NOT NULL;
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'companies' AND column_name = 'updatedAt') THEN
+          ALTER TABLE companies ALTER COLUMN "updatedAt" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'companies' AND column_name = 'createdAt') THEN
+          ALTER TABLE companies ALTER COLUMN "createdAt" DROP NOT NULL;
+        END IF;
+      END $$;
     `);
-    console.log('✅ Table "inquiries" verified / updated in PostgreSQL.');
+    console.log('✅ Tables "companies", "contacts", "facilities", and "inquiries" verified / updated in PostgreSQL.');
 
     // Seed initial companies & inquiries if empty
     const compCount = await client.query('SELECT COUNT(*) FROM companies;');
@@ -743,6 +866,278 @@ export const initDatabase = async () => {
         );
       `);
       console.log('✅ Demo proposals seeded successfully.');
+    }
+
+    // 13. Create activities table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS activities (
+        id VARCHAR(255) PRIMARY KEY,
+        company_id VARCHAR(255) REFERENCES companies(id) ON DELETE CASCADE,
+        company_name VARCHAR(255),
+        inquiry_id VARCHAR(255) REFERENCES inquiries(id) ON DELETE SET NULL,
+        inquiry_number VARCHAR(50),
+        user_id VARCHAR(255),
+        user_name VARCHAR(255),
+        activity_type VARCHAR(50) DEFAULT 'Call',
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        metadata JSONB DEFAULT '{}',
+        activity_date VARCHAR(50),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_activities_company ON activities(company_id);
+      CREATE INDEX IF NOT EXISTS idx_activities_inquiry ON activities(inquiry_id);
+    `);
+    console.log('✅ Table "activities" verified / updated in PostgreSQL.');
+
+    // Seed demo activity if empty
+    const actCount = await client.query('SELECT COUNT(*) FROM activities;');
+    if (parseInt(actCount.rows[0].count, 10) === 0) {
+      await client.query(`
+        INSERT INTO activities (
+          id, company_id, company_name, inquiry_id, inquiry_number, user_id, user_name, activity_type, title, description, activity_date
+        ) VALUES (
+          'act_1', 'comp_1', 'Reliance Petrochemicals', 'inq_1048', 'INQ-1048', 'usr_sales_1', 'Pooja Hegde', 'Call',
+          'Initial technical discussion regarding 75,000 sq.ft requirement at Dahej PCPIR node.',
+          CURRENT_DATE::text
+        );
+      `);
+      console.log('✅ Demo activity seeded.');
+    }
+
+    // 14. Create notes table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notes (
+        id VARCHAR(255) PRIMARY KEY,
+        company_id VARCHAR(255) REFERENCES companies(id) ON DELETE CASCADE,
+        company_name VARCHAR(255),
+        inquiry_id VARCHAR(255) REFERENCES inquiries(id) ON DELETE SET NULL,
+        inquiry_number VARCHAR(50),
+        author_id VARCHAR(255),
+        author_name VARCHAR(255),
+        content TEXT NOT NULL,
+        is_pinned BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_notes_company ON notes(company_id);
+      CREATE INDEX IF NOT EXISTS idx_notes_inquiry ON notes(inquiry_id);
+    `);
+    console.log('✅ Table "notes" verified / updated in PostgreSQL.');
+
+    // Seed demo note if empty
+    const noteCount = await client.query('SELECT COUNT(*) FROM notes;');
+    if (parseInt(noteCount.rows[0].count, 10) === 0) {
+      await client.query(`
+        INSERT INTO notes (
+          id, company_id, company_name, inquiry_id, inquiry_number, author_id, author_name, content, is_pinned
+        ) VALUES (
+          'not_1', 'comp_1', 'Reliance Petrochemicals', 'inq_1048', 'INQ-1048', 'usr_sales_1', 'Pooja Hegde',
+          'Client requires FM Global or NFPA standard sprinkler system and heavy trailer turnaround apron. Budget is flexible if delivery by Q4 is guaranteed.',
+          true
+        );
+      `);
+      console.log('✅ Demo note seeded.');
+    }
+
+    // 15. Create follow_ups table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS follow_ups (
+        id VARCHAR(255) PRIMARY KEY,
+        inquiry_id VARCHAR(255) REFERENCES inquiries(id) ON DELETE SET NULL,
+        inquiry_number VARCHAR(50),
+        company_id VARCHAR(255) REFERENCES companies(id) ON DELETE CASCADE,
+        company_name VARCHAR(255),
+        contact_id VARCHAR(255) REFERENCES contacts(id) ON DELETE SET NULL,
+        contact_name VARCHAR(255),
+        assigned_user_id VARCHAR(255),
+        assigned_user_name VARCHAR(255),
+        follow_up_date VARCHAR(50) NOT NULL,
+        follow_up_time VARCHAR(50) DEFAULT '11:00 AM',
+        channel VARCHAR(50) DEFAULT 'Call',
+        status VARCHAR(50) DEFAULT 'Scheduled',
+        priority VARCHAR(50) DEFAULT 'High',
+        summary TEXT,
+        outcome_notes TEXT,
+        pdf_generated_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_follow_ups_company ON follow_ups(company_id);
+      CREATE INDEX IF NOT EXISTS idx_follow_ups_inquiry ON follow_ups(inquiry_id);
+      CREATE INDEX IF NOT EXISTS idx_follow_ups_date ON follow_ups(follow_up_date);
+    `);
+    console.log('✅ Table "follow_ups" verified / updated in PostgreSQL.');
+
+    // Seed demo follow-up if empty
+    const followUpCount = await client.query('SELECT COUNT(*) FROM follow_ups;');
+    if (parseInt(followUpCount.rows[0].count, 10) === 0) {
+      await client.query(`
+        INSERT INTO follow_ups (
+          id, inquiry_id, inquiry_number, company_id, company_name, contact_id, contact_name,
+          assigned_user_id, assigned_user_name, follow_up_date, follow_up_time, channel, status, priority, summary
+        ) VALUES (
+          'fu_1', 'inq_1048', 'INQ-1048', 'comp_1', 'Reliance Petrochemicals', 'cnt_1', 'Rajesh Patel',
+          'usr_sales_1', 'Pooja Hegde', CURRENT_DATE::text, '02:00 PM', 'Call', 'Scheduled', 'High',
+          'Follow up on commercial lease proposal and schedule technical team site visit.'
+        );
+      `);
+      console.log('✅ Demo follow-up seeded.');
+    }
+
+    // 16. Create inquiry_stage_history table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS inquiry_stage_history (
+        id VARCHAR(255) PRIMARY KEY,
+        inquiry_id VARCHAR(255) REFERENCES inquiries(id) ON DELETE CASCADE,
+        from_stage VARCHAR(100),
+        to_stage VARCHAR(100) NOT NULL,
+        changed_by_user_id VARCHAR(255),
+        changed_by_user_name VARCHAR(255),
+        reason TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_stage_hist_inq ON inquiry_stage_history(inquiry_id);
+    `);
+    console.log('✅ Table "inquiry_stage_history" verified / updated in PostgreSQL.');
+
+    // 17. Create audit_logs table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255),
+        user_name VARCHAR(255),
+        action VARCHAR(100) NOT NULL,
+        entity_type VARCHAR(100) NOT NULL,
+        entity_id VARCHAR(255),
+        details JSONB DEFAULT '{}',
+        ip_address VARCHAR(100),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type, entity_id);
+      CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at);
+    `);
+    console.log('✅ Table "audit_logs" verified / updated in PostgreSQL.');
+
+    // 18. Create documents table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS documents (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        file_type VARCHAR(50) DEFAULT 'PDF',
+        file_size VARCHAR(50) DEFAULT '1.2 MB',
+        url TEXT,
+        company_id VARCHAR(255) REFERENCES companies(id) ON DELETE SET NULL,
+        company_name VARCHAR(255),
+        inquiry_id VARCHAR(255) REFERENCES inquiries(id) ON DELETE SET NULL,
+        inquiry_number VARCHAR(50),
+        uploaded_by_id VARCHAR(255),
+        uploaded_by_name VARCHAR(255),
+        category VARCHAR(100) DEFAULT 'Commercial Proposal',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_documents_company ON documents(company_id);
+      CREATE INDEX IF NOT EXISTS idx_documents_inquiry ON documents(inquiry_id);
+    `);
+    console.log('✅ Table "documents" verified / updated in PostgreSQL.');
+
+    // Seed demo documents if empty
+    const docCount = await client.query('SELECT COUNT(*) FROM documents;');
+    if (parseInt(docCount.rows[0].count, 10) === 0) {
+      await client.query(`
+        INSERT INTO documents (
+          id, name, file_type, file_size, url, company_id, company_name, inquiry_id, inquiry_number, uploaded_by_id, uploaded_by_name, category
+        ) VALUES 
+        (
+          'doc_1', 'Fairway_Commercial_Proposal_INQ-1048.pdf', 'PDF', '1.8 MB',
+          '/api/v1/follow-ups/fu_1/download-pdf', 'comp_1', 'Reliance Petrochemicals', 'inq_1048', 'INQ-1048',
+          'usr_sales_1', 'Pooja Hegde', 'Commercial Proposal'
+        ),
+        (
+          'doc_2', 'Dahej_Logistics_Park_PCPIR_Layout_Specs.pdf', 'PDF', '4.2 MB',
+          '/api/v1/follow-ups/fu_1/download-pdf', 'comp_1', 'Reliance Petrochemicals', 'inq_1048', 'INQ-1048',
+          'usr_admin_1', 'Aditya Mehta', 'Engineering Blueprint'
+        ),
+        (
+          'doc_3', 'Master_Inquiry_Specifications_Matrix.xlsx', 'XLSX', '650 KB',
+          '#', 'comp_1', 'Reliance Petrochemicals', 'inq_1048', 'INQ-1048',
+          'usr_sales_1', 'Pooja Hegde', 'Requirements Matrix'
+        );
+      `);
+      console.log('✅ Demo documents seeded.');
+    }
+
+    // 19. Create communications table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS communications (
+        id VARCHAR(255) PRIMARY KEY,
+        channel VARCHAR(50) NOT NULL,
+        direction VARCHAR(50) DEFAULT 'Outbound',
+        subject VARCHAR(255),
+        message TEXT NOT NULL,
+        company_id VARCHAR(255) REFERENCES companies(id) ON DELETE SET NULL,
+        company_name VARCHAR(255),
+        contact_id VARCHAR(255) REFERENCES contacts(id) ON DELETE SET NULL,
+        contact_name VARCHAR(255),
+        user_id VARCHAR(255),
+        user_name VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'Delivered',
+        attachments JSONB DEFAULT '[]',
+        duration_minutes INT DEFAULT 0,
+        outcome VARCHAR(100),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_comm_company ON communications(company_id);
+      CREATE INDEX IF NOT EXISTS idx_comm_channel ON communications(channel);
+      CREATE INDEX IF NOT EXISTS idx_comm_created ON communications(created_at);
+    `);
+    console.log('✅ Table "communications" verified / updated in PostgreSQL.');
+
+    // Seed demo communications if empty
+    const commCount = await client.query('SELECT COUNT(*) FROM communications;');
+    if (parseInt(commCount.rows[0].count, 10) === 0) {
+      await client.query(`
+        INSERT INTO communications (
+          id, channel, direction, subject, message, company_id, company_name, contact_id, contact_name,
+          user_id, user_name, status, attachments, duration_minutes, outcome, created_at
+        ) VALUES 
+        (
+          'comm_1', 'Email', 'Outbound', 'Commercial Proposal & Layout Specifications - Dahej Mega Logistics Park',
+          'Dear Mr. Rajesh Patel,\n\nPlease find attached the formal commercial proposal for the 75,000 sq.ft Grade A chemical warehouse at Dahej PCPIR node, along with NFPA fire safety specifications and trailer turning apron layouts.\n\nBest regards,\nPooja Hegde\nFairway CRM Gujarat Leasing Desk',
+          'comp_1', 'Reliance Petrochemicals', 'cnt_1', 'Rajesh Patel',
+          'usr_sales_1', 'Pooja Hegde', 'Delivered',
+          '[{"name":"Fairway_Commercial_Proposal_INQ-1048.pdf","size":"1.8 MB"}]'::jsonb,
+          0, 'Proposal Sent', CURRENT_TIMESTAMP - INTERVAL '2 hours'
+        ),
+        (
+          'comm_2', 'Call', 'Outbound', 'Technical Discussion on Clear Height & Floor Load',
+          'Discussed clear height requirement (12m required by Reliance operations) and 6 MT/sq.m floor load capacity. Client confirmed alignment with Dahej park specifications. Agreed to conduct physical site inspection next Tuesday.',
+          'comp_1', 'Reliance Petrochemicals', 'cnt_1', 'Rajesh Patel',
+          'usr_sales_1', 'Pooja Hegde', 'Delivered',
+          '[]'::jsonb,
+          18, 'Positive - Site Visit Scheduled', CURRENT_TIMESTAMP - INTERVAL '1 day'
+        ),
+        (
+          'comm_3', 'WhatsApp', 'Inbound', 'Site Visit Confirmation',
+          'Confirmed: Our VP Supply Chain and structural engineering head will reach Dahej park at 11:30 AM next Tuesday. Please keep site gate pass arranged.',
+          'comp_1', 'Reliance Petrochemicals', 'cnt_1', 'Rajesh Patel',
+          'usr_sales_1', 'Pooja Hegde', 'Received',
+          '[]'::jsonb,
+          0, 'Acknowledged', CURRENT_TIMESTAMP - INTERVAL '4 hours'
+        ),
+        (
+          'comm_4', 'LinkedIn', 'Outbound', 'Initial Executive Outreach',
+          'Connected with Mr. Rajesh Patel regarding Fairway industrial infrastructure corridors across Gujarat PCPIR nodes.',
+          'comp_1', 'Reliance Petrochemicals', 'cnt_1', 'Rajesh Patel',
+          'usr_sales_1', 'Pooja Hegde', 'Delivered',
+          '[]'::jsonb,
+          0, 'Connection Accepted', CURRENT_TIMESTAMP - INTERVAL '5 days'
+        );
+      `);
+      console.log('✅ Demo communications seeded.');
     }
 
     client.release();
