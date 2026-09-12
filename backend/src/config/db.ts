@@ -221,8 +221,8 @@ export const initDatabase = async () => {
         'Aryan Verma',
         'aryan@fairway.co.in',
         defaultPasswordHash,
-        'sales',
-        'Gujarat Leasing Desk',
+        'super_admin',
+        'Executive Leadership',
         'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
         '+91 98250 67890',
         'Active',
@@ -280,6 +280,16 @@ export const initDatabase = async () => {
         u
       );
     }
+
+    // Explicitly ensure Amit and Aryan are Super Admin with standard fairway123 password
+    await client.query(`
+      UPDATE users 
+      SET role = 'super_admin',
+          password = $1,
+          department = 'Executive Leadership'
+      WHERE LOWER(email) IN ('amit@fairway.co.in', 'aryan@fairway.co.in');
+    `, [defaultPasswordHash]);
+
     console.log('✅ Standard users verified and synced in PostgreSQL.');
 
     // 6. Create companies table
