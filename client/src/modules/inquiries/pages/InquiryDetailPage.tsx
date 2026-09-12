@@ -462,8 +462,8 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
               >
                 {inquiry.companyName}
               </h1>
-              <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${prioBadge.bg}`}>
-                {inquiry.priority} Priority
+              <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${prioBadge?.bg || 'bg-slate-100 text-slate-700'}`}>
+                {inquiry.priority || 'Normal'} Priority
               </span>
               <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold capitalize border ${getPipelineStageBadge(inquiry.stage).className}`}>
                 {inquiry.stage.replace(/_/g, ' ')}

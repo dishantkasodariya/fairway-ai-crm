@@ -447,8 +447,8 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
                             <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40 shrink-0">
                               {inq.inquiryNumber}
                             </span>
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${prio.bg}`}>
-                              {inq.priority}
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${prio?.bg || 'bg-slate-100 text-slate-700'}`}>
+                              {inq.priority || 'Normal'}
                             </span>
                           </div>
 

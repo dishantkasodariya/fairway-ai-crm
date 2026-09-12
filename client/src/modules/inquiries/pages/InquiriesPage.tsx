@@ -707,10 +707,11 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         id: 'priority',
         header: ({ column }) => <DataGridColumnHeader title="Priority" column={column} />,
         cell: ({ row }) => {
-          const prioBadge = getPriorityBadge(row.original.priority);
+          const priority = row.original.priority || 'Medium';
+          const prioBadge = getPriorityBadge(priority);
           return (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border inline-flex items-center whitespace-nowrap ${prioBadge.bg}`}>
-              {row.original.priority}
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border inline-flex items-center whitespace-nowrap ${prioBadge?.bg || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+              {priority}
             </span>
           );
         },

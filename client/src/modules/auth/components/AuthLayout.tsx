@@ -15,12 +15,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
     <div className="min-h-screen w-full flex bg-background select-none">
       {/* Left Column: Brand Hero Showcase (Hidden on Mobile & Tablet, Visible on Laptop/Desktop >= 1024px) */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-fairway-950 via-fairway-700 to-fairway-600 text-white flex-col justify-between p-12 xl:p-16 relative overflow-hidden shrink-0 min-h-screen">
-        {/* Decorative Wave/Contour Circles */}
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full border border-white/10 pointer-events-none" />
-        <div className="absolute -top-16 -left-16 w-96 h-96 rounded-full border border-white/10 pointer-events-none" />
-        <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full border border-white/10 pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-[400px] h-[400px] rounded-full border border-white/10 pointer-events-none" />
-        <div className="absolute top-1/2 right-0 w-64 h-64 bg-accent-400/10 rounded-full blur-3xl pointer-events-none" />
+
 
         {/* Top Brand Logo */}
         <div className="flex items-center gap-3 z-10">
@@ -58,9 +53,9 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         </div>
       </div>
 
-      {/* Right Column: Clean White / Surface Form Container (Full Width & Centered on Mobile/Tablet, 50% on Laptop/Desktop) */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center min-h-screen p-4 sm:p-6 md:p-10 lg:p-16 bg-surface-muted/30 lg:bg-background">
-        <div className="w-full max-w-[420px] mx-auto bg-surface p-6 sm:p-8 rounded-2xl border border-border shadow-card lg:bg-transparent lg:border-0 lg:shadow-none lg:p-0">
+      {/* Right Column: Clean Surface Form Container (Full Width & Centered on Mobile/Tablet, 50% on Laptop/Desktop) */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center min-h-screen p-6 sm:p-8 md:p-12 lg:p-16 bg-surface-muted/30 lg:bg-background">
+        <div className="w-full max-w-[440px] mx-auto bg-surface p-7 sm:p-9 rounded-2xl border border-border shadow-card">
           {children}
         </div>
       </div>

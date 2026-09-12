@@ -86,83 +86,96 @@ export function formatRelativeDate(dateString: string | undefined | null): strin
 }
 
 // Status Badges Config
-export function getPriorityBadge(priority: PriorityLevel) {
-  switch (priority) {
-    case 'High':
-      return {
-        label: 'High Priority',
-        bg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800/60',
-        dot: 'bg-rose-500',
-      };
-    case 'Medium':
-      return {
-        label: 'Medium Priority',
-        bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60',
-        dot: 'bg-amber-500',
-      };
-    case 'Low':
-      return {
-        label: 'Low Priority',
-        bg: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/90 dark:text-slate-300 dark:border-slate-700',
-        dot: 'bg-slate-400',
-      };
+export function getPriorityBadge(priority: any) {
+  const p = (priority || '').toString().trim().toLowerCase();
+  if (p === 'high') {
+    return {
+      label: 'High Priority',
+      bg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800/60',
+      dot: 'bg-rose-500',
+    };
   }
+  if (p === 'medium') {
+    return {
+      label: 'Medium Priority',
+      bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60',
+      dot: 'bg-amber-500',
+    };
+  }
+  if (p === 'low') {
+    return {
+      label: 'Low Priority',
+      bg: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/90 dark:text-slate-300 dark:border-slate-700',
+      dot: 'bg-slate-400',
+    };
+  }
+  return {
+    label: priority ? `${priority} Priority` : 'Normal Priority',
+    bg: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/90 dark:text-slate-300 dark:border-slate-700',
+    dot: 'bg-slate-400',
+  };
 }
 
-export function getCompanyStatusBadge(status: CompanyStatus) {
-  switch (status) {
-    case 'Active':
-      return { label: 'Active', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
-    case 'Prospect':
-      return { label: 'Prospect', bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800/60' };
-    case 'Inactive':
-      return { label: 'Inactive', bg: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
-    case 'Archived':
-      return { label: 'Archived', bg: 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800/80 dark:text-zinc-400 dark:border-zinc-700' };
+export function getCompanyStatusBadge(status: any) {
+  const s = (status || '').toString().trim().toLowerCase();
+  if (s === 'active') {
+    return { label: 'Active', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
   }
+  if (s === 'prospect') {
+    return { label: 'Prospect', bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800/60' };
+  }
+  if (s === 'inactive') {
+    return { label: 'Inactive', bg: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
+  }
+  if (s === 'archived') {
+    return { label: 'Archived', bg: 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800/80 dark:text-zinc-400 dark:border-zinc-700' };
+  }
+  return { label: status || 'Active', bg: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
 }
 
-export function getFacilityStatusBadge(status: FacilityStatus) {
-  switch (status) {
-    case 'Active':
-      return { label: 'Active Facility', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
-    case 'Under Construction':
-      return { label: 'Under Construction', bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60' };
-    case 'Planned':
-      return { label: 'Planned', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/70 dark:text-indigo-300 dark:border-indigo-800/60' };
-    case 'Inactive':
-      return { label: 'Inactive', bg: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
+export function getFacilityStatusBadge(status: any) {
+  const s = (status || '').toString().trim().toLowerCase();
+  if (s === 'active') {
+    return { label: 'Active Facility', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
   }
+  if (s.includes('construction')) {
+    return { label: 'Under Construction', bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60' };
+  }
+  if (s === 'planned') {
+    return { label: 'Planned', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/70 dark:text-indigo-300 dark:border-indigo-800/60' };
+  }
+  return { label: status || 'Active', bg: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
 }
 
-export function getTaskStatusBadge(status: TaskStatus) {
-  switch (status) {
-    case 'Pending':
-      return { label: 'Pending', bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60' };
-    case 'Completed':
-      return { label: 'Completed', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
-    case 'Cancelled':
-      return { label: 'Cancelled', bg: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
+export function getTaskStatusBadge(status: any) {
+  const s = (status || '').toString().trim().toLowerCase();
+  if (s === 'completed') {
+    return { label: 'Completed', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
   }
+  if (s === 'cancelled') {
+    return { label: 'Cancelled', bg: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
+  }
+  return { label: status || 'Pending', bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60' };
 }
 
-export function getProposalStatusBadge(status: ProposalStatus) {
-  switch (status) {
-    case 'Draft':
-      return { label: 'Draft', bg: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700' };
-    case 'Sent':
-      return { label: 'Sent', bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800/60' };
-    case 'Viewed':
-      return { label: 'Viewed', bg: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-800/60' };
-    case 'Negotiation':
-      return { label: 'Negotiation', bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60' };
-    case 'Accepted':
-      return { label: 'Accepted', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
-    case 'Rejected':
-      return { label: 'Rejected', bg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800/60' };
-    case 'Expired':
-      return { label: 'Expired', bg: 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800/80 dark:text-zinc-400 dark:border-zinc-700' };
+export function getProposalStatusBadge(status: any) {
+  const s = (status || '').toString().trim().toLowerCase();
+  if (s === 'accepted') {
+    return { label: 'Accepted', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
   }
+  if (s === 'sent') {
+    return { label: 'Sent', bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800/60' };
+  }
+  if (s === 'viewed') {
+    return { label: 'Viewed', bg: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-800/60' };
+  }
+  if (s === 'negotiation') {
+    return { label: 'Negotiation', bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60' };
+  }
+  if (s === 'rejected') {
+    return { label: 'Rejected', bg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800/60' };
+  }
+  return { label: status || 'Draft', bg: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700' };
 }
 
 export const STAGE_CONFIGS: Record<PipelineStageKey, { label: string; order: number; bg: string; text: string; border: string }> = {
