@@ -174,22 +174,32 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
       {/* shadcn Command Dialog Box */}
       <div className="relative w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl z-10 flex flex-col max-h-[80vh] animate-in fade-in-0 zoom-in-95 duration-150 text-left">
         {/* Command Input Bar */}
-        <div className="flex items-center border-b border-border px-3.5" cmdk-input-wrapper="">
-          <Search className="mr-2.5 h-4 w-4 shrink-0 text-foreground-muted opacity-60" />
+        <div className="flex items-center border-b border-border px-4" cmdk-input-wrapper="">
+          <Search className="mr-3 h-4 w-4 shrink-0 text-foreground-muted opacity-70" />
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type a command or search..."
+            cmdk-input=""
+            data-transparent="true"
+            placeholder="Search companies, inquiries, properties, contacts..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex h-11 w-full bg-transparent py-2.5 text-sm text-foreground placeholder:text-foreground-muted border-0 outline-none focus:outline-none focus:ring-0 ring-0 shadow-none"
+            style={{
+              backgroundColor: 'transparent',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '0px',
+              boxShadow: 'none',
+              outline: 'none',
+            }}
+            className="cmdk-input flex-1 h-12 w-full !bg-transparent py-3 text-sm text-foreground placeholder:text-foreground-muted/70 !border-0 !border-none !outline-none focus:!outline-none !shadow-none !rounded-none"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
-              className="p-1 text-foreground-muted hover:text-foreground rounded transition-colors mr-1 cursor-pointer"
+              className="p-1 text-foreground-muted hover:text-foreground rounded transition-colors mr-2 cursor-pointer"
               title="Clear"
             >
               <X className="h-3.5 w-3.5" />
@@ -198,7 +208,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-surface-muted px-1.5 font-mono text-[10px] font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer shrink-0"
+            className="inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-surface-muted px-1.5 font-mono text-[10px] font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer shrink-0 ml-1"
             title="Close dialog (Escape)"
           >
             <span>ESC</span>

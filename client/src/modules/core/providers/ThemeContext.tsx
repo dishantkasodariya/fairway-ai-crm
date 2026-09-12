@@ -1034,10 +1034,23 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         html.dark td {
           color: #F5F5F5 !important;
         }
-        html.dark input, html.dark select, html.dark textarea {
+        html.dark input:not([cmdk-input]):not(.cmdk-input):not([data-transparent]):not(.bg-transparent),
+        html.dark select,
+        html.dark textarea {
           background-color: #262626 !important;
           color: #F5F5F5 !important;
           border-color: #333333 !important;
+        }
+        [cmdk-input-wrapper] input,
+        [cmdk-input],
+        .cmdk-input,
+        input.cmdk-input {
+          background-color: transparent !important;
+          background: transparent !important;
+          border: none !important;
+          border-radius: 0px !important;
+          box-shadow: none !important;
+          outline: none !important;
         }
         html.dark input::placeholder, html.dark textarea::placeholder {
           color: #737373 !important;
@@ -1121,9 +1134,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       button:not(.rounded-full):not([class*="rounded-full"]):not([class*="rounded-none"]),
       .btn,
-      input:not([type="checkbox"]):not([type="radio"]):not(.rounded-full):not([class*="rounded-full"]):not([class*="rounded-none"]),
-      select:not(.rounded-full):not([class*="rounded-full"]):not([class*="rounded-none"]),
-      textarea:not(.rounded-full):not([class*="rounded-full"]):not([class*="rounded-none"]) {
+      input:not([type="checkbox"]):not([type="radio"]):not([cmdk-input]):not(.cmdk-input):not(.rounded-full):not([class*="rounded-full"]):not([class*="rounded-none"]):not(.rounded-none),
+      select:not(.rounded-full):not([class*="rounded-full"]):not([class*="rounded-none"]):not(.rounded-none),
+      textarea:not(.rounded-full):not([class*="rounded-full"]):not([class*="rounded-none"]):not(.rounded-none) {
         border-radius: ${currentRadius}px !important;
       }
     `;

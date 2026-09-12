@@ -233,3 +233,16 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.8);
 }
+
+/* Command Palette Input reset */
+[cmdk-input-wrapper] input,
+input[cmdk-input],
+.cmdk-input {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  border-width: 0px !important;
+  border-radius: 0px !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
