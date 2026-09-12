@@ -1,7 +1,18 @@
 // Base API helper client
 
 const getBaseUrl = (): string => {
-  let url: string = (import.meta as any).env?.VITE_API_URL || '/api';
+  let url: string = (import.meta as any).env?.VITE_API_URL || '';
+  if (!url) {
+    if (
+      typeof window !== 'undefined' &&
+      window.location.hostname !== 'localhost' &&
+      window.location.hostname !== '127.0.0.1'
+    ) {
+      url = 'https://fairway-crm-backend.onrender.com/api';
+    } else {
+      url = '/api';
+    }
+  }
   if (url.endsWith('/')) {
     url = url.slice(0, -1);
   }
@@ -89,6 +100,14 @@ class ApiClient {
     return this.request<T>(endpoint, {
       ...options,
       method: 'PUT',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  patch<T = any>(endpoint: string, body?: any, options?: RequestInit): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
     });
   }

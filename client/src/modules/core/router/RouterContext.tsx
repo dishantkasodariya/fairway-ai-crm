@@ -176,7 +176,7 @@ export function pathToView(view: ActiveNavView, entityId?: string): string {
     case 'new_inquiry':
       return '/inquiries/new';
     case 'inquiry_detail':
-      return `/leads/${entityId || 'inq_1048'}`;
+      return entityId ? `/leads/${entityId}` : '/leads';
     case 'pipeline':
       return '/pipeline';
     case 'tasks':

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import React, { createContext, useContext, useCallback } from 'react';
+import hotToast, { Toaster } from 'react-hot-toast';
+import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -20,64 +21,102 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
-
-  const toast = useCallback(
+  const showToast = useCallback(
     (title: string, options?: { message?: string; type?: ToastType; duration?: number }) => {
-      const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
       const type = options?.type || 'info';
-      const newToast: Toast = { id, title, message: options?.message, type };
+      const message = options?.message;
+      const duration = options?.duration || 4000;
 
-      setToasts((prev) => [...prev, newToast]);
-
-      setTimeout(() => {
-        removeToast(id);
-      }, options?.duration || 4000);
-    },
-    [removeToast]
-  );
-
-  const success = useCallback((title: string, message?: string) => toast(title, { message, type: 'success' }), [toast]);
-  const error = useCallback((title: string, message?: string) => toast(title, { message, type: 'error' }), [toast]);
-  const info = useCallback((title: string, message?: string) => toast(title, { message, type: 'info' }), [toast]);
-
-  return (
-    <ToastContext.Provider value={{ toast, success, error, info }}>
-      {children}
-      {/* Fixed bottom-right toast stack */}
-      <div className="fixed bottom-5 right-5 z-[99999] flex flex-col gap-2.5 max-w-sm pointer-events-none">
-        {toasts.map((t) => (
+      hotToast.custom(
+        (t) => (
           <div
-            key={t.id}
-            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl border-2 shadow-2xl animate-fade-in transition-all ${
-              t.type === 'success'
-                ? 'bg-surface border-emerald-500 text-foreground dark:text-foreground'
-                : t.type === 'error'
-                ? 'bg-surface border-rose-500 text-foreground dark:text-foreground'
-                : 'bg-surface border-sky-500 text-foreground dark:text-foreground'
+            className={`flex items-start gap-3 p-3.5 rounded-xl border border-border bg-surface text-foreground shadow-xl transition-all duration-200 max-w-sm w-full select-none ${
+              t.visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-2 scale-95'
             }`}
           >
-            {t.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />}
-            {t.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />}
-            {t.type === 'info' && <Info className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />}
-            <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-bold leading-tight">{t.title}</h4>
-              {t.message && <p className="text-[11px] text-foreground-muted mt-1 leading-relaxed">{t.message}</p>}
+            {type === 'success' && (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            )}
+            {type === 'error' && (
+              <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+            )}
+            {type === 'info' && (
+              <Info className="w-5 h-5 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
+            )}
+            {type === 'warning' && (
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 min-w-0 pr-1">
+              <h4 className="text-xs font-bold text-foreground leading-tight">{title}</h4>
+              {message && (
+                <p className="text-[11px] text-foreground-muted mt-1 leading-relaxed">{message}</p>
+              )}
             </div>
             <button
               type="button"
-              onClick={() => removeToast(t.id)}
+              onClick={() => hotToast.dismiss(t.id)}
               className="text-foreground-muted hover:text-foreground shrink-0 p-1 rounded-md hover:bg-surface-muted transition-colors cursor-pointer"
+              title="Close notification"
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
-        ))}
-      </div>
+        ),
+        { duration }
+      );
+    },
+    []
+  );
+
+  const success = useCallback(
+    (title: string, message?: string) => showToast(title, { message, type: 'success' }),
+    [showToast]
+  );
+  const error = useCallback(
+    (title: string, message?: string) => showToast(title, { message, type: 'error' }),
+    [showToast]
+  );
+  const info = useCallback(
+    (title: string, message?: string) => showToast(title, { message, type: 'info' }),
+    [showToast]
+  );
+
+  return (
+    <ToastContext.Provider value={{ toast: showToast, success, error, info }}>
+      {children}
+      {/* React-Hot-Toast container configured at bottom-right, theme-aware, NO ring */}
+      <Toaster
+        position="bottom-right"
+        reverseOrder={false}
+        gutter={10}
+        containerClassName="!bottom-5 !right-5 z-[99999]"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: 'var(--bg-surface, #ffffff)',
+            color: 'var(--text-foreground, #16201b)',
+            border: '1px solid var(--border-color, #dde5e1)',
+            boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.06)',
+            borderRadius: '0.75rem',
+            padding: '12px 16px',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            maxWidth: '420px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: 'var(--bg-surface, #ffffff)',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: 'var(--bg-surface, #ffffff)',
+            },
+          },
+        }}
+      />
     </ToastContext.Provider>
   );
 };
@@ -87,3 +126,6 @@ export const useToast = () => {
   if (!ctx) throw new Error('useToast must be used within a ToastProvider');
   return ctx;
 };
+
+// Re-export hotToast for direct usage across application
+export { hotToast as toast };

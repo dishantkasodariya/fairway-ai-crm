@@ -18,7 +18,6 @@ import {
   Trash2,
   Layers,
   ArrowUpRight,
-  Sparkles,
   Building2,
   Warehouse,
 } from 'lucide-react';
@@ -73,11 +72,15 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
   const boardContainerRef = useRef<HTMLDivElement>(null);
 
   const refreshData = async () => {
-    setInquiries(StorageService.getInquiries());
+    const local = StorageService.getInquiries();
+    if (local && local.length > 0) {
+      setInquiries(local);
+    }
     try {
       const res = await InquiryService.getInquiries({ pageSize: 100 });
       if (res && res.data && res.data.length > 0) {
         setInquiries(res.data);
+        StorageService.saveInquiries(res.data);
       }
     } catch {
       // StorageService fallback active
@@ -121,7 +124,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
 
   // Drag & drop handlers
   const handleDragStart = (e: React.DragEvent, id: string) => {
-    if (!canEdit) return;
+    if (canEdit === false) return;
     setDraggedInquiryId(id);
     setActiveCardMenuId(null);
     e.dataTransfer.setData('text/plain', id);
@@ -161,13 +164,13 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
     }
   };
 
-  const handleDrop = (e: React.DragEvent, targetStage: PipelineStageKey) => {
+  const handleDrop = async (e: React.DragEvent, targetStage: PipelineStageKey) => {
     e.preventDefault();
     setDragOverStage(null);
     const inqId = e.dataTransfer.getData('text/plain') || draggedInquiryId;
     if (!inqId) return;
 
-    const targetInq = StorageService.getInquiryById(inqId);
+    const targetInq = inquiries.find((i) => i.id === inqId) || StorageService.getInquiryById(inqId);
     if (!targetInq || targetInq.stage === targetStage) {
       setDraggedInquiryId(null);
       return;
@@ -185,14 +188,27 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
       return;
     }
 
-    StorageService.changeInquiryStage(inqId, targetStage);
-    refreshData();
-    success('Stage Updated', `Moved ${targetInq.inquiryNumber} to ${targetStage.replace(/_/g, ' ').toUpperCase()}`);
+    // 1. Optimistic UI update so card moves immediately
+    setInquiries((prev) =>
+      prev.map((i) => (i.id === inqId ? { ...i, stage: targetStage } : i))
+    );
     setDraggedInquiryId(null);
+
+    // 2. Persist locally to StorageService
+    StorageService.changeInquiryStage(inqId, targetStage);
+
+    // 3. Persist to Backend database via API
+    try {
+      await InquiryService.updateInquiry(inqId, { stage: targetStage });
+    } catch (err) {
+      console.warn('Backend stage update notice:', err);
+    }
+
+    success('Stage Updated', `Moved ${targetInq.inquiryNumber} to ${targetStage.replace(/_/g, ' ').toUpperCase()}`);
   };
 
   // Move stage programmatically from 3-dot menu
-  const handleMoveStage = (inq: Inquiry, targetStage: PipelineStageKey) => {
+  const handleMoveStage = async (inq: Inquiry, targetStage: PipelineStageKey) => {
     setActiveCardMenuId(null);
     if (inq.stage === targetStage) return;
 
@@ -206,8 +222,21 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
       return;
     }
 
+    // 1. Optimistic UI update
+    setInquiries((prev) =>
+      prev.map((i) => (i.id === inq.id ? { ...i, stage: targetStage } : i))
+    );
+
+    // 2. Local StorageService
     StorageService.changeInquiryStage(inq.id, targetStage);
-    refreshData();
+
+    // 3. Backend API
+    try {
+      await InquiryService.updateInquiry(inq.id, { stage: targetStage });
+    } catch (err) {
+      console.warn('Backend stage update notice:', err);
+    }
+
     success('Stage Updated', `Moved ${inq.inquiryNumber} to ${targetStage.replace(/_/g, ' ').toUpperCase()}`);
   };
 
@@ -434,10 +463,13 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
                     return (
                       <div
                         key={inq.id}
-                        draggable={canEdit}
+                        draggable={canEdit !== false}
                         onDragStart={(e) => handleDragStart(e, inq.id)}
-                        onClick={() => onSelectInquiry(inq.id)}
-                        className={`group relative bg-surface p-3.5 rounded-xl border border-border shadow-2xs hover:border-fairway-500/60 hover:shadow-md cursor-pointer transition-all duration-150 ${
+                        onClick={() => {
+                          StorageService.upsertInquiry(inq);
+                          onSelectInquiry(inq.id);
+                        }}
+                        className={`group relative bg-surface p-3.5 rounded-xl border border-border shadow-2xs hover:border-fairway-500/60 hover:shadow-md cursor-pointer transition-all duration-150 select-none ${
                           draggedInquiryId === inq.id ? 'opacity-40 scale-95 ring-2 ring-fairway-400' : ''
                         }`}
                       >
@@ -484,6 +516,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
                                   type="button"
                                   onClick={() => {
                                     setActiveCardMenuId(null);
+                                    StorageService.upsertInquiry(inq);
                                     onSelectInquiry(inq.id);
                                   }}
                                   className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-foreground hover:bg-surface-muted transition-colors"

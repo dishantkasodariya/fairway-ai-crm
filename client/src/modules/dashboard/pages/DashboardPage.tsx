@@ -19,7 +19,6 @@ import {
   Users,
   Check,
   ChevronDown,
-  Sparkles,
   Layers,
   ArrowRight,
   Calendar,
@@ -98,15 +97,15 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
     return 'Good evening';
   };
 
-  // Pipeline Funnel Distribution
+  // Pipeline Funnel Distribution - unified cohesive palette
   const funnelStages = [
-    { key: 'new', label: 'New Leads', count: inquiries.filter((i) => i.stage === 'new').length, color: 'bg-sky-500' },
-    { key: 'requirement_confirmed', label: 'Confirmed', count: inquiries.filter((i) => i.stage === 'requirement_confirmed').length, color: 'bg-blue-500' },
-    { key: 'property_matched', label: 'Matched', count: inquiries.filter((i) => i.stage === 'property_matched').length, color: 'bg-indigo-500' },
-    { key: 'site_visit', label: 'Site Visits', count: inquiries.filter((i) => i.stage === 'site_visit').length, color: 'bg-purple-500' },
-    { key: 'proposal', label: 'Proposals', count: inquiries.filter((i) => i.stage === 'proposal').length, color: 'bg-amber-500' },
-    { key: 'negotiation', label: 'Negotiation', count: inquiries.filter((i) => i.stage === 'negotiation').length, color: 'bg-emerald-500' },
-    { key: 'won', label: 'Closed Won', count: wonCount, color: 'bg-emerald-600' },
+    { key: 'new', label: 'New Leads', count: inquiries.filter((i) => i.stage === 'new').length, color: 'bg-zinc-400 dark:bg-zinc-600' },
+    { key: 'requirement_confirmed', label: 'Confirmed', count: inquiries.filter((i) => i.stage === 'requirement_confirmed').length, color: 'bg-zinc-500 dark:bg-zinc-500' },
+    { key: 'property_matched', label: 'Matched', count: inquiries.filter((i) => i.stage === 'property_matched').length, color: 'bg-primary/50' },
+    { key: 'site_visit', label: 'Site Visits', count: inquiries.filter((i) => i.stage === 'site_visit').length, color: 'bg-primary/70' },
+    { key: 'proposal', label: 'Proposals', count: inquiries.filter((i) => i.stage === 'proposal').length, color: 'bg-primary/90' },
+    { key: 'negotiation', label: 'Negotiation', count: inquiries.filter((i) => i.stage === 'negotiation').length, color: 'bg-primary' },
+    { key: 'won', label: 'Closed Won', count: wonCount, color: 'bg-emerald-500' },
   ];
   const totalStageCount = Math.max(funnelStages.reduce((acc, s) => acc + s.count, 0), 1);
 
@@ -120,280 +119,193 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   ];
 
   const stageBadgeStyles: Record<string, string> = {
-    new: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20',
-    requirement_confirmed: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20',
-    property_matched: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20',
-    site_visit: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20',
-    proposal: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20',
-    negotiation: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20',
-    won: 'bg-emerald-600/15 text-emerald-800 dark:text-emerald-200 border-emerald-600/30',
+    new: 'bg-surface-muted text-foreground border-border',
+    requirement_confirmed: 'bg-surface-muted text-foreground border-border',
+    property_matched: 'bg-surface-muted text-foreground border-border',
+    site_visit: 'bg-surface-muted text-foreground border-border',
+    proposal: 'bg-surface-muted text-foreground border-border',
+    negotiation: 'bg-surface-muted text-foreground border-border',
+    won: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
   };
 
   return (
     <div className="space-y-6 max-w-8xl mx-auto text-left">
-      {/* 1. Executive Personalized Header & Welcome Hero */}
-      <div className="relative z-30 rounded-2xl bg-gradient-to-r from-surface via-surface to-surface-muted/80 border border-border p-5 sm:p-6 shadow-xs">
-        <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-fairway-500/5 dark:bg-fairway-400/5 rounded-full blur-3xl -mr-20 -mt-20" />
-        </div>
-        
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-          <div className="space-y-1.5 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-bold text-fairway-700 dark:text-fairway-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                Fairway Industrial CRM
+      {/* 1. Executive Minimal Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">
+              Fairway Industrial CRM
+            </span>
+            <span className="text-xs text-foreground-muted">·</span>
+            <span className="text-xs font-medium text-foreground-muted">Western India Leasing Desk</span>
+            {isSales && (
+              <span className="text-[10px] font-bold bg-surface-muted text-foreground border border-border px-2 py-0.5 rounded-full">
+                My Desk View
               </span>
-              <span className="text-[11px] text-foreground-muted">·</span>
-              <span className="text-[11px] font-semibold text-foreground-muted">Western India Leasing Desk</span>
-              {isSales && (
-                <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                  My Desk View
-                </span>
-              )}
-            </div>
-
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight flex items-center gap-2 flex-wrap">
-              <span>{getGreeting()},</span>
-              <span className="text-fairway-700 dark:text-fairway-400">
-                {currentUser?.name || currentUser?.email?.split('@')[0] || 'Member'}!
-              </span>
-            </h1>
-
-            <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed max-w-3xl">
-              {overdueTasks.length > 0 ? (
-                <span className="text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                  Attention: You have {overdueTasks.length} overdue client follow-up{overdueTasks.length > 1 ? 's' : ''} and {todaysTasks.length} task{todaysTasks.length > 1 ? 's' : ''} scheduled today.
-                </span>
-              ) : (
-                <span>
-                  All client follow-ups are up to date. You have <strong className="text-foreground">{activeInquiriesCount} active leasing inquiries</strong> with a total pipeline velocity of <strong className="text-foreground">{formatINR(totalPipelineValue, true)}/month</strong>.
-                </span>
-              )}
-            </p>
-          </div>
-
-          {/* Action Tools & Owner Switcher */}
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
-            {/* Owner Filter Selector */}
-            <DropdownMenu
-              align="right"
-              className="w-64 max-h-80 overflow-y-auto"
-              trigger={
-                <button
-                  type="button"
-                  className="flex items-center gap-2 text-xs bg-surface border border-border hover:border-fairway-400 rounded-xl px-3.5 py-2 shadow-xs transition-colors focus:outline-none cursor-pointer"
-                >
-                  <User className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
-                  <span className="text-foreground-muted font-medium shrink-0">Desk:</span>
-                  <span className="text-xs font-semibold text-foreground truncate max-w-[130px]">
-                    {ownerFilter === 'all' ? 'All Team Members' : users.find((u) => u.id === ownerFilter)?.name || 'Select Owner'}
-                  </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-foreground-muted shrink-0 ml-auto" />
-                </button>
-              }
-            >
-              <DropdownMenuLabel>Filter Portfolio by Owner</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => setOwnerFilter('all')}
-                className={ownerFilter === 'all' ? 'bg-surface-muted font-semibold text-fairway-700' : ''}
-                icon={ownerFilter === 'all' ? <Check className="w-3.5 h-3.5 text-fairway-600" /> : <Users className="w-3.5 h-3.5 text-foreground-muted" />}
-              >
-                All Team Members
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {users.map((u) => (
-                <DropdownMenuItem
-                  key={u.id}
-                  onClick={() => setOwnerFilter(u.id)}
-                  className={ownerFilter === u.id ? 'bg-surface-muted font-semibold text-fairway-700' : ''}
-                  icon={ownerFilter === u.id ? <Check className="w-3.5 h-3.5 text-fairway-600" /> : <User className="w-3.5 h-3.5 text-foreground-muted" />}
-                >
-                  <div className="flex items-center justify-between gap-2 w-full">
-                    <span className="truncate">{u.name}</span>
-                    <span className="text-[10px] text-foreground-muted font-normal capitalize shrink-0">({u.role?.replace('_', ' ')})</span>
-                  </div>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenu>
-
-            {canEdit && (
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={onOpenNewInquiry}
-                leftIcon={<Plus className="w-4 h-4" />}
-                className="shadow-sm rounded-xl px-4 py-2 font-bold"
-              >
-                New Inquiry
-              </Button>
             )}
           </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight mt-1">
+            {getGreeting()}, {currentUser?.name || currentUser?.email?.split('@')[0] || 'Member'}
+          </h1>
+        </div>
+
+        {/* Action Tools & Owner Switcher */}
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+          <DropdownMenu
+            align="right"
+            className="w-64 max-h-80 overflow-y-auto"
+            trigger={
+              <button
+                type="button"
+                className="flex items-center gap-2 text-xs bg-surface border border-border hover:border-foreground/40 rounded-xl px-3.5 py-2 shadow-xs transition-colors focus:outline-none cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                <span className="text-foreground-muted font-medium shrink-0">Desk:</span>
+                <span className="text-xs font-semibold text-foreground truncate max-w-[130px]">
+                  {ownerFilter === 'all' ? 'All Team Members' : users.find((u) => u.id === ownerFilter)?.name || 'Select Owner'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-foreground-muted shrink-0 ml-auto" />
+              </button>
+            }
+          >
+            <DropdownMenuLabel>Filter Portfolio by Owner</DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => setOwnerFilter('all')}
+              className={ownerFilter === 'all' ? 'bg-surface-muted font-semibold text-foreground' : ''}
+              icon={ownerFilter === 'all' ? <Check className="w-3.5 h-3.5 text-foreground" /> : <Users className="w-3.5 h-3.5 text-foreground-muted" />}
+            >
+              All Team Members
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {users.map((u) => (
+              <DropdownMenuItem
+                key={u.id}
+                onClick={() => setOwnerFilter(u.id)}
+                className={ownerFilter === u.id ? 'bg-surface-muted font-semibold text-foreground' : ''}
+                icon={ownerFilter === u.id ? <Check className="w-3.5 h-3.5 text-foreground" /> : <User className="w-3.5 h-3.5 text-foreground-muted" />}
+              >
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <span className="truncate">{u.name}</span>
+                  <span className="text-[10px] text-foreground-muted font-normal capitalize shrink-0">({u.role?.replace('_', ' ')})</span>
+                </div>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenu>
+
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={onOpenNewInquiry}
+              leftIcon={<Plus className="w-4 h-4" />}
+              className="shadow-sm rounded-xl px-4 py-2 font-bold"
+            >
+              New Inquiry
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* 2. Executive 6 KPI Stat Cards Grid */}
+      {/* 2. Executive 6 KPI Stat Cards Grid - Minimal Swiss Design */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-        {/* Card 1: Total Accounts */}
+        {/* Card 1: Companies */}
         <div
           onClick={() => onNavigate('companies')}
-          className="group relative bg-surface border border-border hover:border-fairway-500/50 hover:shadow-md p-4 rounded-2xl transition-all duration-200 cursor-pointer select-none overflow-hidden"
+          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted block truncate">
-              Companies
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 flex items-center justify-center shrink-0">
-              <Building2 className="w-4 h-4" />
-            </div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Companies</span>
+            <Building2 className="w-4 h-4 text-foreground-muted" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-2xl font-black text-foreground group-hover:text-fairway-700 dark:group-hover:text-fairway-400 transition-colors">
-              {totalCompaniesCount}
-            </div>
+          <div className="mt-3">
+            <div className="text-2xl font-bold text-foreground">{totalCompaniesCount}</div>
             <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">Corporate Accounts</span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[10px] text-foreground-muted font-medium">
-            <span>Western India</span>
-            <ArrowUpRight className="w-3 h-3 text-fairway-600 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>
 
         {/* Card 2: New Leads */}
         <div
           onClick={() => onNavigate('inquiries')}
-          className="group relative bg-surface border border-border hover:border-sky-500/50 hover:shadow-md p-4 rounded-2xl transition-all duration-200 cursor-pointer select-none overflow-hidden"
+          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted block truncate">
-              New Leads
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-300 flex items-center justify-center shrink-0">
-              <FileText className="w-4 h-4" />
-            </div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">New Leads</span>
+            <FileText className="w-4 h-4 text-foreground-muted" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-2xl font-black text-sky-700 dark:text-sky-300">
-              {newInquiriesCount}
-            </div>
+          <div className="mt-3">
+            <div className="text-2xl font-bold text-foreground">{newInquiriesCount}</div>
             <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">Fresh Inquiries</span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[10px] text-foreground-muted font-medium">
-            <span className="text-sky-600 dark:text-sky-400 font-semibold">Needs Contact</span>
-            <ArrowUpRight className="w-3 h-3 text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>
 
         {/* Card 3: Active Pipeline */}
         <div
           onClick={() => onNavigate('pipeline')}
-          className="group relative bg-surface border border-border hover:border-indigo-500/50 hover:shadow-md p-4 rounded-2xl transition-all duration-200 cursor-pointer select-none overflow-hidden"
+          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted block truncate">
-              Active Pipeline
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-4 h-4" />
-            </div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Active Pipeline</span>
+            <TrendingUp className="w-4 h-4 text-foreground-muted" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-2xl font-black text-indigo-700 dark:text-indigo-300">
-              {activeInquiriesCount}
-            </div>
+          <div className="mt-3">
+            <div className="text-2xl font-bold text-foreground">{activeInquiriesCount}</div>
             <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">{formatINR(totalPipelineValue, true)} / mo</span>
           </div>
-          <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[10px] text-foreground-muted font-medium">
-            <span className="text-indigo-600 dark:text-indigo-400 font-semibold">In Qualification</span>
-            <ArrowUpRight className="w-3 h-3 text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
         </div>
 
-        {/* Card 4: In Negotiation */}
+        {/* Card 4: Negotiation */}
         <div
           onClick={() => onNavigate('pipeline')}
-          className="group relative bg-surface border border-border hover:border-amber-500/50 hover:shadow-md p-4 rounded-2xl transition-all duration-200 cursor-pointer select-none overflow-hidden"
+          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted block truncate">
-              Negotiation
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-300 flex items-center justify-center shrink-0">
-              <Clock className="w-4 h-4" />
-            </div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Negotiation</span>
+            <Clock className="w-4 h-4 text-foreground-muted" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-2xl font-black text-amber-700 dark:text-amber-300">
-              {negotiationCount}
-            </div>
-            <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">Proposal & Terms</span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[10px] text-foreground-muted font-medium">
-            <span className="text-amber-600 dark:text-amber-400 font-semibold">Closing Soon</span>
-            <ArrowUpRight className="w-3 h-3 text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="mt-3">
+            <div className="text-2xl font-bold text-foreground">{negotiationCount}</div>
+            <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">Closing Soon</span>
           </div>
         </div>
 
-        {/* Card 5: Won Deals */}
+        {/* Card 5: Closed Won */}
         <div
           onClick={() => onNavigate('inquiries')}
-          className="group relative bg-surface border border-border hover:border-emerald-500/50 hover:shadow-md p-4 rounded-2xl transition-all duration-200 cursor-pointer select-none overflow-hidden"
+          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted block truncate">
-              Closed Won
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 flex items-center justify-center shrink-0">
-              <Trophy className="w-4 h-4" />
-            </div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Closed Won</span>
+            <Trophy className="w-4 h-4 text-foreground-muted" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
-              {wonCount}
-            </div>
-            <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold block mt-0.5">
-              {formatINR(totalWonValue, true)} / mo
-            </span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[10px] text-foreground-muted font-medium">
-            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Leased Deals</span>
-            <ArrowUpRight className="w-3 h-3 text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="mt-3">
+            <div className="text-2xl font-bold text-foreground">{wonCount}</div>
+            <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">{formatINR(totalWonValue, true)} / mo</span>
           </div>
         </div>
 
         {/* Card 6: Ready Stock */}
         <div
           onClick={() => onNavigate('properties')}
-          className="group relative bg-surface border border-border hover:border-purple-500/50 hover:shadow-md p-4 rounded-2xl transition-all duration-200 cursor-pointer select-none overflow-hidden"
+          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted block truncate">
-              Ready Stock
-            </span>
-            <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-300 flex items-center justify-center shrink-0">
-              <Warehouse className="w-4 h-4" />
-            </div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Ready Stock</span>
+            <Warehouse className="w-4 h-4 text-foreground-muted" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-2xl font-black text-foreground">
-              {formatSqFt(totalAvailableSqFt).replace(' sq.ft.', '')}
-            </div>
+          <div className="mt-3">
+            <div className="text-2xl font-bold text-foreground">{formatSqFt(totalAvailableSqFt).replace(' sq.ft.', '')}</div>
             <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">sq.ft available</span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[10px] text-foreground-muted font-medium">
-            <span className="text-purple-600 dark:text-purple-400 font-semibold">Ready to Lease</span>
-            <ArrowUpRight className="w-3 h-3 text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>
       </div>
 
       {/* 3. Pipeline Velocity Visualizer & Corridor Demand Bar */}
-      <div className="p-4 sm:p-5 bg-surface rounded-2xl border border-border shadow-xs space-y-3.5">
+      <div className="p-4 sm:p-5 bg-surface rounded-xl border border-border space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-fairway-600" />
+              <Layers className="w-4 h-4 text-foreground" />
               <span>Pipeline Stage Velocity</span>
             </h3>
             <p className="text-[11px] text-foreground-muted mt-0.5">
@@ -405,7 +317,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               size="xs"
               variant="outline"
               onClick={() => onNavigate('pipeline')}
-              leftIcon={<ArrowUpRight className="w-3.5 h-3.5 text-indigo-600" />}
+              leftIcon={<ArrowUpRight className="w-3.5 h-3.5 text-foreground" />}
               className="rounded-lg font-semibold text-xs"
             >
               Open Pipeline Board
@@ -414,7 +326,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               size="xs"
               variant="outline"
               onClick={() => onNavigate('reports')}
-              leftIcon={<BarChart3 className="w-3.5 h-3.5 text-fairway-600" />}
+              leftIcon={<BarChart3 className="w-3.5 h-3.5 text-foreground" />}
               className="rounded-lg font-semibold text-xs"
             >
               Reports & Graphs
@@ -423,7 +335,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         </div>
 
         {/* Multi-segment Horizontal Progress Strip */}
-        <div className="h-3 w-full rounded-full bg-surface-muted overflow-hidden flex shadow-inner">
+        <div className="h-2.5 w-full rounded-full bg-surface-muted overflow-hidden flex">
           {funnelStages.map((stage) => {
             const widthPct = (stage.count / totalStageCount) * 100;
             if (widthPct === 0) return null;
@@ -444,7 +356,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             <div
               key={stage.key}
               onClick={() => onNavigate('pipeline')}
-              className="flex items-center gap-1.5 text-xs bg-surface-muted hover:bg-surface-muted/80 border border-border/80 px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 text-xs bg-surface-muted hover:bg-surface-muted/80 border border-border px-2.5 py-1 rounded-lg cursor-pointer transition-colors"
             >
               <div className={`w-2 h-2 rounded-full ${stage.color}`} />
               <span className="text-[11px] text-foreground-muted">{stage.label}:</span>
@@ -457,19 +369,21 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
       {/* 4. Operational Urgency Desk: Overdue Follow-ups & Today's Schedule */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Overdue Follow-ups Card */}
-        <Card className={`rounded-2xl ${overdueTasks.length > 0 ? 'border-rose-300 dark:border-rose-900/60 bg-rose-50/20 dark:bg-rose-950/15' : 'bg-surface'}`}>
-          <CardHeader className="pb-3 pt-4 px-5 border-b border-border/60">
+        <Card className="rounded-xl bg-surface border border-border">
+          <CardHeader className="pb-3 pt-4 px-5 border-b border-border">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center font-bold shrink-0">
-                  <AlertTriangle className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg bg-surface-muted text-foreground border border-border flex items-center justify-center font-bold shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-foreground" />
                 </div>
                 <div>
                   <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                     <span>Overdue Follow-ups</span>
-                    <span className="text-[10px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 px-2 py-0.5 rounded-full">
-                      {overdueTasks.length} Urgent
-                    </span>
+                    {overdueTasks.length > 0 && (
+                      <span className="text-[10px] font-bold bg-surface-muted text-foreground border border-border px-2 py-0.5 rounded-full">
+                        {overdueTasks.length} Urgent
+                      </span>
+                    )}
                   </CardTitle>
                   <p className="text-[11px] text-foreground-muted">Client communications needing immediate resolution</p>
                 </div>
@@ -482,30 +396,30 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
 
           {overdueTasks.length === 0 ? (
             <div className="py-10 text-center text-xs text-foreground-muted flex flex-col items-center justify-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-                <CheckCircle2 className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-full bg-surface-muted text-foreground flex items-center justify-center border border-border">
+                <CheckCircle2 className="w-4 h-4" />
               </div>
-              <span className="font-bold text-foreground text-sm">All follow-ups on track!</span>
+              <span className="font-bold text-foreground text-sm">All follow-ups on track</span>
               <span className="text-xs text-foreground-muted">Zero overdue tasks across your current view.</span>
             </div>
           ) : (
-            <div className="divide-y divide-border/60 max-h-80 overflow-y-auto">
+            <div className="divide-y divide-border max-h-80 overflow-y-auto">
               {overdueTasks.map((t) => (
-                <div key={t.id} className="py-3 px-5 flex items-start justify-between gap-3 hover:bg-surface-muted/40 transition-colors">
+                <div key={t.id} className="py-3 px-5 flex items-start justify-between gap-3 hover:bg-surface-muted/50 transition-colors">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
-                        className="text-xs font-bold text-foreground hover:text-fairway-600 dark:hover:text-fairway-400 cursor-pointer truncate"
+                        className="text-xs font-bold text-foreground hover:underline cursor-pointer truncate"
                         onClick={() => t.companyId && onNavigate('company_detail', t.companyId)}
                       >
                         {t.companyName}
                       </span>
-                      <span className="text-[9px] font-bold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/20 px-1.5 py-0.5 rounded">
+                      <span className="text-[9px] font-medium bg-surface-muted text-foreground border border-border px-1.5 py-0.5 rounded">
                         {formatRelativeDate(t.dueDate)}
                       </span>
                       {t.priority && (
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${t.priority === 'High' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-800'}`}>
-                          {t.priority} Priority
+                        <span className="text-[9px] font-medium bg-surface-muted text-foreground border border-border px-1.5 py-0.5 rounded">
+                          {t.priority}
                         </span>
                       )}
                     </div>
@@ -518,9 +432,9 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                   </div>
                   <Button
                     size="xs"
-                    variant="primary"
+                    variant="outline"
                     onClick={() => handleCompleteTask(t.id)}
-                    leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                    leftIcon={<CheckCircle2 className="w-3.5 h-3.5 text-foreground" />}
                     className="shrink-0 rounded-lg text-xs font-semibold"
                   >
                     Done
@@ -532,17 +446,17 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         </Card>
 
         {/* Today's Follow-ups Card */}
-        <Card className="rounded-2xl bg-surface">
-          <CardHeader className="pb-3 pt-4 px-5 border-b border-border/60">
+        <Card className="rounded-xl bg-surface border border-border">
+          <CardHeader className="pb-3 pt-4 px-5 border-b border-border">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center font-bold shrink-0">
-                  <Clock className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg bg-surface-muted text-foreground border border-border flex items-center justify-center font-bold shrink-0">
+                  <Clock className="w-4 h-4 text-foreground" />
                 </div>
                 <div>
                   <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                     <span>Today&apos;s Follow-ups</span>
-                    <span className="text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold bg-surface-muted text-foreground border border-border px-2 py-0.5 rounded-full">
                       {todaysTasks.length} Planned
                     </span>
                   </CardTitle>
@@ -557,20 +471,20 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
 
           {todaysTasks.length === 0 ? (
             <div className="py-10 text-center text-xs text-foreground-muted flex flex-col items-center justify-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-surface-muted text-foreground-muted flex items-center justify-center border border-border">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <div className="w-9 h-9 rounded-full bg-surface-muted text-foreground-muted flex items-center justify-center border border-border">
+                <CheckCircle2 className="w-4 h-4" />
               </div>
-              <span className="font-bold text-foreground text-sm">Schedule cleared for today!</span>
+              <span className="font-bold text-foreground text-sm">Schedule clear for today</span>
               <span className="text-xs text-foreground-muted">No pending calls or site visits scheduled today.</span>
             </div>
           ) : (
-            <div className="divide-y divide-border/60 max-h-80 overflow-y-auto">
+            <div className="divide-y divide-border max-h-80 overflow-y-auto">
               {todaysTasks.map((t) => (
-                <div key={t.id} className="py-3 px-5 flex items-start justify-between gap-3 hover:bg-surface-muted/40 transition-colors">
+                <div key={t.id} className="py-3 px-5 flex items-start justify-between gap-3 hover:bg-surface-muted/50 transition-colors">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
-                        className="text-xs font-bold text-foreground hover:text-fairway-600 dark:hover:text-fairway-400 cursor-pointer truncate"
+                        className="text-xs font-bold text-foreground hover:underline cursor-pointer truncate"
                         onClick={() => t.companyId && onNavigate('company_detail', t.companyId)}
                       >
                         {t.companyName}
@@ -580,7 +494,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                           {t.dueTime}
                         </span>
                       )}
-                      <span className="text-[9px] font-medium bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 px-1.5 py-0.5 rounded">
+                      <span className="text-[9px] font-medium bg-surface-muted text-foreground border border-border px-1.5 py-0.5 rounded">
                         {t.taskType}
                       </span>
                     </div>
@@ -593,7 +507,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                     size="xs"
                     variant="outline"
                     onClick={() => handleCompleteTask(t.id)}
-                    leftIcon={<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                    leftIcon={<CheckCircle2 className="w-3.5 h-3.5 text-foreground" />}
                     className="shrink-0 rounded-lg text-xs font-semibold"
                   >
                     Complete
@@ -608,12 +522,12 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
       {/* 5. High-Value Inquiries Table & Live Timeline Stream */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Active High-Value Inquiries Dense Card (2 Cols) */}
-        <Card className="lg:col-span-2 rounded-2xl bg-surface">
-          <CardHeader className="pb-3 pt-4 px-5 border-b border-border/60">
+        <Card className="lg:col-span-2 rounded-xl bg-surface border border-border">
+          <CardHeader className="pb-3 pt-4 px-5 border-b border-border">
             <div className="flex items-center justify-between w-full">
               <div>
                 <CardTitle className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
-                  <Flame className="w-4 h-4 text-amber-500" />
+                  <Flame className="w-4 h-4 text-foreground" />
                   <span>High-Value Active Inquiries</span>
                 </CardTitle>
                 <p className="text-xs text-foreground-muted mt-0.5">Top active industrial leasing requirements in Western India</p>
@@ -624,22 +538,25 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             </div>
           </CardHeader>
 
-          <div className="divide-y divide-border/60">
+          <div className="divide-y divide-border">
             {inquiries.slice(0, 6).map((inq) => {
-              const badgeClass = stageBadgeStyles[inq.stage] || 'bg-surface-muted text-foreground-muted border-border';
+              const badgeClass = stageBadgeStyles[inq.stage] || 'bg-surface-muted text-foreground border-border';
 
               return (
                 <div
                   key={inq.id}
-                  onClick={() => onNavigate('inquiry_detail', inq.id)}
-                  className="py-3 px-5 flex items-center justify-between hover:bg-surface-muted/60 cursor-pointer transition-colors group select-none"
+                  onClick={() => {
+                    StorageService.upsertInquiry(inq);
+                    onNavigate('inquiry_detail', inq.id);
+                  }}
+                  className="py-3 px-5 flex items-center justify-between hover:bg-surface-muted/50 cursor-pointer transition-colors group select-none"
                 >
                   <div className="min-w-0 flex-1 pr-4">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[11px] font-mono font-bold text-foreground bg-surface-muted px-2 py-0.5 rounded border border-border shrink-0">
                         {inq.inquiryNumber}
                       </span>
-                      <span className="text-xs font-bold text-foreground truncate group-hover:text-fairway-700 dark:group-hover:text-fairway-400 transition-colors">
+                      <span className="text-xs font-bold text-foreground truncate group-hover:underline transition-colors">
                         {inq.companyName}
                       </span>
                       <span className="text-[11px] font-medium text-foreground-muted truncate max-w-[140px]">· {inq.industry}</span>
@@ -651,7 +568,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                       </span>
                       <span>·</span>
                       <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-foreground-muted shrink-0" />
+                        <MapPin className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
                         {inq.location}
                       </span>
                       <span>·</span>
@@ -668,7 +585,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                       </span>
                       <span className="text-[10px] text-foreground-muted block mt-1">{inq.salespersonName}</span>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-foreground-muted group-hover:text-fairway-700 dark:group-hover:text-fairway-400 group-hover:translate-x-0.5 transition-all" />
+                    <ChevronRight className="w-4 h-4 text-foreground-muted group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
                   </div>
                 </div>
               );
@@ -677,22 +594,22 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         </Card>
 
         {/* Live Activity Timeline Stream (1 Col) */}
-        <Card className="rounded-2xl bg-surface">
-          <CardHeader className="pb-3 pt-4 px-5 border-b border-border/60">
+        <Card className="rounded-xl bg-surface border border-border">
+          <CardHeader className="pb-3 pt-4 px-5 border-b border-border">
             <div>
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Activity className="w-4 h-4 text-fairway-600" />
+                <Activity className="w-4 h-4 text-foreground" />
                 <span>Live Action Timeline</span>
               </CardTitle>
               <p className="text-xs text-foreground-muted mt-0.5">Calls, meetings & status changes</p>
             </div>
           </CardHeader>
 
-          <div className="p-4 space-y-3.5">
+          <div className="p-4 space-y-3">
             {activities.slice(0, 6).map((act) => (
               <div key={act.id} className="flex items-start gap-3 text-xs">
-                <div className="w-7 h-7 rounded-full bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 border border-fairway-500/20 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                  <PhoneCall className="w-3.5 h-3.5" />
+                <div className="w-7 h-7 rounded-lg bg-surface-muted text-foreground border border-border flex items-center justify-center shrink-0 mt-0.5">
+                  <PhoneCall className="w-3.5 h-3.5 text-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
@@ -700,7 +617,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                     <span className="text-[10px] text-foreground-muted font-mono shrink-0">{formatRelativeDate(act.activityDate)}</span>
                   </div>
                   <p className="text-xs text-foreground-muted line-clamp-2 mt-0.5 leading-relaxed">{act.description}</p>
-                  <span className="text-[11px] text-fairway-700 dark:text-fairway-400 font-semibold block mt-1">by {act.userName}</span>
+                  <span className="text-[11px] text-foreground-muted font-medium block mt-1">by {act.userName}</span>
                 </div>
               </div>
             ))}
@@ -709,11 +626,11 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
       </div>
 
       {/* 6. Western India Industrial Corridor Demand Hub */}
-      <div className="p-5 bg-surface rounded-2xl border border-border shadow-xs space-y-3">
+      <div className="p-5 bg-surface rounded-xl border border-border space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <Compass className="w-4 h-4 text-fairway-600" />
+              <Compass className="w-4 h-4 text-foreground" />
               <span>Gujarat & Western India Logistics Hubs</span>
             </h4>
             <p className="text-[11px] text-foreground-muted mt-0.5">
@@ -724,7 +641,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             size="xs"
             variant="outline"
             onClick={() => onNavigate('map')}
-            leftIcon={<MapPin className="w-3.5 h-3.5 text-fairway-600" />}
+            leftIcon={<MapPin className="w-3.5 h-3.5 text-foreground" />}
             className="rounded-lg text-xs"
           >
             Open Interactive Corridor Map
@@ -736,16 +653,16 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             <div
               key={c.short}
               onClick={() => onNavigate('map')}
-              className="p-3 bg-surface-muted/60 hover:bg-surface-muted border border-border rounded-xl cursor-pointer transition-all hover:-translate-y-0.5"
+              className="p-3 bg-surface-muted/50 hover:bg-surface-muted border border-border rounded-xl cursor-pointer transition-all hover:-translate-y-0.5"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-foreground">{c.short}</span>
-                <span className="text-[10px] font-mono font-semibold text-fairway-700 dark:text-fairway-400 bg-fairway-500/10 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-mono font-semibold text-foreground bg-surface px-1.5 py-0.5 rounded border border-border">
                   {formatSqFt(c.activeDemand).replace(' sq.ft.', '')} sqft
                 </span>
               </div>
               <span className="text-[10px] text-foreground-muted block mt-1 truncate">{c.name}</span>
-              <span className="text-[9px] font-medium text-foreground-muted/80 block mt-0.5 truncate">{c.tag}</span>
+              <span className="text-[9px] font-medium text-foreground-muted block mt-0.5 truncate">{c.tag}</span>
             </div>
           ))}
         </div>

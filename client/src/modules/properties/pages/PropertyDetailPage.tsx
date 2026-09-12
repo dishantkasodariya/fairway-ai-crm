@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   FileText,
   ExternalLink,
-  Sparkles,
   Layers,
   Check,
   ChevronLeft,

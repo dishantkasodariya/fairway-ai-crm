@@ -915,69 +915,69 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const darkVars = darkMode
       ? `
-        --bg-app: #0A0A0A !important;
-        --bg-surface: #171717 !important;
-        --bg-surface-muted: #262626 !important;
-        --bg-card: #171717 !important;
-        --text-foreground: #F5F5F5 !important;
-        --text-muted: #A3A3A3 !important;
-        --text-subtle: #737373 !important;
-        --border-color: #262626 !important;
-        --border-strong: #333333 !important;
-        --border-subtle: #1F1F1F !important;
-        --background: 10 10 10 !important;
-        --surface: 23 23 23 !important;
-        --surface-muted: 38 38 38 !important;
-        --foreground: 245 245 245 !important;
-        --foreground-muted: 163 163 163 !important;
-        --border: 38 38 38 !important;
-        --border-strong: 51 51 51 !important;
-        --card: 23 23 23 !important;
-        --card-foreground: 245 245 245 !important;
-        --muted: 38 38 38 !important;
-        --muted-foreground: 163 163 163 !important;
+        --bg-app: #09090B !important;
+        --bg-surface: #121214 !important;
+        --bg-surface-muted: #1C1C1F !important;
+        --bg-card: #121214 !important;
+        --text-foreground: #FFFFFF !important;
+        --text-muted: #D4D4D8 !important;
+        --text-subtle: #A1A1AA !important;
+        --border-color: #27272A !important;
+        --border-strong: #3F3F46 !important;
+        --border-subtle: #18181B !important;
+        --background: 9 9 11 !important;
+        --surface: 18 18 20 !important;
+        --surface-muted: 28 28 31 !important;
+        --foreground: 255 255 255 !important;
+        --foreground-muted: 212 212 216 !important;
+        --border: 39 39 42 !important;
+        --border-strong: 63 63 70 !important;
+        --card: 18 18 20 !important;
+        --card-foreground: 255 255 255 !important;
+        --muted: 28 28 31 !important;
+        --muted-foreground: 212 212 216 !important;
       `
       : `
-        --bg-app: #F7F9F8 !important;
+        --bg-app: #F8FAFC !important;
         --bg-surface: #FFFFFF !important;
-        --bg-surface-muted: #F1F4F2 !important;
+        --bg-surface-muted: #F1F5F9 !important;
         --bg-card: #FFFFFF !important;
-        --text-foreground: #16201B !important;
-        --text-muted: #66736C !important;
-        --text-subtle: #8C9B93 !important;
-        --border-color: #DDE5E1 !important;
-        --border-strong: #C8D3CE !important;
-        --border-subtle: #EAEFEA !important;
-        --background: 247 249 248 !important;
+        --text-foreground: #000000 !important;
+        --text-muted: #475569 !important;
+        --text-subtle: #64748B !important;
+        --border-color: #E2E8F0 !important;
+        --border-strong: #CBD5E1 !important;
+        --border-subtle: #F1F5F9 !important;
+        --background: 248 250 252 !important;
         --surface: 255 255 255 !important;
-        --surface-muted: 241 244 242 !important;
-        --foreground: 22 32 27 !important;
-        --foreground-muted: 102 115 108 !important;
-        --border: 221 229 225 !important;
-        --border-strong: 200 211 206 !important;
+        --surface-muted: 241 245 249 !important;
+        --foreground: 0 0 0 !important;
+        --foreground-muted: 71 85 105 !important;
+        --border: 226 232 240 !important;
+        --border-strong: 203 213 225 !important;
         --card: 255 255 255 !important;
-        --card-foreground: 22 32 27 !important;
-        --muted: 241 244 242 !important;
-        --muted-foreground: 102 115 108 !important;
+        --card-foreground: 0 0 0 !important;
+        --muted: 241 245 249 !important;
+        --muted-foreground: 71 85 105 !important;
       `;
 
     const darkClassOverrides = darkMode
       ? `
         html.dark, body.dark, .dark {
-          background-color: #0A0A0A !important;
-          color: #F5F5F5 !important;
+          background-color: #09090B !important;
+          color: #FFFFFF !important;
         }
         html.dark .bg-surface, html.dark .bg-white, html.dark .bg-surface-card {
-          background-color: #171717 !important;
+          background-color: #121214 !important;
         }
         html.dark .bg-background {
-          background-color: #0A0A0A !important;
+          background-color: #09090B !important;
         }
         html.dark .bg-surface-muted, html.dark .bg-slate-50, html.dark .bg-slate-100 {
-          background-color: #262626 !important;
+          background-color: #1C1C1F !important;
         }
         html.dark .bg-surface-muted\\/30, html.dark .bg-surface-muted\\/40, html.dark .bg-surface-muted\\/50, html.dark .bg-surface-muted\\/60, html.dark .bg-surface-muted\\/70 {
-          background-color: rgba(38, 38, 38, 0.6) !important;
+          background-color: rgba(28, 28, 31, 0.7) !important;
         }
         html.dark .hover\\:bg-surface-muted:hover,
         html.dark .hover\\:bg-surface-muted\\/40:hover,
@@ -987,17 +987,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         html.dark .hover\\:bg-slate-200:hover,
         html.dark .hover\\:bg-gray-50:hover,
         html.dark .hover\\:bg-gray-100:hover {
-          background-color: #262626 !important;
+          background-color: #27272A !important;
         }
         html.dark .hover\\:bg-surface:hover,
         html.dark .hover\\:bg-white:hover {
-          background-color: #171717 !important;
+          background-color: #18181B !important;
         }
         html.dark .border-border, html.dark .border-slate-200, html.dark .border-slate-300 {
-          border-color: #262626 !important;
+          border-color: #27272A !important;
         }
         html.dark .border-border\\/40, html.dark .border-border\\/50, html.dark .border-border\\/60, html.dark .border-border\\/70, html.dark .border-border\\/80 {
-          border-color: rgba(38, 38, 38, 0.7) !important;
+          border-color: rgba(63, 63, 70, 0.6) !important;
         }
         html.dark .text-foreground,
         html.dark .text-slate-900, html.dark .text-slate-800, html.dark .text-slate-700,
@@ -1005,7 +1005,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         html.dark .text-zinc-900, html.dark .text-zinc-800, html.dark .text-zinc-700,
         html.dark .text-neutral-900, html.dark .text-neutral-800, html.dark .text-neutral-700,
         html.dark .text-black, html.dark .text-card-foreground {
-          color: #F5F5F5 !important;
+          color: #FFFFFF !important;
         }
         html.dark .text-foreground-muted,
         html.dark .text-muted-foreground,
@@ -1013,33 +1013,34 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         html.dark .text-gray-600, html.dark .text-gray-500, html.dark .text-gray-400,
         html.dark .text-zinc-600, html.dark .text-zinc-500, html.dark .text-zinc-400,
         html.dark .text-neutral-600, html.dark .text-neutral-500, html.dark .text-neutral-400 {
-          color: #A3A3A3 !important;
+          color: #D4D4D8 !important;
         }
         html.dark .text-foreground-subtle,
         html.dark .text-slate-300, html.dark .text-gray-300, html.dark .text-zinc-300 {
-          color: #737373 !important;
+          color: #A1A1AA !important;
         }
         html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6 {
-          color: #F5F5F5 !important;
+          color: #FFFFFF !important;
         }
         html.dark strong, html.dark b {
-          color: #F5F5F5 !important;
+          color: #FFFFFF !important;
         }
         html.dark label {
-          color: #E5E5E5 !important;
+          color: #F4F4F5 !important;
         }
         html.dark th {
-          color: #A3A3A3 !important;
+          color: #FFFFFF !important;
+          background-color: #1C1C1F !important;
         }
         html.dark td {
-          color: #F5F5F5 !important;
+          color: #FFFFFF !important;
         }
         html.dark input:not([cmdk-input]):not(.cmdk-input):not([data-transparent]):not(.bg-transparent),
         html.dark select,
         html.dark textarea {
-          background-color: #262626 !important;
-          color: #F5F5F5 !important;
-          border-color: #333333 !important;
+          background-color: #18181B !important;
+          color: #FFFFFF !important;
+          border-color: #27272A !important;
         }
         [cmdk-input-wrapper] input,
         [cmdk-input],
@@ -1053,31 +1054,48 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           outline: none !important;
         }
         html.dark input::placeholder, html.dark textarea::placeholder {
-          color: #737373 !important;
+          color: #71717A !important;
         }
       `
       : `
         html:not(.dark), body:not(.dark) {
-          background-color: #F7F9F8 !important;
-          color: #16201B !important;
+          background-color: #F8FAFC !important;
+          color: #000000 !important;
         }
         html:not(.dark) .bg-surface {
           background-color: #FFFFFF !important;
         }
         html:not(.dark) .bg-background {
-          background-color: #F7F9F8 !important;
+          background-color: #F8FAFC !important;
         }
         html:not(.dark) .bg-surface-muted {
-          background-color: #F1F4F2 !important;
+          background-color: #F1F5F9 !important;
         }
         html:not(.dark) .border-border {
-          border-color: #DDE5E1 !important;
+          border-color: #E2E8F0 !important;
         }
-        html:not(.dark) .text-foreground {
-          color: #16201B !important;
+        html:not(.dark) .text-foreground,
+        html:not(.dark) h1, html:not(.dark) h2, html:not(.dark) h3, html:not(.dark) h4, html:not(.dark) h5, html:not(.dark) h6,
+        html:not(.dark) strong, html:not(.dark) b, html:not(.dark) td, html:not(.dark) label {
+          color: #000000 !important;
         }
-        html:not(.dark) .text-foreground-muted {
-          color: #66736C !important;
+        html:not(.dark) th {
+          color: #000000 !important;
+          background-color: #F1F5F9 !important;
+        }
+        html:not(.dark) .text-foreground-muted,
+        html:not(.dark) .text-muted-foreground {
+          color: #475569 !important;
+        }
+        html:not(.dark) input:not([cmdk-input]):not(.cmdk-input):not([data-transparent]):not(.bg-transparent),
+        html:not(.dark) select,
+        html:not(.dark) textarea {
+          background-color: #FFFFFF !important;
+          color: #000000 !important;
+          border-color: #E2E8F0 !important;
+        }
+        html:not(.dark) input::placeholder, html:not(.dark) textarea::placeholder {
+          color: #94A3B8 !important;
         }
       `;
 

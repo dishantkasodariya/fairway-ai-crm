@@ -86,6 +86,16 @@ function isCleanCompanyName(name?: string): boolean {
   return true;
 }
 
+export function normalizeCompanyName(name?: string): string {
+  if (!name || typeof name !== 'string') return '';
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\b(private\s+limited|pvt\.?\s*ltd\.?|limited|ltd\.?|llp|inc\.?|corp\.?|corporation|co\.?)\b/gi, '')
+    .replace(/[^a-z0-9]/gi, '')
+    .trim();
+}
+
 export class StorageService {
   public static init() {
     if (!localStorage.getItem(STORAGE_KEYS.INITIALIZED)) {
@@ -161,10 +171,26 @@ export class StorageService {
     this.init();
     const raw = getStorageItem<Company[]>(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES);
     const valid = raw.filter((c) => isCleanCompanyName(c?.name));
-    if (valid.length !== raw.length) {
-      setStorageItem(STORAGE_KEYS.COMPANIES, valid);
+
+    // Deduplicate companies in memory & storage by normalized name
+    const seen = new Map<string, Company>();
+    const deduplicated: Company[] = [];
+    for (const c of valid) {
+      const key = normalizeCompanyName(c.name);
+      if (!seen.has(key)) {
+        seen.set(key, c);
+        deduplicated.push(c);
+      } else {
+        const existing = seen.get(key)!;
+        existing.inquiriesCount = Math.max(existing.inquiriesCount || 0, c.inquiriesCount || 0);
+        existing.facilitiesCount = Math.max(existing.facilitiesCount || 0, c.facilitiesCount || 0);
+      }
     }
-    return valid;
+
+    if (deduplicated.length !== raw.length) {
+      setStorageItem(STORAGE_KEYS.COMPANIES, deduplicated);
+    }
+    return deduplicated;
   }
 
   public static getCompanyById(id: string): Company | undefined {
@@ -384,8 +410,38 @@ export class StorageService {
     return companyId ? inquiries.filter((i) => i.companyId === companyId) : inquiries;
   }
 
+  public static saveInquiries(inquiries: Inquiry[]): void {
+    if (!inquiries || !Array.isArray(inquiries)) return;
+    setStorageItem(STORAGE_KEYS.INQUIRIES, inquiries);
+  }
+
+  public static upsertInquiry(inquiry: Inquiry): void {
+    if (!inquiry || (!inquiry.id && !inquiry.inquiryNumber)) return;
+    const inquiries = this.getInquiries();
+    const idx = inquiries.findIndex(
+      (i) =>
+        (inquiry.id && i.id === inquiry.id) ||
+        (inquiry.inquiryNumber && i.inquiryNumber === inquiry.inquiryNumber)
+    );
+    if (idx >= 0) {
+      inquiries[idx] = { ...inquiries[idx], ...inquiry };
+    } else {
+      inquiries.unshift(inquiry);
+    }
+    setStorageItem(STORAGE_KEYS.INQUIRIES, inquiries);
+  }
+
   public static getInquiryById(id: string): Inquiry | undefined {
-    return this.getInquiries().find((i) => i.id === id || i.inquiryNumber === id);
+    if (!id) return undefined;
+    const cleanId = id.trim().toLowerCase();
+    const inquiries = this.getInquiries();
+    return inquiries.find(
+      (i) =>
+        (i.id && i.id.toLowerCase() === cleanId) ||
+        (i.inquiryNumber && i.inquiryNumber.toLowerCase() === cleanId) ||
+        i.id === id ||
+        i.inquiryNumber === id
+    );
   }
 
   public static createInquiry(data: Omit<Inquiry, 'id' | 'inquiryNumber' | 'createdAt' | 'updatedAt'>): Inquiry {
@@ -811,6 +867,10 @@ export class StorageService {
     return companyId ? tasks.filter((t) => t.companyId === companyId) : tasks;
   }
 
+  public static setTasks(tasks: Task[]): void {
+    setStorageItem(STORAGE_KEYS.TASKS, tasks);
+  }
+
   public static getTaskById(id: string): Task | undefined {
     return this.getTasks().find((t) => t.id === id);
   }
@@ -1143,9 +1203,13 @@ export class StorageService {
       return '';
     };
 
+    const batchCompanies = new Map<string, Company>();
+    const batchSeenInquiries = new Set<string>();
+
     rows.forEach((rawRow, index) => {
       const rowNum = index + 1;
-      const companyName = getVal(rawRow, mapping.companyName, mapping.company, 'Company', 'Company Name');
+      const rawCompanyName = getVal(rawRow, mapping.companyName, mapping.company, 'Company', 'Company Name');
+      const companyName = rawCompanyName.trim();
       const industry = getVal(rawRow, mapping.industry, 'Industry') || 'General Industrial';
       const city = getVal(rawRow, mapping.siteName, mapping.city, 'Site Name', 'City', 'Location') || 'Dahej';
       const comments = getVal(rawRow, mapping.comments, mapping.requirement, 'Comments', 'Requirement Description') || 'Warehouse requirement';
@@ -1171,8 +1235,30 @@ export class StorageService {
         return;
       }
 
-      // Check if company already exists
-      let company = this.getCompanies().find((c) => c.name.toLowerCase() === companyName.toLowerCase());
+      const normComp = normalizeCompanyName(companyName) || companyName.toLowerCase().replace(/[^a-z0-9]/gi, '');
+
+      // Check within-batch duplicate inquiry
+      const inqKey = `${normComp}::${area}::${city.toLowerCase().trim()}::${comments.toLowerCase().trim()}`;
+      if (batchSeenInquiries.has(inqKey)) {
+        skippedCount++;
+        errors.push({
+          row: rowNum,
+          field: 'Duplicate Entry',
+          error: `Duplicate row in file for ${companyName} (${city}, ${area} sq.ft) - skipped.`,
+          data: rawRow,
+        });
+        return;
+      }
+
+      // Check if company already exists (using normalized matching against name and legalName)
+      let company = this.getCompanies().find((c) => {
+        return normalizeCompanyName(c.name) === normComp || (c.legalName && normalizeCompanyName(c.legalName) === normComp);
+      });
+
+      if (!company && batchCompanies.has(normComp)) {
+        company = batchCompanies.get(normComp);
+      }
+
       if (!company) {
         company = this.createCompany({
           name: companyName,
@@ -1194,6 +1280,7 @@ export class StorageService {
           inquiriesCount: 1,
         });
         importedCompanies.push(company.name);
+        batchCompanies.set(normComp, company);
 
         // Add contact if present
         if (contactName) {
@@ -1225,6 +1312,31 @@ export class StorageService {
           builtUpAreaSqFt: area,
         });
       }
+
+      // Check if this inquiry already exists in CRM (cross-file / previous imports deduplication)
+      const existingInquiries = this.getInquiries();
+      const duplicateInquiry = existingInquiries.find((inq) => {
+        const sameComp = inq.companyId === company!.id || normalizeCompanyName(inq.companyName) === normComp;
+        if (!sameComp) return false;
+        const sameAreaAndLoc = inq.requiredAreaSqFt === area && (inq.location.toLowerCase().trim() === city.toLowerCase().trim() || !city);
+        const samePhoneAndArea = Boolean(phone && inq.contactPhone && inq.contactPhone.replace(/\D/g, '') === phone.replace(/\D/g, '') && inq.requiredAreaSqFt === area);
+        const sameRequirement = Boolean(comments && inq.requirement && inq.requirement.toLowerCase().trim() === comments.toLowerCase().trim());
+        return sameAreaAndLoc || samePhoneAndArea || sameRequirement;
+      });
+
+      if (duplicateInquiry) {
+        batchSeenInquiries.add(inqKey);
+        skippedCount++;
+        errors.push({
+          row: rowNum,
+          field: 'Duplicate Entry',
+          error: `Duplicate inquiry: already exists in CRM (${duplicateInquiry.inquiryNumber}) for ${company.name} - skipped.`,
+          data: rawRow,
+        });
+        return;
+      }
+
+      batchSeenInquiries.add(inqKey);
 
       // Create Inquiry
       const inquiry = this.createInquiry({

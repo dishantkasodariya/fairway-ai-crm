@@ -3,7 +3,6 @@ import {
   Building2,
   Warehouse,
   ArrowLeft,
-  Sparkles,
   CheckCircle2,
   AlertTriangle,
   MapPin,

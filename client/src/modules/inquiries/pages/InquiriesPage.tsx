@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   FileText,
   Search,
@@ -10,7 +10,6 @@ import {
   Clock,
   ChevronRight,
   ArrowRight,
-  Sparkles,
   LayoutList,
   LayoutGrid,
   List,
@@ -319,6 +318,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
       if (res.success && res.data) {
         setInquiries(res.data);
         setTotalCount(res.totalCount !== undefined ? res.totalCount : res.data.length);
+        res.data.forEach((inq) => StorageService.upsertInquiry(inq));
       } else {
         const local = StorageService.getInquiries();
         setInquiries(local);
@@ -332,6 +332,25 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
       setIsLoading(false);
     }
   };
+
+  const handleSelectInquiry = useCallback(
+    (inq: Inquiry) => {
+      StorageService.upsertInquiry(inq);
+      onSelectInquiry(inq.id);
+    },
+    [onSelectInquiry]
+  );
+
+  const handleSelectInquiryById = useCallback(
+    (id: string) => {
+      const found = inquiries.find((i) => i.id === id || i.inquiryNumber === id);
+      if (found) {
+        StorageService.upsertInquiry(found);
+      }
+      onSelectInquiry(id);
+    },
+    [inquiries, onSelectInquiry]
+  );
 
   // Reset pageIndex when search or filter values change
   useEffect(() => {
@@ -610,7 +629,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         cell: ({ row }) => (
           <button
             type="button"
-            onClick={() => onSelectInquiry(row.original.id)}
+            onClick={() => handleSelectInquiry(row.original)}
             className="font-mono font-bold text-primary dark:text-white bg-primary/10 dark:bg-primary/20 px-2.5 py-1 rounded-full border border-primary/25 dark:border-primary/40 hover:bg-primary/20 dark:hover:bg-primary/30 transition-colors text-xs text-left cursor-pointer inline-flex items-center shadow-xs"
           >
             {row.original.inquiryNumber}
@@ -628,7 +647,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         cell: ({ row }) => (
           <button
             type="button"
-            onClick={() => onSelectInquiry(row.original.id)}
+            onClick={() => handleSelectInquiry(row.original)}
             className="font-semibold text-foreground hover:text-fairway-600 dark:hover:text-fairway-400 text-left transition-colors truncate max-w-[200px] block cursor-pointer text-xs"
           >
             {row.original.companyName}
@@ -729,7 +748,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         enableSorting: true,
       },
     ],
-    [onSelectInquiry]
+    [handleSelectInquiry]
   );
 
   const table = useTable({
@@ -1248,7 +1267,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                   <WarehouseInquiryLineCard
                     key={inq.id}
                     inquiry={inq}
-                    onSelect={onSelectInquiry}
+                    onSelect={handleSelectInquiryById}
                   />
                 ))}
               </div>
@@ -1284,7 +1303,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                   <WarehouseInquiryCard
                     key={inq.id}
                     inquiry={inq}
-                    onSelect={onSelectInquiry}
+                    onSelect={handleSelectInquiryById}
                   />
                 ))}
               </div>

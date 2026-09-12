@@ -115,16 +115,19 @@ const AppRouter: React.FC = () => {
           />
         );
 
-      case 'inquiry_detail':
+      case 'inquiry_detail': {
+        const targetId = selectedEntityId || StorageService.getInquiries()[0]?.id || '';
         return (
           <InquiryDetailPage
-            inquiryId={selectedEntityId || 'inq_1048'}
+            key={targetId}
+            inquiryId={targetId}
             onBack={() => handleNavigate('inquiries')}
             onNavigateToCompany={(compKid) => handleNavigate('company_detail', compKid)}
             onNavigateToMap={() => handleNavigate('map')}
             onNavigateToProperty={(propId) => handleNavigate('property_detail', propId)}
           />
         );
+      }
 
       case 'companies':
         return (

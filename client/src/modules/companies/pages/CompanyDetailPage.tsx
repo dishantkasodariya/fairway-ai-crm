@@ -17,7 +17,6 @@ import {
   ExternalLink,
   MessageSquare,
   Clock,
-  Sparkles,
   ArrowRight,
   Send,
   AlertOctagon,

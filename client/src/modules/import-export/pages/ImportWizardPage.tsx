@@ -15,10 +15,9 @@ import {
   X,
   Database,
   ArrowLeft,
-  Sparkles,
   Layers,
 } from 'lucide-react';
-import { StorageService } from '@/modules/core/services/storageService';
+import { StorageService, normalizeCompanyName } from '@/modules/core/services/storageService';
 import { ImportService } from '@/modules/core/services/importService';
 import { ImportResult } from '@/modules/core/types';
 import { Button } from '@/modules/core/components/ui/Button';
@@ -228,6 +227,111 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
     success('Sample Data Loaded', 'Loaded 5 sample industrial warehouse inquiry records.');
   };
 
+  // Proactive Diagnostic Validation Calculation for Step 3 Preview (detects in-file and cross-file duplicates)
+  const validationAnalysis = React.useMemo(() => {
+    if (!parsedRows || parsedRows.length === 0) {
+      return {
+        rowStatuses: [] as Array<{
+          isMissingCompany: boolean;
+          isDuplicate: boolean;
+          duplicateReason: string;
+          isValid: boolean;
+          isOpenSpec?: boolean;
+        }>,
+        validCount: 0,
+        duplicateCount: 0,
+        missingCount: 0,
+      };
+    }
+
+    const existingInquiries = StorageService.getInquiries();
+    const existingCompanies = StorageService.getCompanies();
+
+    const seenInBatch = new Set<string>();
+    let validCount = 0;
+    let duplicateCount = 0;
+    let missingCount = 0;
+
+    const mapping = columnMapping as Record<string, string | undefined>;
+    const rowStatuses = parsedRows.map((r) => {
+      const rawComp = (
+        r[mapping.companyName || ''] ??
+        r[mapping.company || ''] ??
+        r['Company'] ??
+        r['Company Name'] ??
+        ''
+      ).toString().trim();
+      if (!rawComp) {
+        missingCount++;
+        return { isMissingCompany: true, isDuplicate: false, duplicateReason: '', isValid: false };
+      }
+
+      const normComp = normalizeCompanyName(rawComp) || rawComp.toLowerCase().replace(/[^a-z0-9]/gi, '');
+      const siteName = (
+        r[mapping.siteName || ''] ??
+        r[mapping.city || ''] ??
+        r['Site Name'] ??
+        r['City'] ??
+        r['Location'] ??
+        'Gujarat Industrial Cluster'
+      ).toString().trim();
+      const area = parseAreaNumber(
+        r[mapping.requiredAreaSqFt || ''] ??
+        r[mapping.areaRequired || ''] ??
+        r['Area Required (sq. ft.)'] ??
+        r['Required Area']
+      );
+      const comments = (
+        r[mapping.comments || ''] ??
+        r[mapping.requirement || ''] ??
+        r['Comments'] ??
+        r['Requirement Description'] ??
+        ''
+      ).toString().trim();
+      const rawPhone = (
+        r[mapping.phone || ''] ??
+        r[mapping.contactNumber || ''] ??
+        r['Contact Number'] ??
+        r['Phone'] ??
+        ''
+      ).toString().trim();
+
+      const batchKey = `${normComp}::${area}::${siteName.toLowerCase()}::${comments.toLowerCase()}`;
+
+      // Check within-batch duplicate
+      if (seenInBatch.has(batchKey)) {
+        duplicateCount++;
+        return { isMissingCompany: false, isDuplicate: true, duplicateReason: 'Duplicate row within this spreadsheet', isValid: false };
+      }
+
+      // Check against CRM records (from prior imports or manual entries)
+      const matchedCompany = existingCompanies.find(
+        (c) => normalizeCompanyName(c.name) === normComp || (c.legalName && normalizeCompanyName(c.legalName) === normComp)
+      );
+
+      const isExistingInCrm = existingInquiries.some((inq) => {
+        const sameComp = (matchedCompany && inq.companyId === matchedCompany.id) || normalizeCompanyName(inq.companyName) === normComp;
+        if (!sameComp) return false;
+        const sameAreaAndLoc = inq.requiredAreaSqFt === area && (inq.location.toLowerCase().trim() === siteName.toLowerCase().trim() || !siteName);
+        const samePhoneAndArea = Boolean(rawPhone && inq.contactPhone && inq.contactPhone.replace(/\D/g, '') === rawPhone.replace(/\D/g, '') && inq.requiredAreaSqFt === area);
+        const sameRequirement = Boolean(comments && inq.requirement && inq.requirement.toLowerCase().trim() === comments.toLowerCase().trim());
+        return sameAreaAndLoc || samePhoneAndArea || sameRequirement;
+      });
+
+      if (isExistingInCrm) {
+        seenInBatch.add(batchKey);
+        duplicateCount++;
+        return { isMissingCompany: false, isDuplicate: true, duplicateReason: 'Already exists in Fairway CRM database', isValid: false };
+      }
+
+      seenInBatch.add(batchKey);
+      validCount++;
+      return { isMissingCompany: false, isDuplicate: false, duplicateReason: '', isValid: true, isOpenSpec: area <= 0 };
+    });
+
+    return { rowStatuses, validCount, duplicateCount, missingCount };
+  }, [parsedRows, columnMapping]);
+
   const handleValidateAndProceed = () => {
     setStep(3);
   };
@@ -292,98 +396,71 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
 
   return (
     <div className="w-full text-left space-y-6 pb-16">
-      {/* Header Pattern Matching Warehouse Inquiry & Companies Module */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-surface-muted border border-border text-foreground flex items-center justify-center shrink-0 shadow-xs">
-            <UploadCloud className="w-5 h-5 text-fairway-600" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
-              <span>Excel & CSV Inquiry Migration Wizard</span>
-            </h1>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              Migrate spreadsheets (such as enquiries.xlsx) directly into Fairway CRM with field mapping and validation.
-            </p>
-          </div>
+      {/* Minimal Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+        <div>
+          <h1 className="text-xl font-bold text-foreground tracking-tight">Spreadsheet Data Import</h1>
+          <p className="text-xs text-foreground-muted mt-0.5">
+            Import inquiries, client accounts, and pipeline records from Excel (.xlsx) or CSV files.
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
           {onBack && (
-            <Button size="sm" variant="outline" onClick={onBack} leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}>
+            <Button size="sm" variant="outline" onClick={onBack}>
               Back
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={downloadSampleTemplate} leftIcon={<Download className="w-3.5 h-3.5" />}>
-            Download Template
+            Download Template (.csv)
           </Button>
         </div>
       </div>
 
-      {/* 4-Step Stepper Progress Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-surface p-3 rounded-2xl border border-border shadow-xs">
+      {/* Minimal 4-Step Segmented Bar */}
+      <div className="flex items-center border border-border rounded-xl bg-surface p-1 text-xs">
         {[
-          { num: 1, label: 'Upload File', desc: 'Select or drag enquiries.xlsx' },
-          { num: 2, label: 'Map Columns', desc: 'Auto & manual mapping' },
-          { num: 3, label: 'Validate Data', desc: 'Diagnostics preview' },
-          { num: 4, label: 'Import Summary', desc: 'Batch completion stats' },
+          { num: 1, label: '1. Upload File' },
+          { num: 2, label: '2. Map Columns' },
+          { num: 3, label: '3. Validate & Preview' },
+          { num: 4, label: '4. Summary' },
         ].map((s) => (
-          <div
+          <button
             key={s.num}
+            type="button"
+            onClick={() => {
+              if (s.num === 1) setStep(1);
+              else if (s.num === 2 && parsedRows.length > 0) setStep(2);
+              else if (s.num === 3 && parsedRows.length > 0) setStep(3);
+            }}
+            disabled={s.num > step && parsedRows.length === 0}
             className={cn(
-              'p-2.5 rounded-xl border transition-all flex items-center gap-3',
+              'flex-1 py-2 px-3 rounded-lg font-medium text-center transition-all truncate',
               step === s.num
-                ? 'bg-fairway-50/70 dark:bg-fairway-950/40 border-fairway-400 shadow-2xs'
+                ? 'bg-fairway-600 text-white font-semibold shadow-2xs'
                 : step > s.num
-                ? 'bg-surface-muted/40 border-border/70 text-foreground-muted'
-                : 'bg-transparent border-transparent opacity-60'
+                ? 'text-foreground hover:bg-surface-muted'
+                : 'text-foreground-muted opacity-50 cursor-not-allowed'
             )}
           >
-            <div
-              className={cn(
-                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                step > s.num
-                  ? 'bg-fairway-600 text-white'
-                  : step === s.num
-                  ? 'bg-fairway-600 text-white shadow-xs'
-                  : 'bg-surface-muted text-foreground-muted border border-border'
-              )}
-            >
-              {step > s.num ? <CheckCircle2 className="w-4 h-4" /> : s.num}
-            </div>
-            <div className="min-w-0">
-              <span className={cn('text-xs font-bold block truncate', step === s.num ? 'text-foreground' : 'text-foreground-muted')}>
-                {s.label}
-              </span>
-              <span className="text-[10px] text-foreground-muted truncate block hidden sm:block">
-                {s.desc}
-              </span>
-            </div>
-          </div>
+            {s.label}
+          </button>
         ))}
       </div>
 
-      {/* ================= STEP 1: UPLOAD FILE (DRAG & DROP READY) ================= */}
+      {/* ================= STEP 1: UPLOAD FILE ================= */}
       {step === 1 && (
-        <div className="bg-surface border border-border rounded-2xl p-6 sm:p-10 shadow-xs space-y-6">
-          <div className="text-center max-w-xl mx-auto space-y-2">
-            <h2 className="text-lg font-bold text-foreground">Upload your Spreadsheet or Data Log</h2>
-            <p className="text-xs text-foreground-muted leading-relaxed">
-              Upload warehouse inquiry logs, Excel (.xlsx/.xls) sheets, or CSV files to bulk-ingest into your Fairway pipeline.
-            </p>
-          </div>
-
-          {/* Interactive Drag & Drop Area */}
+        <div className="bg-surface border border-border rounded-xl p-8 sm:p-12 text-center space-y-6">
           <div
             onDragOver={handleDragOver}
             onDragEnter={handleDragEnter}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             className={cn(
-              'border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all cursor-pointer relative group flex flex-col items-center justify-center space-y-4',
+              'border border-dashed rounded-xl p-10 sm:p-14 text-center transition-all cursor-pointer relative flex flex-col items-center justify-center space-y-3',
               isDragging
-                ? 'border-fairway-500 bg-fairway-500/10 scale-[1.005] shadow-lg'
-                : 'border-border hover:border-fairway-400/80 bg-surface-muted/30 hover:bg-surface-muted/60'
+                ? 'border-fairway-500 bg-fairway-500/5'
+                : 'border-border hover:border-foreground/40 bg-surface-muted/20 hover:bg-surface-muted/40'
             )}
           >
             <input
@@ -394,72 +471,43 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
               title="Click or drag file to upload"
             />
 
-            <div
-              className={cn(
-                'w-16 h-16 rounded-2xl flex items-center justify-center transition-all shadow-xs',
-                isDragging
-                  ? 'bg-fairway-600 text-white scale-110'
-                  : 'bg-fairway-100 text-fairway-800 dark:bg-fairway-950 dark:text-fairway-200 border border-fairway-300 dark:border-fairway-800 group-hover:scale-105'
-              )}
-            >
-              <UploadCloud className="w-8 h-8" />
+            <div className="w-12 h-12 rounded-xl bg-surface-muted border border-border flex items-center justify-center text-foreground shrink-0 shadow-2xs">
+              <UploadCloud className="w-6 h-6 text-fairway-600" />
             </div>
 
-            <div className="space-y-1 z-0 pointer-events-none">
-              <p className="text-sm font-bold text-foreground">
-                {isDragging ? 'Drop your Excel/CSV file right here' : 'Drag & drop enquiries.xlsx or any spreadsheet here, or browse files'}
+            <div className="space-y-1 pointer-events-none">
+              <p className="text-sm font-semibold text-foreground">
+                {isDragging ? 'Drop your spreadsheet here' : 'Click to upload or drag and drop spreadsheet'}
               </p>
               <p className="text-xs text-foreground-muted">
-                Supports Microsoft Excel (.XLSX, .XLS) and Comma-Separated (.CSV, .TXT) files
+                Supports Excel (.xlsx, .xls) and CSV (.csv, .txt) files
               </p>
             </div>
-
-            <div className="pt-2 z-0 pointer-events-none">
-              <span className="inline-flex items-center gap-2 px-4 py-2 bg-fairway-600 text-white text-xs font-bold rounded-xl shadow-xs group-hover:bg-fairway-700 transition-colors">
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Select File from Computer</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Quick Demo Dataset Action */}
-          <div className="flex items-center justify-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleLoadSample}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl bg-surface-muted border border-border text-foreground hover:bg-surface-muted/80 transition-colors cursor-pointer"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Load 5-Row Demo Sample Dataset</span>
-            </button>
           </div>
         </div>
       )}
 
-      {/* ================= STEP 2: MAP COLUMNS (WITH SHEET SELECTOR & COMBOBOX) ================= */}
+      {/* ================= STEP 2: MAP COLUMNS ================= */}
       {step === 2 && (
-        <div className="bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="bg-surface border border-border rounded-xl p-6 sm:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
             <div>
-              <h2 className="text-base font-bold text-foreground">
-                Step 2: Map Spreadsheet Columns to Fairway CRM Fields
-              </h2>
+              <h2 className="text-sm font-bold text-foreground">Map Columns to CRM Fields</h2>
               <p className="text-xs text-foreground-muted mt-0.5">
-                Verify auto-detected mapping or assign columns from your spreadsheet for each field below.
+                Assign each spreadsheet column to the corresponding CRM record field.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               {sheetNames.length > 1 && (
-                <div className="flex items-center gap-1.5 bg-surface-muted px-2.5 py-1 rounded-xl border border-border text-xs">
-                  <Layers className="w-3.5 h-3.5 text-fairway-600" />
-                  <span className="font-semibold text-foreground-muted">Sheet:</span>
+                <div className="flex items-center gap-2 bg-surface-muted px-2.5 py-1 rounded-lg border border-border text-xs">
+                  <span className="text-foreground-muted font-medium">Sheet:</span>
                   <select
                     value={selectedSheet}
                     onChange={(e) => {
                       if (rawWorkbook) loadWorksheetData(rawWorkbook, e.target.value);
                     }}
-                    className="bg-transparent font-bold text-foreground outline-none cursor-pointer"
+                    className="bg-transparent font-semibold text-foreground outline-none cursor-pointer"
                   >
                     {sheetNames.map((s) => (
                       <option key={s} value={s}>
@@ -469,30 +517,31 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                   </select>
                 </div>
               )}
-              <Badge variant="outline" className="font-mono text-xs">
-                📄 {uploadedFileName || 'Uploaded File'} ({parsedRows.length} Rows)
-              </Badge>
+              <span className="text-xs font-mono px-2.5 py-1 bg-surface-muted border border-border rounded-lg text-foreground-muted">
+                {uploadedFileName || 'File'} ({parsedRows.length} rows)
+              </span>
             </div>
           </div>
 
-          {/* Field Mapping Grid with Custom Schema */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+          {/* Clean Minimal Field Mapping Grid (No Nested Box Clutter) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5 text-xs">
             {/* 1. Company */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
-                Company <span className="text-rose-500">*</span>
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground flex items-center justify-between">
+                <span>Company Name</span>
+                <span className="text-[10px] text-rose-500 font-normal">Required</span>
               </label>
               <Combobox
                 options={headerComboboxOptions}
                 value={columnMapping.companyName}
                 onChange={(val) => setColumnMapping({ ...columnMapping, companyName: val })}
-                placeholder="Map to Company..."
+                placeholder="Map to Company Name..."
               />
             </div>
 
             {/* 2. Site Name */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
                 Site Name / Hub Location
               </label>
               <Combobox
@@ -503,23 +552,23 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
               />
             </div>
 
-            {/* 3. Area Required (sq. ft.) */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
+            {/* 3. Area Required */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
                 Area Required (sq. ft.)
               </label>
               <Combobox
                 options={headerComboboxOptions}
                 value={columnMapping.requiredAreaSqFt}
                 onChange={(val) => setColumnMapping({ ...columnMapping, requiredAreaSqFt: val })}
-                placeholder="Map to Area Required..."
+                placeholder="Map to Required Area..."
               />
             </div>
 
             {/* 4. Date */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
-                Date / Inquiry Date
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
+                Inquiry Date
               </label>
               <Combobox
                 options={headerComboboxOptions}
@@ -530,150 +579,159 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
             </div>
 
             {/* 5. Contact Person */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
                 Contact Person
               </label>
               <Combobox
                 options={headerComboboxOptions}
                 value={columnMapping.contactName}
                 onChange={(val) => setColumnMapping({ ...columnMapping, contactName: val })}
-                placeholder="Map to Contact Person..."
+                placeholder="Map to Contact Name..."
               />
             </div>
 
             {/* 6. Contact Number */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
-                Contact Number / Phone
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
+                Phone Number
               </label>
               <Combobox
                 options={headerComboboxOptions}
                 value={columnMapping.phone}
                 onChange={(val) => setColumnMapping({ ...columnMapping, phone: val })}
-                placeholder="Map to Contact Number..."
+                placeholder="Map to Phone..."
               />
             </div>
 
             {/* 7. Entered By */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
-                Entered By / Assigned Owner
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
+                Assigned Salesperson
               </label>
               <Combobox
                 options={headerComboboxOptions}
                 value={columnMapping.enteredBy}
                 onChange={(val) => setColumnMapping({ ...columnMapping, enteredBy: val })}
-                placeholder="Map to Entered By..."
+                placeholder="Map to Salesperson..."
               />
             </div>
 
             {/* 8. Comments */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
-                Comments / Description
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
+                Requirement Details / Comments
               </label>
               <Combobox
                 options={headerComboboxOptions}
                 value={columnMapping.comments}
                 onChange={(val) => setColumnMapping({ ...columnMapping, comments: val })}
-                placeholder="Map to Comments..."
+                placeholder="Map to Requirement..."
               />
             </div>
 
-            {/* 9. Remark 1 – Current Status */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
-                Remark 1 – Current Status
+            {/* 9. Remark 1 */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
+                Current Status
               </label>
               <Combobox
                 options={headerComboboxOptions}
                 value={columnMapping.remark1CurrentStatus}
                 onChange={(val) => setColumnMapping({ ...columnMapping, remark1CurrentStatus: val })}
-                placeholder="Map to Remark 1..."
+                placeholder="Map to Current Status..."
               />
             </div>
 
-            {/* 10. Remark 2 – Next Action */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60">
-              <label className="font-bold text-foreground block">
-                Remark 2 – Next Action
+            {/* 10. Remark 2 */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
+                Next Action
               </label>
               <Combobox
                 options={headerComboboxOptions}
                 value={columnMapping.remark2NextAction}
                 onChange={(val) => setColumnMapping({ ...columnMapping, remark2NextAction: val })}
-                placeholder="Map to Remark 2..."
+                placeholder="Map to Next Action..."
               />
             </div>
 
-            {/* 11. Remark 3 – Follow-up Plan */}
-            <div className="space-y-1.5 bg-surface-muted/30 p-3 rounded-xl border border-border/60 md:col-span-2">
-              <label className="font-bold text-foreground block">
-                Remark 3 – Follow-up Plan
+            {/* 11. Remark 3 */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-foreground block">
+                Follow-up Plan
               </label>
               <Combobox
                 options={headerComboboxOptions}
                 value={columnMapping.remark3FollowUpPlan}
                 onChange={(val) => setColumnMapping({ ...columnMapping, remark3FollowUpPlan: val })}
-                placeholder="Map to Remark 3..."
+                placeholder="Map to Follow-up Plan..."
               />
             </div>
           </div>
 
-          {/* Stepper Footer Navigation */}
           <div className="flex items-center justify-between pt-5 border-t border-border">
-            <Button variant="outline" size="sm" onClick={() => setStep(1)} leftIcon={<ArrowLeft className="w-4 h-4" />}>
+            <Button variant="outline" size="sm" onClick={() => setStep(1)} leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}>
               Back to Upload
             </Button>
             <Button
               variant="primary"
               size="sm"
               onClick={handleValidateAndProceed}
-              rightIcon={<ArrowRight className="w-4 h-4" />}
+              rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
               className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold"
             >
-              Validate & Preview Data ({parsedRows.length} Rows)
+              Validate & Preview ({parsedRows.length} Rows)
             </Button>
           </div>
         </div>
       )}
 
-      {/* ================= STEP 3: PREVIEW & DIAGNOSTICS VALIDATION ================= */}
+      {/* ================= STEP 3: PREVIEW & VALIDATE ================= */}
       {step === 3 && (
-        <div className="bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
+        <div className="bg-surface border border-border rounded-xl p-6 sm:p-8 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
             <div>
-              <h2 className="text-base font-bold text-foreground">
-                Step 3: Diagnostic Validation & Row Preview
-              </h2>
+              <h2 className="text-sm font-bold text-foreground">Data Preview & Validation</h2>
               <p className="text-xs text-foreground-muted mt-0.5">
-                Automated validation verifies company accounts and normalizes serial dates and area requirements.
+                Review records before importing. Duplicates and existing records will be automatically skipped.
               </p>
             </div>
-            <Badge variant="success" size="sm" className="font-semibold">
-              Ready to Ingest ({parsedRows.length} Records)
-            </Badge>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                {validationAnalysis.validCount} New
+              </span>
+              {validationAnalysis.duplicateCount > 0 && (
+                <span className="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                  {validationAnalysis.duplicateCount} Duplicates (Skip)
+                </span>
+              )}
+              {validationAnalysis.missingCount > 0 && (
+                <span className="inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20">
+                  {validationAnalysis.missingCount} Incomplete
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Preview Table with Theme System Styling */}
-          <div className="overflow-x-auto border border-border rounded-2xl max-h-[460px] shadow-xs bg-surface">
+          {/* Clean High-Density Minimalist Table */}
+          <div className="overflow-x-auto border border-border rounded-lg max-h-[460px] bg-surface relative">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-surface-muted/90 dark:bg-[#161B22] text-[11px] font-bold uppercase tracking-wider text-foreground-muted sticky top-0 z-10 border-b border-border shadow-2xs backdrop-blur-xs">
-                <tr>
-                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">#</th>
-                  <th className="px-3.5 py-3 text-foreground whitespace-nowrap">Company</th>
-                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Site Name</th>
-                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Area Required</th>
-                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Date</th>
-                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Contact Person</th>
-                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Phone</th>
-                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Entered By</th>
-                  <th className="px-3.5 py-3 text-foreground-muted whitespace-nowrap">Status Remark</th>
-                  <th className="px-3.5 py-3 text-foreground text-right whitespace-nowrap">Validation</th>
+              <thead className="sticky top-0 z-20">
+                <tr className="border-b border-border">
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">#</th>
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">Company</th>
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">Site Name</th>
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">Area Required</th>
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">Date</th>
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">Contact Person</th>
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">Phone</th>
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">Entered By</th>
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">Status Remark</th>
+                  <th className="sticky top-0 z-20 px-3.5 py-2.5 font-bold uppercase tracking-wider text-[11px] text-foreground text-right whitespace-nowrap bg-surface-muted dark:bg-[#161B22] border-b border-border">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/70 text-xs">
+              <tbody className="divide-y divide-border text-xs">
                 {parsedRows.map((r, i) => {
                   const companyName = r[columnMapping.companyName]?.toString().trim();
                   const siteName = r[columnMapping.siteName]?.toString().trim();
@@ -681,85 +739,81 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
                   const area = parseAreaNumber(areaRaw);
                   const rawDate = r[columnMapping.inquiryDate] ?? r['Date_1'] ?? r['Date'];
                   const formattedDate = formatExcelDate(rawDate);
-                  const isMissingCompany = !companyName;
                   const remarkText = r[columnMapping.remark1CurrentStatus]?.toString().trim();
+                  const status = validationAnalysis.rowStatuses[i];
 
                   return (
                     <tr
                       key={i}
-                      className={`transition-colors ${
-                        isMissingCompany
-                          ? 'bg-rose-50/50 dark:bg-rose-950/20 hover:bg-rose-100/50 dark:hover:bg-rose-950/40'
-                          : 'hover:bg-surface-muted/40'
-                      }`}
+                      className={cn(
+                        'transition-colors',
+                        status?.isMissingCompany
+                          ? 'bg-rose-50/40 dark:bg-rose-950/20'
+                          : status?.isDuplicate
+                          ? 'bg-amber-50/30 dark:bg-amber-950/20'
+                          : 'hover:bg-surface-muted/50'
+                      )}
                     >
-                      <td className="px-3.5 py-2.5 font-mono font-bold text-foreground-muted text-[11px] whitespace-nowrap">
+                      <td className="px-3.5 py-2 font-mono text-foreground-muted text-[11px] whitespace-nowrap">
                         {i + 1}
                       </td>
-                      <td className="px-3.5 py-2.5 font-bold text-foreground whitespace-nowrap">
+                      <td className="px-3.5 py-2 font-semibold text-foreground whitespace-nowrap">
                         {companyName ? (
-                          <span>{companyName}</span>
+                          <div className="flex flex-col">
+                            <span>{companyName}</span>
+                            {status?.isDuplicate && (
+                              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-normal">
+                                {status.duplicateReason}
+                              </span>
+                            )}
+                          </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span className="text-rose-600 dark:text-rose-400 font-medium">
                             Missing Company
                           </span>
                         )}
                       </td>
-                      <td className="px-3.5 py-2.5 text-foreground-muted whitespace-nowrap">
+                      <td className="px-3.5 py-2 text-foreground-muted whitespace-nowrap">
                         {siteName || '—'}
                       </td>
-                      <td className="px-3.5 py-2.5 font-mono font-bold text-foreground whitespace-nowrap">
+                      <td className="px-3.5 py-2 font-mono text-foreground whitespace-nowrap">
                         {area > 0 ? (
                           `${area.toLocaleString()} sq.ft`
                         ) : (
-                          <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60 shadow-2xs">
-                            Open / TBD
-                          </span>
+                          <span className="text-foreground-muted font-sans text-[11px]">Open / TBD</span>
                         )}
                       </td>
-                      <td className="px-3.5 py-2.5 text-foreground-muted font-mono text-[11px] whitespace-nowrap">
+                      <td className="px-3.5 py-2 text-foreground-muted font-mono text-[11px] whitespace-nowrap">
                         {formattedDate || '—'}
                       </td>
-                      <td className="px-3.5 py-2.5 text-foreground-muted whitespace-nowrap">
+                      <td className="px-3.5 py-2 text-foreground-muted whitespace-nowrap">
                         {r[columnMapping.contactName] || '—'}
                       </td>
-                      <td className="px-3.5 py-2.5 text-foreground-muted font-mono text-[11px] whitespace-nowrap">
+                      <td className="px-3.5 py-2 text-foreground-muted font-mono text-[11px] whitespace-nowrap">
                         {r[columnMapping.phone] ? String(r[columnMapping.phone]) : '—'}
                       </td>
-                      <td className="px-3.5 py-2.5 text-foreground-muted whitespace-nowrap">
+                      <td className="px-3.5 py-2 text-foreground-muted whitespace-nowrap">
                         {r[columnMapping.enteredBy] || 'Prapti Shah'}
                       </td>
-                      <td className="px-3.5 py-2.5 text-foreground-muted max-w-[220px]">
-                        {remarkText && remarkText.toLowerCase() !== 'active' ? (
-                          <span
-                            className="inline-block max-w-[200px] truncate px-2.5 py-0.5 rounded-md bg-surface-muted/80 text-foreground-muted border border-border/80 text-[11px] font-medium shadow-2xs align-middle"
-                            title={remarkText}
-                          >
-                            {remarkText}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-surface-muted/50 text-foreground-muted border border-border/60 text-[11px] font-medium shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            Active
-                          </span>
-                        )}
+                      <td className="px-3.5 py-2 text-foreground-muted max-w-[200px] truncate">
+                        {remarkText || 'Active'}
                       </td>
-                      <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                        {isMissingCompany ? (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/70 px-2.5 py-1 rounded-md border border-rose-200 dark:border-rose-800/60 shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-                            Will Skip
+                      <td className="px-3.5 py-2 text-right whitespace-nowrap">
+                        {status?.isMissingCompany ? (
+                          <span className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                            Skip
                           </span>
-                        ) : area > 0 ? (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/70 px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/60 shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            Valid
+                        ) : status?.isDuplicate ? (
+                          <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400" title={status.duplicateReason}>
+                            Duplicate (Skip)
+                          </span>
+                        ) : status?.isOpenSpec ? (
+                          <span className="text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                            Valid (Open)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/70 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-800/60 shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                            Valid (Open Spec)
+                          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                            Valid
                           </span>
                         )}
                       </td>
@@ -771,7 +825,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-border">
-            <Button variant="outline" size="sm" onClick={() => setStep(2)} leftIcon={<ArrowLeft className="w-4 h-4" />}>
+            <Button variant="outline" size="sm" onClick={() => setStep(2)} leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}>
               Back to Mapping
             </Button>
             <Button
@@ -779,10 +833,15 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
               size="sm"
               disabled={isImporting}
               onClick={handleExecuteImport}
-              leftIcon={<UploadCloud className="w-4 h-4" />}
-              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold shadow-xs"
+              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold"
             >
-              {isImporting ? 'Migrating Records into CRM...' : `Confirm & Import ${parsedRows.length} Records`}
+              {isImporting
+                ? 'Importing...'
+                : `Import ${validationAnalysis.validCount} Records${
+                    validationAnalysis.duplicateCount > 0
+                      ? ` (${validationAnalysis.duplicateCount} skipped)`
+                      : ''
+                  }`}
             </Button>
           </div>
         </div>
@@ -790,31 +849,49 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
 
       {/* ================= STEP 4: RESULT SUMMARY ================= */}
       {step === 4 && importResult && (
-        <div className="bg-surface border border-border rounded-2xl p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="p-5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-start gap-4 text-xs">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
-              <CheckCircle2 className="w-6 h-6" />
+        <div className="bg-surface border border-border rounded-xl p-6 sm:p-8 space-y-6">
+          <div className="flex items-center gap-3 pb-4 border-b border-border">
+            <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
-            <div className="space-y-1">
-              <h3 className="text-base font-bold text-foreground">Migration Batch Completed Successfully!</h3>
-              <p className="text-xs text-foreground-muted leading-relaxed">
-                Successfully imported <strong className="text-foreground">{importResult.importedCount}</strong> inquiry records into the Fairway CRM database.
-                {importResult.skippedCount > 0 && ` (${importResult.skippedCount} empty rows were skipped).`}
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Import Complete</h3>
+              <p className="text-xs text-foreground-muted">
+                {importResult.importedCount} records imported into Fairway CRM database
+                {importResult.skippedCount > 0 && ` (${importResult.skippedCount} duplicates/invalids skipped)`}.
               </p>
             </div>
           </div>
 
-          {/* Diagnostic Error Report if any skipped */}
+          {/* Clean Metric Tiles */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-lg border border-border bg-surface-muted/20">
+              <span className="text-xs text-foreground-muted block">Total Processed</span>
+              <span className="text-xl font-semibold font-mono text-foreground mt-1 block">{importResult.totalRows}</span>
+            </div>
+            <div className="p-3.5 rounded-lg border border-border bg-surface-muted/20">
+              <span className="text-xs text-foreground-muted block">New Inquiries</span>
+              <span className="text-xl font-semibold font-mono text-foreground mt-1 block">{importResult.importedCount}</span>
+            </div>
+            <div className="p-3.5 rounded-lg border border-border bg-surface-muted/20">
+              <span className="text-xs text-foreground-muted block">Duplicates Skipped</span>
+              <span className="text-xl font-semibold font-mono text-foreground mt-1 block">{importResult.skippedCount}</span>
+            </div>
+            <div className="p-3.5 rounded-lg border border-border bg-surface-muted/20">
+              <span className="text-xs text-foreground-muted block">Companies Linked</span>
+              <span className="text-xl font-semibold font-mono text-foreground mt-1 block">{new Set(importResult.importedCompanies).size}</span>
+            </div>
+          </div>
+
+          {/* Clean Minimalist Skipped Log */}
           {importResult.errors.length > 0 && (
-            <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs space-y-2">
-              <h4 className="font-bold text-rose-700 dark:text-rose-300 flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-rose-600" />
-                <span>Diagnostic Report ({importResult.errors.length} skipped)</span>
-              </h4>
-              <div className="space-y-1 max-h-48 overflow-y-auto">
+            <div className="border border-border rounded-lg p-3 text-xs space-y-2 bg-surface-muted/10">
+              <h4 className="font-semibold text-foreground">Skipped Records Log ({importResult.errors.length})</h4>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
                 {importResult.errors.map((err, i) => (
-                  <div key={i} className="p-2 bg-surface text-foreground rounded-lg border border-border flex items-center justify-between">
-                    <span>Row {err.row}: <strong>{err.field}</strong> — {err.error}</span>
+                  <div key={i} className="py-1 px-2 text-foreground-muted flex items-center justify-between border-b border-border/50 last:border-0">
+                    <span>Row {err.row}: {err.error}</span>
+                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Skipped</span>
                   </div>
                 ))}
               </div>

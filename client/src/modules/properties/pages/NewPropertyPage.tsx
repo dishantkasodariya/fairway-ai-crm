@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Warehouse,
   ArrowLeft,
-  Sparkles,
   MapPin,
   Calendar,
   Layers,

@@ -4,7 +4,6 @@ import {
   Building2,
   MapPin,
   Clock,
-  Sparkles,
   CheckCircle2,
   AlertTriangle,
   Send,
@@ -62,32 +61,50 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
   const { canEdit, currentUser, users } = useAuth();
   const { success, error } = useToast();
 
-  const [loading, setLoading] = useState(true);
-  const [inquiry, setInquiry] = useState<Inquiry | undefined>(StorageService.getInquiryById(inquiryId));
+  const initialCached = StorageService.getInquiryById(inquiryId);
+  const [loading, setLoading] = useState(!initialCached);
+  const [inquiry, setInquiry] = useState<Inquiry | undefined>(initialCached);
   const [propertyMatches, setPropertyMatches] = useState<PropertyMatchResult[]>(
-    inquiry ? StorageService.matchPropertiesForInquiry(inquiry) : []
+    initialCached ? StorageService.matchPropertiesForInquiry(initialCached) : []
   );
   const [proposals, setProposals] = useState<Proposal[]>(
-    inquiry ? StorageService.getProposals().filter((p) => p.inquiryId === inquiry.id) : []
+    initialCached ? StorageService.getProposals().filter((p) => p.inquiryId === initialCached.id) : []
   );
   const [siteVisits, setSiteVisits] = useState<SiteVisit[]>(
-    inquiry ? StorageService.getSiteVisits().filter((s) => s.inquiryId === inquiry.id) : []
+    initialCached ? StorageService.getSiteVisits().filter((s) => s.inquiryId === initialCached.id) : []
   );
   const [tasks, setTasks] = useState<Task[]>(
-    inquiry ? StorageService.getTasks().filter((t) => t.inquiryId === inquiry.id) : []
+    initialCached ? StorageService.getTasks().filter((t) => t.inquiryId === initialCached.id) : []
   );
   const [activities, setActivities] = useState<Activity[]>(
-    inquiry ? StorageService.getActivities(inquiry.companyId).filter((a) => !a.inquiryId || a.inquiryId === inquiry.id) : []
+    initialCached ? StorageService.getActivities(initialCached.companyId).filter((a) => !a.inquiryId || a.inquiryId === initialCached.id) : []
   );
 
   useEffect(() => {
     let isMounted = true;
     const fetchInquiry = async () => {
-      setLoading(true);
+      // 1. Check local cache first so UI responds immediately
+      const cached = StorageService.getInquiryById(inquiryId);
+      if (cached && isMounted) {
+        setInquiry(cached);
+        setPropertyMatches(StorageService.matchPropertiesForInquiry(cached));
+        setProposals(StorageService.getProposals().filter((p) => p.inquiryId === cached.id));
+        setSiteVisits(StorageService.getSiteVisits().filter((s) => s.inquiryId === cached.id));
+        setTasks(StorageService.getTasks().filter((t) => t.inquiryId === cached.id));
+        setActivities(
+          StorageService.getActivities(cached.companyId).filter((a) => !a.inquiryId || a.inquiryId === cached.id)
+        );
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+
       try {
+        // 2. Fetch latest data from backend API
         const res = await InquiryService.getInquiryById(inquiryId);
         if (isMounted && res.success && res.data) {
           setInquiry(res.data);
+          StorageService.upsertInquiry(res.data);
           setPropertyMatches(StorageService.matchPropertiesForInquiry(res.data));
           setProposals(StorageService.getProposals().filter((p) => p.inquiryId === res.data!.id));
           setSiteVisits(StorageService.getSiteVisits().filter((s) => s.inquiryId === res.data!.id));
@@ -95,10 +112,10 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
           setActivities(
             StorageService.getActivities(res.data!.companyId).filter((a) => !a.inquiryId || a.inquiryId === res.data!.id)
           );
-        } else if (isMounted) {
+        } else if (isMounted && !cached) {
           const localInq = StorageService.getInquiryById(inquiryId);
-          setInquiry(localInq);
           if (localInq) {
+            setInquiry(localInq);
             setPropertyMatches(StorageService.matchPropertiesForInquiry(localInq));
             setProposals(StorageService.getProposals().filter((p) => p.inquiryId === localInq.id));
             setSiteVisits(StorageService.getSiteVisits().filter((s) => s.inquiryId === localInq.id));
@@ -108,10 +125,11 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
             );
           }
         }
-      } catch {
+      } catch (err) {
+        console.warn('Inquiry detail fetch error:', err);
         if (isMounted) {
           const localInq = StorageService.getInquiryById(inquiryId);
-          setInquiry(localInq);
+          if (localInq) setInquiry(localInq);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -179,10 +197,20 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
     }
   };
 
+  if (loading && !inquiry) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-fairway-600 animate-spin" />
+        <p className="text-sm font-medium text-foreground-muted">Loading inquiry details...</p>
+      </div>
+    );
+  }
+
   if (!inquiry) {
     return (
       <div className="py-12 text-center">
         <h3 className="text-lg font-bold text-foreground">Inquiry Record Not Found</h3>
+        <p className="text-xs text-foreground-muted mt-1">Inquiry ID: {inquiryId}</p>
         <Button size="sm" onClick={onBack} className="mt-4">
           Back to Inquiries
         </Button>
@@ -479,8 +507,8 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
                 <Calendar className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
                 <span>Inquiry Date: {formatDate(inquiry.inquiryDate)}</span>
               </span>
-              <span className="opacity-40">·</span>
-              <span>Owner: <strong className="text-foreground">{inquiry.salespersonName}</strong></span>
+              {/* <span className="opacity-40">·</span> */}
+              {/* <span>Owner: <strong className="text-foreground">{inquiry.salespersonName}</strong></span> */}
             </p>
           </div>
 

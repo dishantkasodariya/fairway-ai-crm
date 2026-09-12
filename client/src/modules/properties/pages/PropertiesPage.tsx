@@ -4,7 +4,6 @@ import {
   Search,
   Filter,
   MapPin,
-  Sparkles,
   ChevronRight,
   Shield,
   Zap,

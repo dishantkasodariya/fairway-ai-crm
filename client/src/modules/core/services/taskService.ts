@@ -97,10 +97,12 @@ export class TaskService {
   /**
    * Toggle task status between Pending and Completed
    */
-  static async toggleTask(id: string): Promise<{ success: boolean; data?: Task; error?: string }> {
+  static async toggleTask(id: string, taskData?: Partial<Task>): Promise<{ success: boolean; data?: Task; error?: string }> {
     try {
       const res = await fetch(`${API_BASE_URL}/tasks/${id}/toggle`, {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: taskData ? JSON.stringify(taskData) : undefined,
       });
       const json = await res.json();
       return json;

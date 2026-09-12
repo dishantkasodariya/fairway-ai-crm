@@ -10,7 +10,6 @@ import {
   Building2,
   ExternalLink,
   ChevronRight,
-  Sparkles,
   Layers,
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';

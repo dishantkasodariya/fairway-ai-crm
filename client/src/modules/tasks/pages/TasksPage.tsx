@@ -41,14 +41,27 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   const { canEdit, currentUser, users, isSales } = useAuth();
   const { success, error } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'today' | 'upcoming' | 'overdue' | 'completed'>('today');
+  const [activeTab, setActiveTab] = useState<'all' | 'today' | 'upcoming' | 'overdue' | 'completed'>('all');
   const [ownerFilter, setOwnerFilter] = useState<string>(isSales ? currentUser.id : 'all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [tasks, setTasks] = useState<Task[]>(() => StorageService.getTasks());
+  const [isLoading, setIsLoading] = useState(false);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const normalizeStatus = (s?: string): Task['status'] => {
+    if (!s) return 'Pending';
+    return s.toString().trim().toLowerCase() === 'completed' ? 'Completed' : 'Pending';
+  };
+
+  const getValidDueDate = (t: Task): string => {
+    if (t.dueDate) return t.dueDate;
+    if (t.createdAt) return t.createdAt.split('T')[0];
+    return todayStr;
+  };
 
   const companies = StorageService.getCompanies();
 
@@ -56,7 +69,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     companyId: companies[0]?.id || '',
     taskType: 'Call' as Task['taskType'],
     description: '',
-    dueDate: new Date().toISOString().split('T')[0],
+    dueDate: todayStr,
     dueTime: '11:00 AM',
     priority: 'High' as Task['priority'],
     assignedUserId: currentUser.id,
@@ -64,11 +77,31 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
   const loadTasks = async () => {
     try {
+      const local = StorageService.getTasks();
       const res = await TaskService.getTasks();
-      if (res.success && res.data) {
-        setTasks(res.data);
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        const normalizedBackend = res.data.map((t) => ({
+          ...t,
+          status: normalizeStatus(t.status),
+          dueDate: getValidDueDate(t),
+        }));
+
+        // Merge backend items into local items so all 41 items in StorageService are retained
+        const taskMap = new Map<string, Task>();
+        local.forEach((t) => taskMap.set(t.id, t));
+        normalizedBackend.forEach((t) => {
+          if (taskMap.has(t.id)) {
+            taskMap.set(t.id, { ...taskMap.get(t.id)!, ...t });
+          } else {
+            taskMap.set(t.id, t);
+          }
+        });
+
+        const merged = Array.from(taskMap.values());
+        setTasks(merged);
+        StorageService.setTasks(merged);
       } else {
-        setTasks(StorageService.getTasks());
+        setTasks(local);
       }
     } catch {
       setTasks(StorageService.getTasks());
@@ -81,41 +114,30 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     loadTasks();
   }, []);
 
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  const todaysCount = tasks.filter((t) => t.status === 'Pending' && t.dueDate === todayStr).length;
-  const upcomingCount = tasks.filter((t) => t.status === 'Pending' && t.dueDate > todayStr).length;
-  const overdueCount = tasks.filter((t) => t.status === 'Pending' && t.dueDate < todayStr).length;
-  const completedCount = tasks.filter((t) => t.status === 'Completed').length;
+  const allOpenCount = tasks.filter((t) => normalizeStatus(t.status) === 'Pending').length;
+  const todaysCount = tasks.filter((t) => normalizeStatus(t.status) === 'Pending' && getValidDueDate(t) === todayStr).length;
+  const upcomingCount = tasks.filter((t) => normalizeStatus(t.status) === 'Pending' && getValidDueDate(t) > todayStr).length;
+  const overdueCount = tasks.filter((t) => normalizeStatus(t.status) === 'Pending' && getValidDueDate(t) < todayStr).length;
+  const completedCount = tasks.filter((t) => normalizeStatus(t.status) === 'Completed').length;
 
   const handleToggleTask = async (id: string) => {
-    try {
-      const res = await TaskService.toggleTask(id);
-      if (res.success && res.data) {
-        setTasks((prev) => prev.map((t) => (t.id === id ? res.data! : t)));
-        try {
-          StorageService.toggleTaskCompletion(id);
-        } catch {}
-      } else {
-        StorageService.toggleTaskCompletion(id);
-        loadTasks();
-      }
-      success('Task Updated', 'Follow-up status synchronized.');
-    } catch {
-      StorageService.toggleTaskCompletion(id);
-      loadTasks();
-      success('Task Updated', 'Follow-up status synchronized.');
+    const updatedLocal = StorageService.toggleTaskCompletion(id);
+    if (updatedLocal) {
+      setTasks((prev) => prev.map((t) => (t.id === id ? updatedLocal : t)));
     }
+    try {
+      await TaskService.toggleTask(id, updatedLocal);
+    } catch { }
+    success('Task Updated', 'Follow-up status synchronized.');
   };
 
   const handleDeleteTask = async (id: string) => {
+    StorageService.deleteTask(id);
+    setTasks((prev) => prev.filter((t) => t.id !== id));
     try {
       await TaskService.deleteTask(id);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
-      success('Task Deleted', 'Follow-up task removed.');
-    } catch (err: any) {
-      error('Error', err.message || 'Failed to delete task.');
-    }
+    } catch { }
+    success('Task Deleted', 'Follow-up task removed.');
   };
 
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -127,7 +149,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
     setIsSubmitting(true);
     try {
-      const res = await TaskService.createTask({
+      const localT = StorageService.createTask({
         companyId: comp?.id,
         companyName: comp?.name,
         assignedUserId: assigned.id,
@@ -139,14 +161,10 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         priority: newTaskForm.priority,
         status: 'Pending',
       });
+      setTasks((prev) => [localT, ...prev]);
 
-      if (res.success && res.data) {
-        setTasks((prev) => [res.data!, ...prev]);
-        try {
-          StorageService.createTask(res.data);
-        } catch {}
-      } else {
-        const localT = StorageService.createTask({
+      try {
+        await TaskService.createTask({
           companyId: comp?.id,
           companyName: comp?.name,
           assignedUserId: assigned.id,
@@ -158,8 +176,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
           priority: newTaskForm.priority,
           status: 'Pending',
         });
-        setTasks((prev) => [localT, ...prev]);
-      }
+      } catch { }
 
       setIsNewTaskOpen(false);
       setNewTaskForm({
@@ -190,11 +207,15 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     const matchesOwner = ownerFilter === 'all' || t.assignedUserId === ownerFilter;
     const matchesType = typeFilter === 'all' || t.taskType === typeFilter;
 
+    const taskStatus = normalizeStatus(t.status);
+    const taskDueDate = getValidDueDate(t);
+
     let matchesTab = false;
-    if (activeTab === 'today') matchesTab = t.status === 'Pending' && t.dueDate === todayStr;
-    if (activeTab === 'upcoming') matchesTab = t.status === 'Pending' && t.dueDate > todayStr;
-    if (activeTab === 'overdue') matchesTab = t.status === 'Pending' && t.dueDate < todayStr;
-    if (activeTab === 'completed') matchesTab = t.status === 'Completed';
+    if (activeTab === 'all') matchesTab = taskStatus === 'Pending';
+    if (activeTab === 'today') matchesTab = taskStatus === 'Pending' && taskDueDate === todayStr;
+    if (activeTab === 'upcoming') matchesTab = taskStatus === 'Pending' && taskDueDate > todayStr;
+    if (activeTab === 'overdue') matchesTab = taskStatus === 'Pending' && taskDueDate < todayStr;
+    if (activeTab === 'completed') matchesTab = taskStatus === 'Completed';
 
     return matchesQuery && matchesOwner && matchesType && matchesTab;
   });
@@ -204,9 +225,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
-          <span className="text-xs font-semibold text-fairway-800 uppercase tracking-wider">CRM / Tasks</span>
+          <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">CRM / Tasks</span>
           <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 mt-0.5">
-            <CheckSquare className="w-6 h-6 text-amber-600" />
+            <CheckSquare className="w-6 h-6 text-foreground" />
             <span>Follow-up & Tasks Management</span>
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
@@ -227,6 +248,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         onChange={(id) => setActiveTab(id as any)}
         variant="pills"
         tabs={[
+          { id: 'all', label: 'All Open Tasks', count: allOpenCount },
           { id: 'today', label: "Today's Tasks", count: todaysCount },
           { id: 'overdue', label: 'Overdue Follow-ups', count: overdueCount },
           { id: 'upcoming', label: 'Upcoming', count: upcomingCount },
@@ -286,14 +308,15 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
           </div>
         ) : (
           filteredTasks.map((t) => {
-            const prio = getPriorityBadge(t.priority);
-            const isOverdue = t.status === 'Pending' && t.dueDate < todayStr;
+            const isDone = normalizeStatus(t.status) === 'Completed';
+            const dueDateStr = getValidDueDate(t);
+            const isOverdue = !isDone && dueDateStr < todayStr;
 
             return (
               <div
                 key={t.id}
                 className={`p-4 flex items-start justify-between gap-4 hover:bg-surface-muted/50 transition-colors ${
-                  isOverdue ? 'bg-rose-50/20' : ''
+                  isOverdue ? 'bg-rose-500/5 border-l-2 border-rose-500' : ''
                 }`}
               >
                 <div className="flex items-start gap-3.5 min-w-0">
@@ -303,14 +326,14 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                   >
                     <CheckCircle2
                       className={`w-5 h-5 ${
-                        t.status === 'Completed' ? 'text-emerald-600 fill-emerald-100' : 'text-slate-400'
+                        isDone ? 'text-emerald-600 fill-emerald-100' : 'text-slate-400'
                       }`}
                     />
                   </button>
 
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs font-semibold ${t.status === 'Completed' ? 'line-through text-foreground-muted' : 'text-foreground'}`}>
+                      <span className={`text-xs font-semibold ${isDone ? 'line-through text-foreground-muted' : 'text-foreground'}`}>
                         {t.description}
                       </span>
                       <Badge variant={t.priority === 'High' ? 'danger' : t.priority === 'Medium' ? 'warning' : 'default'} size="sm" dot>
@@ -322,9 +345,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                       {t.companyName && (
                         <span
                           onClick={() => t.companyId && onNavigateToCompany(t.companyId)}
-                          className="font-bold text-fairway-800 hover:underline cursor-pointer flex items-center gap-1"
+                          className="font-bold text-foreground hover:underline cursor-pointer flex items-center gap-1"
                         >
-                          <Building2 className="w-3 h-3 text-fairway-600" />
+                          <Building2 className="w-3 h-3 text-foreground-muted" />
                           <span>{t.companyName}</span>
                         </span>
                       )}
@@ -332,21 +355,21 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                       {t.inquiryNumber && (
                         <span
                           onClick={() => t.inquiryId && onNavigateToInquiry(t.inquiryId)}
-                          className="font-mono bg-surface-muted px-1.5 py-0.2 rounded border border-border text-foreground hover:border-fairway-400 cursor-pointer"
+                          className="font-mono bg-surface-muted px-1.5 py-0.2 rounded border border-border text-foreground hover:border-foreground/40 cursor-pointer"
                         >
                           {t.inquiryNumber}
                         </span>
                       )}
 
                       <span className="flex items-center gap-1">
-                        <Clock className={`w-3 h-3 ${isOverdue ? 'text-rose-600' : 'text-slate-400'}`} />
-                        <span className={isOverdue ? 'font-bold text-rose-700' : ''}>
-                          Due: {formatDate(t.dueDate)} {t.dueTime && `· ${t.dueTime}`} ({formatRelativeDate(t.dueDate)})
+                        <Clock className={`w-3 h-3 ${isOverdue ? 'text-rose-600' : 'text-foreground-muted'}`} />
+                        <span className={isOverdue ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-foreground-muted'}>
+                          Due: {formatDate(dueDateStr)} {t.dueTime && `· ${t.dueTime}`} ({formatRelativeDate(dueDateStr)})
                         </span>
                       </span>
 
-                      <span className="flex items-center gap-1">
-                        <User className="w-3 h-3 text-slate-400" />
+                      <span className="flex items-center gap-1 text-foreground-muted">
+                        <User className="w-3 h-3 text-foreground-muted" />
                         <span>{t.assignedUserName}</span>
                       </span>
                     </div>
@@ -356,10 +379,10 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     size="xs"
-                    variant={t.status === 'Completed' ? 'outline' : 'primary'}
+                    variant={isDone ? 'outline' : 'primary'}
                     onClick={() => handleToggleTask(t.id)}
                   >
-                    {t.status === 'Completed' ? 'Reopen' : 'Complete'}
+                    {isDone ? 'Reopen' : 'Complete'}
                   </Button>
                   <Button
                     size="xs"
