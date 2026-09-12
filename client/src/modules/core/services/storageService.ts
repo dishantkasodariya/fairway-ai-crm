@@ -708,7 +708,14 @@ export class StorageService {
   // --- Properties & Matching Engine ---
   public static getProperties(): Property[] {
     this.init();
-    return getStorageItem<Property[]>(STORAGE_KEYS.PROPERTIES, INITIAL_PROPERTIES);
+    const stored = getStorageItem<Property[]>(STORAGE_KEYS.PROPERTIES, []);
+    // Ensure any previously cached mock dummy properties (prop_1..prop_6) are purged
+    const cleaned = stored.filter((p) => p && p.id && !['prop_1', 'prop_2', 'prop_3', 'prop_4', 'prop_5', 'prop_6'].includes(p.id));
+    return cleaned;
+  }
+
+  public static setProperties(properties: Property[]): void {
+    setStorageItem(STORAGE_KEYS.PROPERTIES, properties);
   }
 
   public static getPropertyById(id: string): Property | undefined {

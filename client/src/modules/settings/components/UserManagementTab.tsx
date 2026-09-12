@@ -8,6 +8,7 @@ import {
   Building,
   UserCheck,
   UserX,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
@@ -223,32 +224,43 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search name, email, dept..."
-                className="pl-8.5 pr-3 py-1.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted/60 focus:outline-none focus:border-fairway-500 focus:ring-1 focus:ring-fairway-500 transition-all w-48 sm:w-60 shadow-2xs"
+                className="pl-8.5 pr-8 py-1.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted/60 focus:outline-none focus:border-fairway-500 focus:ring-1 focus:ring-fairway-500 transition-all w-48 sm:w-60 shadow-2xs"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 text-foreground-muted hover:text-foreground"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="w-36">
+              <Combobox
+                options={[
+                  { value: 'all', label: 'All Roles' },
+                  ...roles.map((r) => ({ value: r.key, label: r.name })),
+                ]}
+                value={roleFilter}
+                onChange={(val) => setRoleFilter(val || 'all')}
+                placeholder="All Roles"
               />
             </div>
 
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-2.5 py-1.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground focus:outline-none focus:border-fairway-500 shadow-2xs"
-            >
-              <option value="all">All Roles</option>
-              {roles.map((r) => (
-                <option key={r.id} value={r.key}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground focus:outline-none focus:border-fairway-500 shadow-2xs"
-            >
-              <option value="all">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
+            <div className="w-32">
+              <Combobox
+                options={[
+                  { value: 'all', label: 'All Status' },
+                  { value: 'Active', label: 'Active' },
+                  { value: 'Inactive', label: 'Inactive' },
+                ]}
+                value={statusFilter}
+                onChange={(val) => setStatusFilter(val || 'all')}
+                placeholder="All Status"
+              />
+            </div>
 
             {isAdmin && (
               <Button
@@ -311,18 +323,17 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
 
                     <td className="p-3.5">
                       {isAdmin ? (
-                        <select
-                          value={u.role}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
-                          disabled={u.id === currentUser.id && isSuperAdmin}
-                          className="bg-surface border border-border rounded-lg px-2.5 py-1 font-bold text-xs capitalize text-foreground focus:outline-none focus:border-fairway-500 shadow-2xs"
-                        >
-                          {roles.map((r) => (
-                            <option key={r.id} value={r.key}>
-                              {r.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="w-36">
+                          <Combobox
+                            options={roles.map((r) => ({ value: r.key, label: r.name }))}
+                            value={u.role}
+                            onChange={(val) => {
+                              if (val) handleRoleChange(u.id, val as UserRole);
+                            }}
+                            disabled={u.id === currentUser.id && isSuperAdmin}
+                            placeholder="Select role"
+                          />
+                        </div>
                       ) : (
                         <span className="font-bold capitalize bg-surface-muted border border-border px-2.5 py-1 rounded-lg text-foreground text-xs">
                           {u.role.replace('_', ' ')}

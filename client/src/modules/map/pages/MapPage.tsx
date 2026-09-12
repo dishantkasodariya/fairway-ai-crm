@@ -63,13 +63,13 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
   onNavigateToProperty,
 }) => {
   const facilities = StorageService.getFacilities();
-  const [properties, setProperties] = useState<Property[]>(StorageService.getProperties());
+  const [properties, setProperties] = useState<Property[]>([]);
 
   useEffect(() => {
     const fetchProps = async () => {
       try {
         const res = await PropertyService.getProperties();
-        if (res.success && res.data && res.data.length > 0) {
+        if (res.success && res.data) {
           setProperties(res.data);
         }
       } catch {}

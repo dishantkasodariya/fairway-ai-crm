@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTheme } from '@/modules/core/providers/ThemeContext';
 
 interface AuthLayoutProps {
   headline?: string;
@@ -11,30 +12,30 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   subheadline = 'Built for industrial real estate developers, leasing managers, and brokerage teams. Organize inquiries, streamline property matching, and keep client follow-ups in one secure place.',
   children,
 }) => {
+  const { currentTheme } = useTheme();
+
+  // Exact color selected in the theme palette (e.g. Fairway Orange #EB661F, Slate, Blue, etc.)
+  const themeBgColor = currentTheme.previewColor || currentTheme.shades[600];
+
   return (
     <div className="min-h-screen w-full flex bg-background select-none">
       {/* Left Column: Brand Hero Showcase (Hidden on Mobile & Tablet, Visible on Laptop/Desktop >= 1024px) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-fairway-950 via-fairway-700 to-fairway-600 text-white flex-col justify-between p-12 xl:p-16 relative overflow-hidden shrink-0 min-h-screen">
-
-
+      <div
+        style={{
+          backgroundColor: themeBgColor,
+        }}
+        className="hidden lg:flex lg:w-1/2 text-white flex-col justify-between p-12 xl:p-16 relative overflow-hidden shrink-0 min-h-screen transition-colors duration-200"
+      >
         {/* Top Brand Logo */}
-        <div className="flex items-center gap-3 z-10">
-          <div className="w-10 h-10 rounded-xl bg-white p-1.5 flex items-center justify-center shadow-md shrink-0 border border-white/20">
-            <img
-              src="/images/logo.png"
-              alt="Fairway Logo"
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                (e.currentTarget as HTMLElement).style.display = 'none';
-              }}
-            />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xl font-black tracking-tight text-white">FAIRWAY</span>
-            <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-accent-400/20 text-accent-300 border border-accent-400/30">
-              AI CRM
-            </span>
-          </div>
+        <div className="flex items-center z-10 w-full">
+          <img
+            src="/images/logo.png"
+            alt="Fairway Logo"
+            className="h-9 sm:h-10 w-auto object-contain"
+            onError={(e) => {
+              (e.currentTarget as HTMLElement).style.display = 'none';
+            }}
+          />
         </div>
 
         {/* Middle Hero Content */}
@@ -42,13 +43,13 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
           <h1 className="text-4xl lg:text-[44px] font-black tracking-tight text-white leading-[1.15]">
             {headline}
           </h1>
-          <p className="mt-5 text-base text-fairway-100/90 leading-relaxed font-normal">
+          <p className="mt-5 text-base text-white/90 leading-relaxed font-normal">
             {subheadline}
           </p>
         </div>
 
         {/* Bottom Footer */}
-        <div className="text-xs text-fairway-200/70 z-10 text-left pt-6 border-t border-white/10">
+        <div className="text-xs text-white/70 z-10 text-left pt-6 border-t border-white/15">
           <span>© 2026 Powered by FAIRWAY CRM. All rights reserved.</span>
         </div>
       </div>

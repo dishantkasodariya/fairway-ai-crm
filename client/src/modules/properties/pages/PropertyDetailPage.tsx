@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Eye,
   SlidersHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
 import { PropertyService } from '@/modules/core/services/propertyService';
@@ -36,6 +37,7 @@ import { Badge } from '@/modules/core/components/ui/Badge';
 import { Card, CardHeader, CardTitle } from '@/modules/core/components/ui/Card';
 import { cn } from '@/modules/core/lib/utils';
 import { useToast } from '@/modules/core/providers/ToastContext';
+import { useAuth } from '@/modules/core/providers/AuthContext';
 
 export interface PropertyDetailViewProps {
   propertyId: string;
@@ -52,9 +54,11 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   onNavigateToMap,
   onOpenNewInquiryForProperty,
 }) => {
-  const { success } = useToast();
-  const [property, setProperty] = useState<Property | undefined>(StorageService.getPropertyById(propertyId));
-  const [isLoading, setIsLoading] = useState(!property);
+  const { success, error: toastError } = useToast();
+  const { canDelete } = useAuth();
+  const [property, setProperty] = useState<Property | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const [activeTab, setActiveTab] = useState<'overview' | 'technical' | 'connectivity' | 'inquiries'>('overview');
   const [areaUnit, setAreaUnit] = useState<'sqft' | 'sqm'>('sqft');
@@ -63,28 +67,60 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   const allInquiries = useMemo(() => StorageService.getInquiries(), []);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchProp = async () => {
+      setIsLoading(true);
       try {
         const res = await PropertyService.getPropertyById(propertyId);
-        if (res.success && res.data) {
-          setProperty(res.data);
-        } else {
-          setProperty(StorageService.getPropertyById(propertyId));
+        if (isMounted) {
+          if (res.success && res.data) {
+            setProperty(res.data);
+          } else {
+            setProperty(undefined);
+          }
         }
-      } catch {
-        setProperty(StorageService.getPropertyById(propertyId));
+      } catch (err: any) {
+        console.error('Failed to load property details from backend:', err);
+        if (isMounted) setProperty(undefined);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
     fetchProp();
+    return () => {
+      isMounted = false;
+    };
   }, [propertyId]);
+
+  const handleDelete = async () => {
+    if (!property) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${property.name}" (${property.code})? This will remove it from the backend database.`
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      const res = await PropertyService.deleteProperty(property.id);
+      if (res.success) {
+        success('Property Deleted', `${property.name} has been removed.`);
+        onBack();
+      } else {
+        const msg = typeof res.error === 'string' ? res.error : res.error?.message || 'Failed to delete property';
+        toastError('Delete Failed', msg);
+      }
+    } catch (err: any) {
+      toastError('Error', err.message || 'Failed to delete property.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="py-24 text-center space-y-3">
         <div className="w-10 h-10 border-3 border-fairway-500 border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-xs text-foreground-muted font-medium">Loading property asset dossier...</p>
+        <p className="text-xs text-foreground-muted font-medium">Loading live property asset dossier from backend...</p>
       </div>
     );
   }
@@ -97,7 +133,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
         </div>
         <h3 className="text-lg font-bold text-foreground">Property Asset Not Found</h3>
         <p className="text-xs text-foreground-muted">
-          The requested warehouse asset (ID: {propertyId}) could not be retrieved from the catalog database.
+          The requested warehouse asset (ID: {propertyId}) could not be retrieved from the backend database.
         </p>
         <Button size="sm" variant="outline" onClick={onBack} leftIcon={<ArrowLeft className="w-4 h-4" />}>
           Back to Warehouse Catalog
@@ -110,7 +146,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   const matchingInquiries = allInquiries
     .map((inq) => {
       const matches = StorageService.matchPropertiesForInquiry(inq);
-      const matched = matches.find((m) => m.property.id === property.id);
+      const matched = matches.find((m) => m.property.id === property.id || m.property.code === property.code);
       return {
         inquiry: inq,
         score: matched ? matched.overallScore : 0,
@@ -137,14 +173,14 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   };
 
   const getStatusBadgeVariant = (status: Property['status']) => {
-    switch (status) {
-      case 'Available':
+    switch (status?.toLowerCase()) {
+      case 'available':
         return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20';
-      case 'Partially Leased':
+      case 'partially leased':
         return 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20';
-      case 'Under Development':
+      case 'under development':
         return 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20';
-      case 'Fully Leased':
+      case 'fully leased':
       default:
         return 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/20';
     }
@@ -207,6 +243,20 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
           >
             Share
           </Button>
+
+          {canDelete && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleDelete}
+              isLoading={isDeleting}
+              leftIcon={<Trash2 className="w-3.5 h-3.5 text-rose-500" />}
+              className="rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-rose-200 dark:border-rose-900"
+            >
+              Delete
+            </Button>
+          )}
 
           <Button
             type="button"

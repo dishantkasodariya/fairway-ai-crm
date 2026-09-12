@@ -6,6 +6,7 @@ interface DropdownMenuProps {
   children: React.ReactNode;
   align?: 'left' | 'right';
   className?: string;
+  containerClassName?: string;
 }
 
 export const DropdownMenu: React.FC<DropdownMenuProps> = ({
@@ -13,6 +14,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   children,
   align = 'right',
   className,
+  containerClassName,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -30,7 +32,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   }, [isOpen]);
 
   return (
-    <div ref={containerRef} className="relative inline-block text-left">
+    <div ref={containerRef} className={cn('relative inline-block text-left', containerClassName)}>
       <div onClick={() => setIsOpen(!isOpen)} className="cursor-pointer">
         {trigger}
       </div>

@@ -51,24 +51,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     >
       <div className="text-left space-y-6">
         {/* Right Side Header with Fairway Brand */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-surface-muted border border-border p-1 flex items-center justify-center shadow-xs shrink-0">
-              <img
-                src="/images/logo.png"
-                alt="Fairway Logo"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  (e.currentTarget as HTMLElement).style.display = 'none';
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xl font-black tracking-tight text-foreground">FAIRWAY</span>
-              <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-muted text-foreground-muted border border-border shadow-2xs">
-                CRM
-              </span>
-            </div>
+        <div className="space-y-2">
+          <div className="flex items-center mb-2">
+            <img
+              src="/images/logo.png"
+              alt="Fairway Logo"
+              className="h-9 sm:h-10 w-auto object-contain"
+              onError={(e) => {
+                (e.currentTarget as HTMLElement).style.display = 'none';
+              }}
+            />
           </div>
           <p className="text-xs text-foreground-muted leading-relaxed">
             Enter your email and password to access your CRM workspace.

@@ -51,6 +51,38 @@ export class ContactService {
   }
 
   /**
+   * Update a contact
+   */
+  static async updateContact(
+    id: string,
+    payload: Partial<{
+      companyId: string;
+      companyName?: string;
+      name: string;
+      designation?: string;
+      department?: string;
+      phone?: string;
+      email?: string;
+      linkedinUrl?: string;
+      isPrimary?: boolean;
+      notes?: string;
+    }>
+  ): Promise<{ success: boolean; data?: Contact; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/contacts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      console.warn('ContactService.updateContact failed:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
    * Delete a contact
    */
   static async deleteContact(id: string): Promise<{ success: boolean; error?: string }> {

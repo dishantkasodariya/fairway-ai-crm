@@ -20,6 +20,7 @@ import {
   ArrowUpRight,
   Building2,
   Warehouse,
+  X,
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
@@ -32,6 +33,7 @@ import { LostReasonModal } from '@/modules/core/components/LostReasonModal';
 import { WonCelebrationModal } from '@/modules/core/components/WonCelebrationModal';
 import { EditInquiryModal } from '@/modules/inquiries/components/EditInquiryModal';
 import { InquiryService } from '@/modules/core/services/inquiryService';
+import { Combobox } from '@/modules/core/components/ui/combobox-1';
 
 export interface PipelineKanbanViewProps {
   onSelectInquiry: (id: string) => void;
@@ -329,36 +331,47 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
               placeholder="Search company, inquiry #, or location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface-muted/70 pl-8 pr-3 py-1.5 rounded-lg border border-border text-xs focus:outline-none focus:border-fairway-600 transition-colors"
+              className="w-full bg-surface-muted/70 pl-8 pr-8 py-1.5 rounded-lg border border-border text-xs focus:outline-none focus:border-fairway-600 transition-colors"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 text-foreground-muted hover:text-foreground"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
         {/* Center: Dropdown Filters */}
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
-          <select
-            value={ownerFilter}
-            onChange={(e) => setOwnerFilter(e.target.value)}
-            className="bg-surface border border-border rounded-lg px-2.5 py-1.5 font-medium text-foreground text-xs focus:outline-none focus:border-fairway-600"
-          >
-            <option value="all">All Owners</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
+          <div className="w-44">
+            <Combobox
+              options={[
+                { value: 'all', label: 'All Owners' },
+                ...users.map((u) => ({ value: u.id, label: u.name })),
+              ]}
+              value={ownerFilter}
+              onChange={(val) => setOwnerFilter(val || 'all')}
+              placeholder="All Owners"
+            />
+          </div>
 
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="bg-surface border border-border rounded-lg px-2.5 py-1.5 font-medium text-foreground text-xs focus:outline-none focus:border-fairway-600"
-          >
-            <option value="all">All Priorities</option>
-            <option value="High">High Priority</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
+          <div className="w-40">
+            <Combobox
+              options={[
+                { value: 'all', label: 'All Priorities' },
+                { value: 'High', label: 'High Priority' },
+                { value: 'Medium', label: 'Medium' },
+                { value: 'Low', label: 'Low' },
+              ]}
+              value={priorityFilter}
+              onChange={(val) => setPriorityFilter(val || 'all')}
+              placeholder="All Priorities"
+            />
+          </div>
 
           {(searchQuery || ownerFilter !== (isSales ? currentUser.id : 'all') || priorityFilter !== 'all') && (
             <button

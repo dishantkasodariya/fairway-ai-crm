@@ -558,6 +558,9 @@ export const ProfilePage: React.FC = () => {
                 value={birthDate}
                 onChange={(dateStr) => setBirthDate(dateStr)}
                 placeholder="Select your birth date"
+                allowPastDates={true}
+                allowToday={true}
+                maxDate={new Date()}
               />
             </div>
           </div>

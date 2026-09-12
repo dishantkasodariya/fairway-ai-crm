@@ -328,6 +328,12 @@ export const createCompany = async (req: Request, res: Response): Promise<void> 
       annualTurnover = '₹500+ Cr',
       employeeCount = '1,000+',
       gujaratPresence = true,
+      // Contact & notes from NewCompanyPage
+      contactName,
+      contactDesignation,
+      contactPhone,
+      contactEmail,
+      initialNotes,
     } = req.body;
 
     if (!name || !name.trim()) {
@@ -376,6 +382,60 @@ export const createCompany = async (req: Request, res: Response): Promise<void> 
     const result = await query(insertSql, values);
     const row = result.rows[0];
 
+    // If primary contact details provided, create contact record in PostgreSQL
+    let createdContact = null;
+    if (contactName && contactName.trim()) {
+      try {
+        const contactId = `cnt_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+        const insertContactSql = `
+          INSERT INTO contacts (
+            id, company_id, company_name, name, designation, department, phone, email, is_primary, notes, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          RETURNING *;
+        `;
+        const contactValues = [
+          contactId,
+          companyId,
+          name.trim(),
+          contactName.trim(),
+          contactDesignation || 'VP - Supply Chain & Operations',
+          'Supply Chain & Operations',
+          contactPhone || phone || '',
+          contactEmail || email || '',
+          true,
+          initialNotes || '',
+        ];
+        const contactRes = await query(insertContactSql, contactValues);
+        createdContact = contactRes.rows[0];
+      } catch (cntErr: any) {
+        console.warn('Could not auto-create contact in PostgreSQL:', cntErr.message);
+      }
+    }
+
+    // If initial notes provided, record an activity entry in PostgreSQL
+    if (initialNotes && initialNotes.trim()) {
+      try {
+        const actId = `act_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+        await query(
+          `INSERT INTO activities (
+            id, company_id, company_name, user_id, user_name, activity_type, title, description, activity_date, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_DATE::text, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+          [
+            actId,
+            companyId,
+            name.trim(),
+            assignedOwnerId || 'usr_admin',
+            assignedOwnerName || 'Admin',
+            'Note',
+            'Initial Account Registration Note',
+            initialNotes.trim(),
+          ]
+        );
+      } catch (actErr: any) {
+        console.warn('Could not auto-create initial activity note in PostgreSQL:', actErr.message);
+      }
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -398,6 +458,8 @@ export const createCompany = async (req: Request, res: Response): Promise<void> 
         annualTurnover: row.annual_turnover,
         employeeCount: row.employee_count,
         gujaratPresence: row.gujarat_presence,
+        contactsCount: createdContact ? 1 : 0,
+        contact: createdContact,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       },
@@ -461,24 +523,24 @@ export const updateCompany = async (req: Request, res: Response): Promise<void> 
     `;
 
     const values = [
-      name,
-      legalName,
-      website,
-      industry,
-      status,
-      address,
-      city,
-      state,
-      pincode,
-      phone,
-      email,
-      assignedOwnerId,
-      assignedOwnerName,
-      prospectStage,
-      priority,
-      annualTurnover,
-      employeeCount,
-      gujaratPresence,
+      name ?? null,
+      legalName ?? null,
+      website ?? null,
+      industry ?? null,
+      status ?? null,
+      address ?? null,
+      city ?? null,
+      state ?? null,
+      pincode ?? null,
+      phone ?? null,
+      email ?? null,
+      assignedOwnerId ?? null,
+      assignedOwnerName ?? null,
+      prospectStage ?? null,
+      priority ?? null,
+      annualTurnover ?? null,
+      employeeCount ?? null,
+      gujaratPresence ?? null,
       id,
     ];
 

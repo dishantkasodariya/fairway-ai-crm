@@ -25,7 +25,9 @@ import {
   Briefcase,
   SlidersHorizontal,
   ChevronRight,
+  AlertCircle,
 } from 'lucide-react';
+import { cn } from '@/modules/core/lib/utils';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
@@ -92,24 +94,24 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
 
   // Core Inquiry Data
   const [inquiryData, setInquiryData] = useState({
-    requirement: 'Grade-A compliant regional distribution center with multi-dock access and high flooring load capacity.',
-    requiredAreaSqFt: 75000,
-    location: 'Dahej PCPIR',
-    targetCorridor: 'Dahej PCPIR Corridor',
-    industry: 'Specialty Chemicals & Polymers',
-    possessionDate: '2026-10-01',
-    leaseDurationMonths: 60,
-    budgetMonthlyINR: 1650000,
-    dockRequirements: 10,
-    clearHeightFt: 12,
-    floorLoadCapacity: '6 MT/sq.m',
-    powerKVA: 1200,
-    fireSystemsRequired: true,
-    specialRequirements: 'NFPA compliant fire sprinklers, chemical grade epoxy flooring, 24/7 CCTV & security perimeter.',
+    requirement: '',
+    requiredAreaSqFt: 0,
+    location: '',
+    targetCorridor: '',
+    industry: '',
+    possessionDate: '',
+    leaseDurationMonths: 36,
+    budgetMonthlyINR: 0,
+    dockRequirements: 0,
+    clearHeightFt: 0,
+    floorLoadCapacity: '',
+    powerKVA: 0,
+    fireSystemsRequired: false,
+    specialRequirements: '',
     source: 'Direct' as Inquiry['source'],
-    priority: 'High' as Inquiry['priority'],
-    nextAction: 'Review initial property matches and schedule joint site inspection.',
-    nextFollowUpDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+    priority: 'Medium' as Inquiry['priority'],
+    nextAction: '',
+    nextFollowUpDate: '',
   });
 
   // Company Selection / Creation
@@ -117,20 +119,20 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
     defaultCompanyId ? 'existing' : 'existing'
   );
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>(
-    defaultCompanyId || existingCompanies[0]?.id || ''
+    defaultCompanyId || ''
   );
   const [newCompanyData, setNewCompanyData] = useState({
     name: '',
     legalName: '',
     website: '',
-    industry: 'Specialty Chemicals & Polymers',
-    address: 'Dahej Industrial Zone',
-    city: 'Dahej',
-    state: 'Gujarat',
-    pincode: '392130',
-    phone: '+91 98250 11223',
-    email: 'info@newclient.example.com',
-    priority: 'High' as Company['priority'],
+    industry: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    phone: '',
+    email: '',
+    priority: 'Medium' as Company['priority'],
   });
 
   const [duplicateWarnings, setDuplicateWarnings] = useState<any[]>([]);
@@ -139,27 +141,27 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
   const [contactMode, setContactMode] = useState<'existing' | 'new'>('new');
   const [selectedContactId, setSelectedContactId] = useState<string>('');
   const [contactData, setContactData] = useState({
-    name: 'Rajesh Sharma',
-    designation: 'VP - Supply Chain & Infrastructure',
-    department: 'Logistics Operations',
-    phone: '+91 98250 55667',
-    email: 'rajesh.sharma@company.com',
-    linkedinUrl: 'https://linkedin.com/in/rajesh-sharma-logistics',
+    name: '',
+    designation: '',
+    department: '',
+    phone: '',
+    email: '',
+    linkedinUrl: '',
     isPrimary: true,
   });
 
   // Facility Setup
-  const [createFacility, setCreateFacility] = useState(true);
+  const [createFacility, setCreateFacility] = useState(false);
   const [facilityData, setFacilityData] = useState({
-    name: 'Proposed Dahej Distribution Hub',
+    name: '',
     type: 'Warehouse' as Facility['type'],
-    address: 'Plot 55, GIDC Industrial Estate',
-    city: 'Dahej',
-    state: 'Gujarat',
-    pincode: '392130',
-    latitude: 21.712,
-    longitude: 72.585,
-    builtUpAreaSqFt: 75000,
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    latitude: 0,
+    longitude: 0,
+    builtUpAreaSqFt: 0,
   });
 
   // Deal Ownership
@@ -217,17 +219,168 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
     }
   };
 
+  // Validation Errors State
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const clearError = (field: string) => {
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  // Validation Regex Patterns
+  const PHONE_REGEX = /^(?:\+91[\s-]?)?[6-9]\d{9}$/;
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
+  const URL_REGEX = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/.*)?$/;
+  const TEXT_ONLY_REGEX = /^[a-zA-Z\s.'-]{2,50}$/;
+
+  // Comprehensive Form Validation Rules
+  const validateForm = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+
+    // 1. Company Selection
+    if (selectedCompanyMode === 'existing') {
+      if (!selectedCompanyId) {
+        errs.selectedCompanyId = 'Please select an existing customer company';
+      }
+    } else {
+      if (!newCompanyData.name || !newCompanyData.name.trim()) {
+        errs.companyName = 'Company trade name is required';
+      } else if (newCompanyData.name.trim().length < 2) {
+        errs.companyName = 'Please enter a valid company name';
+      }
+
+      if (!newCompanyData.industry || !newCompanyData.industry.trim()) {
+        errs.companyIndustry = 'Industry segment is required';
+      }
+
+      if (!newCompanyData.city || !newCompanyData.city.trim()) {
+        errs.companyCity = 'City is required';
+      } else if (!TEXT_ONLY_REGEX.test(newCompanyData.city.trim())) {
+        errs.companyCity = 'Please enter a valid city name (letters only, e.g. Ahmedabad)';
+      }
+
+      if (newCompanyData.state && newCompanyData.state.trim() && !TEXT_ONLY_REGEX.test(newCompanyData.state.trim())) {
+        errs.companyState = 'Please enter a valid state name (letters only, e.g. Gujarat)';
+      }
+
+      if (newCompanyData.pincode && newCompanyData.pincode.trim() && !PINCODE_REGEX.test(newCompanyData.pincode.trim())) {
+        errs.companyPincode = 'Please enter a valid 6-digit postal pincode (e.g. 392130)';
+      }
+
+      if (newCompanyData.phone && newCompanyData.phone.trim()) {
+        const cleanPhone = newCompanyData.phone.replace(/[\s-]/g, '');
+        if (!PHONE_REGEX.test(cleanPhone)) {
+          errs.companyPhone = 'Please enter a valid 10-digit mobile phone number (e.g. 9825011223)';
+        }
+      }
+
+      if (newCompanyData.email && newCompanyData.email.trim() && !EMAIL_REGEX.test(newCompanyData.email.trim())) {
+        errs.companyEmail = 'Please enter a valid official email address (e.g. info@company.com)';
+      }
+
+      if (newCompanyData.website && newCompanyData.website.trim() && !URL_REGEX.test(newCompanyData.website.trim())) {
+        errs.companyWebsite = 'Please enter a valid website URL (e.g. https://company.com)';
+      }
+    }
+
+    // 2. Warehouse Requirements
+    if (!inquiryData.requirement || !inquiryData.requirement.trim()) {
+      errs.requirement = 'Requirement posting title / summary is required';
+    } else if (inquiryData.requirement.trim().length < 3) {
+      errs.requirement = 'Requirement summary must be at least 3 characters';
+    }
+
+    if (!inquiryData.requiredAreaSqFt || inquiryData.requiredAreaSqFt <= 0) {
+      errs.requiredAreaSqFt = 'Please enter a valid required area (greater than 0 sq.ft)';
+    }
+
+    if (!inquiryData.targetCorridor || !inquiryData.targetCorridor.trim()) {
+      errs.targetCorridor = 'Target logistics corridor is required';
+    }
+
+    if (!inquiryData.location || !inquiryData.location.trim()) {
+      errs.location = 'Specific hub / location is required';
+    }
+
+    // 3. Contact Person
+    if (contactMode === 'existing' && existingCompanyContacts.length > 0) {
+      if (!selectedContactId) {
+        errs.selectedContactId = 'Please select a registered contact person';
+      }
+    } else {
+      if (!contactData.name || !contactData.name.trim()) {
+        errs.contactName = 'Full name of decision maker is required';
+      } else if (!TEXT_ONLY_REGEX.test(contactData.name.trim())) {
+        errs.contactName = 'Please enter a valid contact name (letters only)';
+      }
+
+      if (!contactData.phone || !contactData.phone.trim()) {
+        errs.contactPhone = 'Direct mobile phone is required';
+      } else {
+        const cleanPhone = contactData.phone.replace(/[\s-]/g, '');
+        if (!PHONE_REGEX.test(cleanPhone)) {
+          errs.contactPhone = 'Please enter a valid 10-digit mobile phone number (e.g. 9825055667)';
+        }
+      }
+
+      if (contactData.email && contactData.email.trim() && !EMAIL_REGEX.test(contactData.email.trim())) {
+        errs.contactEmail = 'Please enter a valid work email address (e.g. name@company.com)';
+      }
+    }
+
+    // 4. Commercial Terms
+    if (!inquiryData.budgetMonthlyINR || inquiryData.budgetMonthlyINR <= 0) {
+      errs.budgetMonthlyINR = 'Please enter a valid monthly rental budget';
+    }
+    if (!inquiryData.possessionDate || !inquiryData.possessionDate.trim()) {
+      errs.possessionDate = 'Target possession date is required';
+    }
+    if (!inquiryData.priority) {
+      errs.priority = 'Inquiry priority is required';
+    }
+    if (!inquiryData.source) {
+      errs.source = 'Lead source is required';
+    }
+    if (!assignedSalespersonId) {
+      errs.assignedSalespersonId = 'Assigned sales owner is required';
+    }
+
+    return errs;
+  };
+
   // Form Validation
   const isValid = useMemo(() => {
     if (selectedCompanyMode === 'existing' && !selectedCompanyId) return false;
-    if (selectedCompanyMode === 'new' && (!newCompanyData.name || !newCompanyData.city)) return false;
+    if (selectedCompanyMode === 'new') {
+      if (!newCompanyData.name || !newCompanyData.city || !newCompanyData.industry) return false;
+      if (!TEXT_ONLY_REGEX.test(newCompanyData.city.trim())) return false;
+      if (newCompanyData.state && !TEXT_ONLY_REGEX.test(newCompanyData.state.trim())) return false;
+      if (newCompanyData.pincode && !PINCODE_REGEX.test(newCompanyData.pincode.trim())) return false;
+      if (newCompanyData.phone && !PHONE_REGEX.test(newCompanyData.phone.replace(/[\s-]/g, ''))) return false;
+      if (newCompanyData.email && !EMAIL_REGEX.test(newCompanyData.email.trim())) return false;
+      if (newCompanyData.website && !URL_REGEX.test(newCompanyData.website.trim())) return false;
+    }
     if (!inquiryData.requirement) return false;
     if (!inquiryData.requiredAreaSqFt || inquiryData.requiredAreaSqFt <= 0) return false;
+    if (!inquiryData.targetCorridor) return false;
     if (!inquiryData.location) return false;
     if (!inquiryData.possessionDate) return false;
     if (!inquiryData.budgetMonthlyINR || inquiryData.budgetMonthlyINR <= 0) return false;
-    if (contactMode === 'new' && (!contactData.name || !contactData.phone)) return false;
-    if (contactMode === 'existing' && !selectedContactId) return false;
+    if (!inquiryData.priority) return false;
+    if (!inquiryData.source) return false;
+    if (!assignedSalespersonId) return false;
+    if (contactMode === 'new') {
+      if (!contactData.name || !contactData.phone) return false;
+      if (!TEXT_ONLY_REGEX.test(contactData.name.trim())) return false;
+      if (!PHONE_REGEX.test(contactData.phone.replace(/[\s-]/g, ''))) return false;
+      if (contactData.email && !EMAIL_REGEX.test(contactData.email.trim())) return false;
+    }
+    if (contactMode === 'existing' && existingCompanyContacts.length > 0 && !selectedContactId) return false;
     return true;
   }, [
     selectedCompanyMode,
@@ -237,6 +390,8 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
     contactMode,
     contactData,
     selectedContactId,
+    existingCompanyContacts.length,
+    assignedSalespersonId,
   ]);
 
   // Rent per sq.ft computation
@@ -283,9 +438,9 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
   ];
 
   const priorityOptions: ComboboxOption[] = [
-    { value: 'High', label: '🔴 High Priority' },
-    { value: 'Medium', label: '🟡 Medium Priority' },
-    { value: 'Low', label: '🟢 Low Priority' },
+    { value: 'High', label: 'High Priority' },
+    { value: 'Medium', label: 'Medium Priority' },
+    { value: 'Low', label: 'Low Priority' },
   ];
 
   const sourceOptions: ComboboxOption[] = [
@@ -323,8 +478,15 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
   // Handle Form Submission
   const handleFinalSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!isValid) {
-      error('Form Incomplete', 'Please fill all required fields marked with *');
+    const formErrors = validateForm();
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      error('Form Incomplete', 'Please fill all mandatory fields highlighted in red.');
+      const firstErrorKey = Object.keys(formErrors)[0];
+      const el = document.getElementById(`field-${firstErrorKey}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
@@ -502,7 +664,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 Warehouse Inquiry Registered!
               </h1>
               <p className="text-sm text-foreground-muted max-w-lg mx-auto mt-1.5">
-                <strong className="text-foreground">{createdInquiry.companyName}</strong> has been added to the CRM pipeline. Instant AI corridor analysis found {propertyMatches.length} matching warehouse assets.
+                <strong className="text-foreground">{createdInquiry.companyName}</strong> has been successfully added to the CRM pipeline.
               </p>
             </div>
 
@@ -521,79 +683,6 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               >
                 Return to Inquiries List
               </Button>
-            </div>
-          </div>
-
-          {/* AI Matches */}
-          <div className="bg-surface border border-border rounded-2xl p-6 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-fairway-500/10 text-fairway-600 dark:text-fairway-400 flex items-center justify-center">
-                  <Building2 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-foreground">
-                    Corridor Match Assets ({propertyMatches.length})
-                  </h2>
-                  <p className="text-xs text-foreground-muted">
-                    Compatible inventory based on area ({formatSqFt(createdInquiry.requiredAreaSqFt)}), corridor ({createdInquiry.targetCorridor}), and clear height
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {propertyMatches.map((m) => {
-                const badgeStyle =
-                  m.overallScore >= 80
-                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-                    : m.overallScore >= 60
-                    ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30'
-                    : m.overallScore >= 40
-                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
-                    : 'bg-surface-muted text-foreground-muted border-border';
-
-                return (
-                  <div
-                    key={m.property.id}
-                    onClick={() => onSuccess(createdInquiry.id)}
-                    className="bg-surface hover:bg-surface-muted/30 border border-border hover:border-primary/50 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-2xs hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-bold text-foreground text-sm group-hover:text-primary transition-colors line-clamp-1" title={m.property.name}>
-                            {m.property.name}
-                          </h3>
-                          <p className="text-xs text-foreground-muted flex items-center gap-1.5 mt-1 truncate">
-                            <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
-                            <span className="truncate">{m.property.location}</span>
-                          </p>
-                        </div>
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 whitespace-nowrap shadow-2xs ${badgeStyle}`}>
-                          {m.overallScore}% Match
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-border">
-                      <div className="bg-surface-muted/50 rounded-lg p-2 border border-border/50">
-                        <span className="text-foreground-muted block text-[10px] uppercase font-semibold">Available Area</span>
-                        <span className="font-bold text-foreground text-xs mt-0.5 block">{formatSqFt(m.property.totalAreaSqFt)}</span>
-                      </div>
-                      <div className="bg-surface-muted/50 rounded-lg p-2 border border-border/50">
-                        <span className="text-foreground-muted block text-[10px] uppercase font-semibold">Rate</span>
-                        <span className="font-bold text-foreground text-xs mt-0.5 block">₹{m.property.rentPerSqFtINR}/sq.ft</span>
-                      </div>
-                    </div>
-
-                    <div className="pt-1 flex items-center justify-between text-[11px] text-foreground-muted group-hover:text-primary transition-colors font-semibold">
-                      <span>Review in Workspace</span>
-                      <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </div>
@@ -659,7 +748,12 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
             <div className="flex items-center p-1 bg-surface-muted rounded-xl border border-border self-start sm:self-auto">
               <button
                 type="button"
-                onClick={() => setSelectedCompanyMode('existing')}
+                onClick={() => {
+                  setSelectedCompanyMode('existing');
+                  clearError('companyName');
+                  clearError('companyIndustry');
+                  clearError('companyCity');
+                }}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   selectedCompanyMode === 'existing'
                     ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
@@ -670,7 +764,10 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedCompanyMode('new')}
+                onClick={() => {
+                  setSelectedCompanyMode('new');
+                  clearError('selectedCompanyId');
+                }}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                   selectedCompanyMode === 'new'
                     ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
@@ -687,18 +784,28 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
           {selectedCompanyMode === 'existing' ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2 space-y-1.5">
+                <div id="field-selectedCompanyId" className="md:col-span-2 space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Choose Customer Company <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <Combobox
                     options={companyComboboxOptions}
                     value={selectedCompanyId}
-                    onChange={setSelectedCompanyId}
+                    onChange={(val) => {
+                      setSelectedCompanyId(val);
+                      clearError('selectedCompanyId');
+                    }}
                     placeholder="Search and select existing customer company..."
                     searchPlaceholder="Search company by name, industry, location..."
                     className="h-10 text-xs"
+                    triggerClassName={errors.selectedCompanyId ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                   />
+                  {errors.selectedCompanyId && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.selectedCompanyId}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -710,7 +817,6 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     <Badge
                       variant={selectedCompany?.priority === 'High' ? 'danger' : selectedCompany?.priority === 'Medium' ? 'warning' : 'default'}
                       size="sm"
-                      dot
                     >
                       {selectedCompany?.priority || 'High'}
                     </Badge>
@@ -729,12 +835,12 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                       </span>
                     </div>
                     <div className="text-foreground-muted">
-                      📍 {selectedCompany.address}, {selectedCompany.city}, {selectedCompany.state} — {selectedCompany.pincode}
+                      {selectedCompany.address}, {selectedCompany.city}, {selectedCompany.state} — {selectedCompany.pincode}
                     </div>
                   </div>
                   <div className="flex items-center gap-4 text-foreground-muted shrink-0">
-                    <span>📞 {selectedCompany.phone}</span>
-                    <span>✉️ {selectedCompany.email}</span>
+                    <span>{selectedCompany.phone}</span>
+                    <span>{selectedCompany.email}</span>
                     <span className="font-semibold text-foreground">{selectedCompany.inquiriesCount || 1} Active Inquiries</span>
                   </div>
                 </div>
@@ -753,18 +859,31 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div id="field-companyName" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Company Trade Name <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Acme Logistics India"
                     value={newCompanyData.name}
-                    onChange={(e) => handleNewCompanyNameChange(e.target.value)}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      handleNewCompanyNameChange(e.target.value);
+                      clearError('companyName');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.companyName
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.companyName && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.companyName}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -782,19 +901,29 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
+                <div id="field-companyIndustry" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Industry Segment <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <Combobox
                     options={industryComboboxOptions}
                     value={newCompanyData.industry}
-                    onChange={(val) => setNewCompanyData({ ...newCompanyData, industry: val })}
+                    onChange={(val) => {
+                      setNewCompanyData({ ...newCompanyData, industry: val });
+                      clearError('companyIndustry');
+                    }}
                     placeholder="Select industry..."
+                    triggerClassName={errors.companyIndustry ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                   />
+                  {errors.companyIndustry && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.companyIndustry}</span>
+                    </p>
+                  )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div id="field-companyWebsite" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Company Website
                   </label>
@@ -802,9 +931,23 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     type="text"
                     placeholder="https://company.example.com"
                     value={newCompanyData.website}
-                    onChange={(e) => setNewCompanyData({ ...newCompanyData, website: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      setNewCompanyData({ ...newCompanyData, website: e.target.value });
+                      clearError('companyWebsite');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.companyWebsite
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.companyWebsite && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.companyWebsite}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -821,21 +964,34 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
+                <div id="field-companyCity" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     City <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="Dahej / Ahmedabad / Surat"
                     value={newCompanyData.city}
-                    onChange={(e) => setNewCompanyData({ ...newCompanyData, city: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      setNewCompanyData({ ...newCompanyData, city: e.target.value });
+                      clearError('companyCity');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.companyCity
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.companyCity && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.companyCity}</span>
+                    </p>
+                  )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div id="field-companyState" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     State
                   </label>
@@ -843,12 +999,26 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     type="text"
                     placeholder="Gujarat"
                     value={newCompanyData.state}
-                    onChange={(e) => setNewCompanyData({ ...newCompanyData, state: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      setNewCompanyData({ ...newCompanyData, state: e.target.value });
+                      clearError('companyState');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.companyState
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.companyState && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.companyState}</span>
+                    </p>
+                  )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div id="field-companyPincode" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Postal Pincode
                   </label>
@@ -856,14 +1026,28 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     type="text"
                     placeholder="392130"
                     value={newCompanyData.pincode}
-                    onChange={(e) => setNewCompanyData({ ...newCompanyData, pincode: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      setNewCompanyData({ ...newCompanyData, pincode: e.target.value });
+                      clearError('companyPincode');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.companyPincode
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.companyPincode && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.companyPincode}</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div id="field-companyPhone" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Official Phone
                   </label>
@@ -871,12 +1055,26 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     type="text"
                     placeholder="+91 98250 11223"
                     value={newCompanyData.phone}
-                    onChange={(e) => setNewCompanyData({ ...newCompanyData, phone: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      setNewCompanyData({ ...newCompanyData, phone: e.target.value });
+                      clearError('companyPhone');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.companyPhone
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.companyPhone && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.companyPhone}</span>
+                    </p>
+                  )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div id="field-companyEmail" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Official Email
                   </label>
@@ -884,9 +1082,23 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     type="email"
                     placeholder="procurement@company.com"
                     value={newCompanyData.email}
-                    onChange={(e) => setNewCompanyData({ ...newCompanyData, email: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      setNewCompanyData({ ...newCompanyData, email: e.target.value });
+                      clearError('companyEmail');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.companyEmail
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.companyEmail && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.companyEmail}</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -908,62 +1120,72 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
 
           <div className="space-y-4">
             {/* Requirement Title / Summary */}
-            <div className="space-y-1.5">
+            <div id="field-requirement" className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
                 Requirement Posting Title / Summary <span className="text-rose-500 font-bold">*</span>
               </label>
               <input
                 type="text"
-                required
                 placeholder="e.g. Grade-A compliant chemical warehousing with fire sprinkler system and multi-dock access"
                 value={inquiryData.requirement}
-                onChange={(e) => setInquiryData({ ...inquiryData, requirement: e.target.value })}
-                className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                onChange={(e) => {
+                  setInquiryData({ ...inquiryData, requirement: e.target.value });
+                  clearError('requirement');
+                }}
+                className={cn(
+                  "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                  errors.requirement
+                    ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                    : "border-border focus:border-fairway-600"
+                )}
               />
+              {errors.requirement && (
+                <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  <span>{errors.requirement}</span>
+                </p>
+              )}
             </div>
 
             {/* Area & Corridor & Specific Hub */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Required Area with Quick Presets */}
-              <div className="space-y-1.5">
+              <div id="field-requiredAreaSqFt" className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-foreground">
                     Required Area (Sq.Ft) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <span className="text-[11px] font-mono font-bold text-fairway-600 dark:text-fairway-400">
-                    {formatSqFt(inquiryData.requiredAreaSqFt)}
+                    {inquiryData.requiredAreaSqFt > 0 ? formatSqFt(inquiryData.requiredAreaSqFt) : '—'}
                   </span>
                 </div>
                 <input
                   type="number"
                   min="0"
                   step="any"
-                  required
+                  placeholder="e.g. 50000"
                   value={inquiryData.requiredAreaSqFt || ''}
-                  onChange={(e) => setInquiryData({ ...inquiryData, requiredAreaSqFt: Number(e.target.value) || 0 })}
-                  className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs font-bold text-foreground p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                  onChange={(e) => {
+                    setInquiryData({ ...inquiryData, requiredAreaSqFt: Number(e.target.value) || 0 });
+                    clearError('requiredAreaSqFt');
+                  }}
+                  className={cn(
+                    "w-full bg-surface-muted/40 border rounded-xl text-xs font-bold text-foreground p-2.5 outline-none transition-colors",
+                    errors.requiredAreaSqFt
+                      ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                      : "border-border focus:border-fairway-600"
+                  )}
                 />
-                {/* Preset Chips */}
-                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
-                  {[25000, 50000, 75000, 100000, 150000].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setInquiryData({ ...inquiryData, requiredAreaSqFt: preset })}
-                      className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
-                        inquiryData.requiredAreaSqFt === preset
-                          ? 'bg-fairway-600 text-white border-fairway-600'
-                          : 'bg-surface-muted text-foreground-muted border-border hover:text-foreground'
-                      }`}
-                    >
-                      {(preset / 1000).toFixed(0)}k sq.ft
-                    </button>
-                  ))}
-                </div>
+                {errors.requiredAreaSqFt && (
+                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{errors.requiredAreaSqFt}</span>
+                  </p>
+                )}
               </div>
 
               {/* Target Corridor */}
-              <div className="space-y-1.5">
+              <div id="field-targetCorridor" className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground block">
                   Target Logistics Corridor <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -976,24 +1198,46 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                       targetCorridor: val,
                       location: val.replace(' Corridor', ''),
                     });
+                    clearError('targetCorridor');
+                    clearError('location');
                   }}
                   placeholder="Select target corridor..."
+                  triggerClassName={errors.targetCorridor ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                 />
+                {errors.targetCorridor && (
+                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{errors.targetCorridor}</span>
+                  </p>
+                )}
               </div>
 
               {/* Specific Location Hub */}
-              <div className="space-y-1.5">
+              <div id="field-location" className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground block">
                   Specific Hub / Location <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
-                  required
                   placeholder="e.g. Dahej PCPIR / Sanand GIDC"
                   value={inquiryData.location}
-                  onChange={(e) => setInquiryData({ ...inquiryData, location: e.target.value })}
-                  className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                  onChange={(e) => {
+                    setInquiryData({ ...inquiryData, location: e.target.value });
+                    clearError('location');
+                  }}
+                  className={cn(
+                    "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                    errors.location
+                      ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                      : "border-border focus:border-fairway-600"
+                  )}
                 />
+                {errors.location && (
+                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{errors.location}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1005,8 +1249,8 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 </label>
                 <Combobox
                   options={clearHeightOptions}
-                  value={String(inquiryData.clearHeightFt)}
-                  onChange={(val) => setInquiryData({ ...inquiryData, clearHeightFt: Number(val) || 12 })}
+                  value={inquiryData.clearHeightFt ? String(inquiryData.clearHeightFt) : ''}
+                  onChange={(val) => setInquiryData({ ...inquiryData, clearHeightFt: Number(val) || 0 })}
                   placeholder="Select clear height..."
                 />
               </div>
@@ -1017,10 +1261,11 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 </label>
                 <input
                   type="number"
-                  min="1"
+                  min="0"
                   max="50"
-                  value={inquiryData.dockRequirements}
-                  onChange={(e) => setInquiryData({ ...inquiryData, dockRequirements: Number(e.target.value) || 1 })}
+                  placeholder="e.g. 6"
+                  value={inquiryData.dockRequirements || ''}
+                  onChange={(e) => setInquiryData({ ...inquiryData, dockRequirements: Number(e.target.value) || 0 })}
                   className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
                 />
               </div>
@@ -1046,8 +1291,8 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 </label>
                 <input
                   type="number"
-                  placeholder="1200"
-                  value={inquiryData.powerKVA}
+                  placeholder="e.g. 500"
+                  value={inquiryData.powerKVA || ''}
                   onChange={(e) => setInquiryData({ ...inquiryData, powerKVA: Number(e.target.value) || 0 })}
                   className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
                 />
@@ -1103,7 +1348,11 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               <div className="flex items-center p-1 bg-surface-muted rounded-xl border border-border">
                 <button
                   type="button"
-                  onClick={() => setContactMode('existing')}
+                  onClick={() => {
+                    setContactMode('existing');
+                    clearError('contactName');
+                    clearError('contactPhone');
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     contactMode === 'existing'
                       ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
@@ -1114,7 +1363,10 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setContactMode('new')}
+                  onClick={() => {
+                    setContactMode('new');
+                    clearError('selectedContactId');
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
                     contactMode === 'new'
                       ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
@@ -1129,32 +1381,55 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
           </div>
 
           {contactMode === 'existing' && existingCompanyContacts.length > 0 ? (
-            <div className="space-y-1.5">
+            <div id="field-selectedContactId" className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
                 Choose Contact Person <span className="text-rose-500 font-bold">*</span>
               </label>
               <Combobox
                 options={contactComboboxOptions}
                 value={selectedContactId}
-                onChange={setSelectedContactId}
+                onChange={(val) => {
+                  setSelectedContactId(val);
+                  clearError('selectedContactId');
+                }}
                 placeholder="Select registered contact..."
+                triggerClassName={errors.selectedContactId ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
               />
+              {errors.selectedContactId && (
+                <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  <span>{errors.selectedContactId}</span>
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div id="field-contactName" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Full Name of Decision Maker <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Rajesh Sharma"
                     value={contactData.name}
-                    onChange={(e) => setContactData({ ...contactData, name: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      setContactData({ ...contactData, name: e.target.value });
+                      clearError('contactName');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.contactName
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.contactName && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.contactName}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -1185,21 +1460,34 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   />
                 </div>
 
-                <div className="space-y-1.5">
+                <div id="field-contactPhone" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Direct Mobile Phone <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="+91 98250 55667"
                     value={contactData.phone}
-                    onChange={(e) => setContactData({ ...contactData, phone: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      setContactData({ ...contactData, phone: e.target.value });
+                      clearError('contactPhone');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.contactPhone
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.contactPhone && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.contactPhone}</span>
+                    </p>
+                  )}
                 </div>
 
-                <div className="space-y-1.5">
+                <div id="field-contactEmail" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Work Email Address
                   </label>
@@ -1207,9 +1495,23 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     type="email"
                     placeholder="rajesh.sharma@company.com"
                     value={contactData.email}
-                    onChange={(e) => setContactData({ ...contactData, email: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                    onChange={(e) => {
+                      setContactData({ ...contactData, email: e.target.value });
+                      clearError('contactEmail');
+                    }}
+                    className={cn(
+                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
+                      errors.contactEmail
+                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                        : "border-border focus:border-fairway-600"
+                    )}
                   />
+                  {errors.contactEmail && (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.contactEmail}</span>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1276,38 +1578,56 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
             {/* Row 1: Budget, Possession Date, Lease Duration */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Monthly Rental Budget with Live Rate */}
-              <div className="space-y-1.5">
+              <div id="field-budgetMonthlyINR" className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-foreground">
                     Monthly Rental Budget (₹ INR) <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <span className="text-[11px] font-mono font-semibold text-foreground-muted">
-                    ≈ ₹{rentPerSqFt}/sq.ft
+                    {Number(rentPerSqFt) > 0 ? `≈ ₹${rentPerSqFt}/sq.ft` : '—'}
                   </span>
                 </div>
                 <input
                   type="number"
                   min="0"
                   step="any"
-                  required
+                  placeholder="e.g. 500000"
                   value={inquiryData.budgetMonthlyINR || ''}
-                  onChange={(e) => setInquiryData({ ...inquiryData, budgetMonthlyINR: Number(e.target.value) || 0 })}
-                  className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs font-bold text-foreground p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                  onChange={(e) => {
+                    setInquiryData({ ...inquiryData, budgetMonthlyINR: Number(e.target.value) || 0 });
+                    clearError('budgetMonthlyINR');
+                  }}
+                  className={cn(
+                    "w-full bg-surface-muted/40 border rounded-xl text-xs font-bold text-foreground p-2.5 outline-none transition-colors",
+                    errors.budgetMonthlyINR
+                      ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                      : "border-border focus:border-fairway-600"
+                  )}
                 />
                 <span className="text-[11px] text-foreground-muted block">
-                  Formatted: <strong>{formatINR(inquiryData.budgetMonthlyINR, true)} / month</strong>
+                  Formatted: <strong>{inquiryData.budgetMonthlyINR > 0 ? `${formatINR(inquiryData.budgetMonthlyINR, true)} / month` : '—'}</strong>
                 </span>
+                {errors.budgetMonthlyINR && (
+                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{errors.budgetMonthlyINR}</span>
+                  </p>
+                )}
               </div>
 
               {/* Target Possession Date with DatePicker */}
-              <div className="space-y-1.5">
+              <div id="field-possessionDate" className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground block">
                   Target Possession Date <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <DatePicker
                   value={inquiryData.possessionDate}
-                  onChange={(val) => setInquiryData((prev) => ({ ...prev, possessionDate: val }))}
+                  onChange={(val) => {
+                    setInquiryData((prev) => ({ ...prev, possessionDate: val }));
+                    clearError('possessionDate');
+                  }}
                   placeholder="Select target possession date"
+                  error={errors.possessionDate}
                 />
               </div>
 
@@ -1318,8 +1638,8 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 </label>
                 <Combobox
                   options={leaseTenureOptions}
-                  value={String(inquiryData.leaseDurationMonths)}
-                  onChange={(val) => setInquiryData({ ...inquiryData, leaseDurationMonths: Number(val) || 60 })}
+                  value={inquiryData.leaseDurationMonths ? String(inquiryData.leaseDurationMonths) : ''}
+                  onChange={(val) => setInquiryData({ ...inquiryData, leaseDurationMonths: Number(val) || 36 })}
                   placeholder="Select lease duration..."
                 />
               </div>
@@ -1327,40 +1647,70 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
 
             {/* Row 2: Priority, Lead Source, Sales Owner */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
+              <div id="field-priority" className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground block">
                   Inquiry Priority <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <Combobox
                   options={priorityOptions}
                   value={inquiryData.priority}
-                  onChange={(val) => setInquiryData({ ...inquiryData, priority: val as Inquiry['priority'] })}
+                  onChange={(val) => {
+                    setInquiryData({ ...inquiryData, priority: val as Inquiry['priority'] });
+                    clearError('priority');
+                  }}
                   placeholder="Select priority..."
+                  triggerClassName={errors.priority ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                 />
+                {errors.priority && (
+                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{errors.priority}</span>
+                  </p>
+                )}
               </div>
 
-              <div className="space-y-1.5">
+              <div id="field-source" className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground block">
                   Lead Source <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <Combobox
                   options={sourceOptions}
                   value={inquiryData.source}
-                  onChange={(val) => setInquiryData({ ...inquiryData, source: val as Inquiry['source'] })}
+                  onChange={(val) => {
+                    setInquiryData({ ...inquiryData, source: val as Inquiry['source'] });
+                    clearError('source');
+                  }}
                   placeholder="Select lead source..."
+                  triggerClassName={errors.source ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                 />
+                {errors.source && (
+                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{errors.source}</span>
+                  </p>
+                )}
               </div>
 
-              <div className="space-y-1.5">
+              <div id="field-assignedSalespersonId" className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground block">
                   Assigned Sales Owner <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <Combobox
                   options={userComboboxOptions}
                   value={assignedSalespersonId}
-                  onChange={setAssignedSalespersonId}
+                  onChange={(val) => {
+                    setAssignedSalespersonId(val);
+                    clearError('assignedSalespersonId');
+                  }}
                   placeholder="Select deal owner..."
+                  triggerClassName={errors.assignedSalespersonId ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                 />
+                {errors.assignedSalespersonId && (
+                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{errors.assignedSalespersonId}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -1397,11 +1747,23 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
         {/* BOTTOM SUBMISSION FOOTER */}
         {/* ========================================================================= */}
         <div className="bg-surface border border-border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
-          <div className="flex items-center gap-3 text-xs text-foreground-muted">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>All mandatory fields verified</span>
-            </span>
+          <div className="flex items-center gap-3 text-xs">
+            {Object.keys(errors).length > 0 ? (
+              <span className="flex items-center gap-1.5 text-rose-500 font-semibold">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                <span>{Object.keys(errors).length} required {Object.keys(errors).length === 1 ? 'field needs' : 'fields need'} your attention</span>
+              </span>
+            ) : isValid ? (
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>All mandatory fields verified</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-foreground-muted">
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span>Please complete all fields marked with *</span>
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
@@ -1417,9 +1779,8 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               type="submit"
               variant="primary"
               isLoading={isSubmitting}
-              disabled={!isValid}
-              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs px-6 shadow-xs flex items-center gap-2"
-              leftIcon={<Building2 className="w-3.5 h-3.5" />}
+              disabled={isSubmitting}
+              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs px-6 shadow-xs flex items-center gap-2 cursor-pointer"
             >
               Register Warehouse Inquiry & Match Assets
             </Button>

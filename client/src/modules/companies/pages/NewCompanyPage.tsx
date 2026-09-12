@@ -73,22 +73,22 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
     name: companyToEdit?.name || '',
     legalName: companyToEdit?.legalName || '',
     website: companyToEdit?.website || '',
-    industry: companyToEdit?.industry || 'Specialty Chemicals & Polymers',
+    industry: companyToEdit?.industry || '',
     address: companyToEdit?.address || '',
-    city: companyToEdit?.city || 'Dahej',
-    state: companyToEdit?.state || 'Gujarat',
-    pincode: companyToEdit?.pincode || '392130',
+    city: companyToEdit?.city || '',
+    state: companyToEdit?.state || '',
+    pincode: companyToEdit?.pincode || '',
     phone: companyToEdit?.phone || '',
     email: companyToEdit?.email || '',
     assignedOwnerId: companyToEdit?.assignedOwnerId || currentUser.id,
     prospectStage: companyToEdit?.prospectStage || 'New',
-    priority: (companyToEdit?.priority as PriorityLevel) || 'High',
-    annualTurnover: companyToEdit?.annualTurnover || '₹500+ Cr',
-    employeeCount: companyToEdit?.employeeCount || '1,000+',
+    priority: (companyToEdit?.priority as PriorityLevel) || 'Medium',
+    annualTurnover: companyToEdit?.annualTurnover || '',
+    employeeCount: companyToEdit?.employeeCount || '',
     gujaratPresence: companyToEdit?.gujaratPresence ?? true,
     // Primary contact person
     contactName: '',
-    contactDesignation: 'VP - Supply Chain & Operations',
+    contactDesignation: '',
     contactPhone: '',
     contactEmail: '',
     initialNotes: '',
@@ -105,21 +105,21 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
         name: companyToEdit.name || '',
         legalName: companyToEdit.legalName || '',
         website: companyToEdit.website || '',
-        industry: companyToEdit.industry || 'Specialty Chemicals & Polymers',
+        industry: companyToEdit.industry || '',
         address: companyToEdit.address || '',
-        city: companyToEdit.city || 'Dahej',
-        state: companyToEdit.state || 'Gujarat',
-        pincode: companyToEdit.pincode || '392130',
+        city: companyToEdit.city || '',
+        state: companyToEdit.state || '',
+        pincode: companyToEdit.pincode || '',
         phone: companyToEdit.phone || '',
         email: companyToEdit.email || '',
         assignedOwnerId: companyToEdit.assignedOwnerId || currentUser.id,
         prospectStage: companyToEdit.prospectStage || 'New',
-        priority: (companyToEdit.priority as PriorityLevel) || 'High',
-        annualTurnover: companyToEdit.annualTurnover || '₹500+ Cr',
-        employeeCount: companyToEdit.employeeCount || '1,000+',
+        priority: (companyToEdit.priority as PriorityLevel) || 'Medium',
+        annualTurnover: companyToEdit.annualTurnover || '',
+        employeeCount: companyToEdit.employeeCount || '',
         gujaratPresence: companyToEdit.gujaratPresence ?? true,
         contactName: '',
-        contactDesignation: 'VP - Supply Chain & Operations',
+        contactDesignation: '',
         contactPhone: '',
         contactEmail: '',
         initialNotes: '',
@@ -131,7 +131,6 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
     setFormData((prev) => ({
       ...prev,
       name,
-      legalName: prev.legalName || (name ? `${name} Private Limited` : ''),
     }));
 
     if (!isEditing && name.trim().length > 2) {
@@ -165,48 +164,81 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
     try {
       if (isEditing && companyToEdit) {
         // Edit mode
-        await CompanyService.updateCompany(companyToEdit.id, {
-          ...formData,
+        const updatePayload = {
+          name: formData.name.trim(),
+          legalName: formData.legalName.trim() || formData.name.trim(),
+          website: formData.website.trim(),
+          industry: formData.industry,
+          address: formData.address.trim(),
+          city: formData.city,
+          state: formData.state.trim(),
+          pincode: formData.pincode.trim(),
+          phone: formData.phone.trim(),
+          email: formData.email.trim(),
+          assignedOwnerId: formData.assignedOwnerId,
           assignedOwnerName: owner.name,
-        });
+          prospectStage: formData.prospectStage,
+          priority: formData.priority,
+          annualTurnover: formData.annualTurnover,
+          employeeCount: formData.employeeCount,
+          gujaratPresence: formData.gujaratPresence,
+        };
 
-        StorageService.updateCompany(companyToEdit.id, {
-          ...formData,
-          assignedOwnerName: owner.name,
-        });
-
-        success('Company Updated', `Saved profile updates for ${formData.name}.`);
-        onSuccess(companyToEdit.id);
-      } else {
-        // Create mode
-        const res = await CompanyService.createCompany({
-          ...formData,
-          status: 'Active',
-          assignedOwnerName: owner.name,
-        });
-
-        let targetId = '';
-        if (res.success && res.data) {
-          targetId = res.data.id;
-          try {
-            StorageService.createCompany({
-              ...formData,
-              status: 'Active',
-              assignedOwnerName: owner.name,
-            });
-          } catch {}
-        } else {
-          const localCompany = StorageService.createCompany({
-            ...formData,
-            status: 'Active',
-            assignedOwnerName: owner.name,
-          });
-          targetId = localCompany.id;
+        const res = await CompanyService.updateCompany(companyToEdit.id, updatePayload);
+        if (!res.success) {
+          throw new Error(res.error || 'Failed to update company in backend database');
         }
 
-        // If contact details provided, create contact
-        if (formData.contactName.trim() && targetId) {
-          try {
+        StorageService.updateCompany(companyToEdit.id, {
+          ...updatePayload,
+        });
+
+        success('Company Updated', `Saved profile updates for ${formData.name} in backend database.`);
+        onSuccess(companyToEdit.id);
+      } else {
+        // Create mode - all data entered into backend
+        const createPayload = {
+          name: formData.name.trim(),
+          legalName: formData.legalName.trim() || formData.name.trim(),
+          website: formData.website.trim(),
+          industry: formData.industry,
+          status: 'Active',
+          address: formData.address.trim(),
+          city: formData.city,
+          state: formData.state.trim(),
+          pincode: formData.pincode.trim(),
+          phone: formData.phone.trim(),
+          email: formData.email.trim(),
+          assignedOwnerId: formData.assignedOwnerId,
+          assignedOwnerName: owner.name,
+          prospectStage: formData.prospectStage,
+          priority: formData.priority,
+          annualTurnover: formData.annualTurnover,
+          employeeCount: formData.employeeCount,
+          gujaratPresence: formData.gujaratPresence,
+          contactName: formData.contactName.trim(),
+          contactDesignation: formData.contactDesignation.trim(),
+          contactPhone: formData.contactPhone.trim() || formData.phone.trim(),
+          contactEmail: formData.contactEmail.trim() || formData.email.trim(),
+          initialNotes: formData.initialNotes.trim(),
+        };
+
+        const res = await CompanyService.createCompany(createPayload);
+
+        if (!res.success || !res.data) {
+          throw new Error(res.error || 'Backend failed to register company.');
+        }
+
+        const targetId = res.data.id;
+
+        // Keep local cache in sync
+        try {
+          StorageService.createCompany({
+            id: targetId,
+            ...createPayload,
+          } as any);
+
+          if (formData.contactName.trim()) {
             StorageService.createContact({
               companyId: targetId,
               companyName: formData.name,
@@ -217,10 +249,10 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
               email: formData.contactEmail || formData.email,
               isPrimary: true,
             });
-          } catch {}
-        }
+          }
+        } catch {}
 
-        success('Company Registered', `Successfully created ${formData.name} in CRM.`);
+        success('Company Registered', `Successfully created ${formData.name} in PostgreSQL backend database.`);
         setCreatedCompanyId(targetId);
         setShowSuccessView(true);
       }
@@ -349,14 +381,13 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
             {/* Legal Entity Name */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
-                Legal Entity Name <span className="text-rose-500">*</span>
+                Legal Entity Name
               </label>
               <input
                 type="text"
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
                 placeholder="e.g. Reliance Industries Limited"
-                required
                 className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted"
               />
             </div>
@@ -439,7 +470,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                 type="text"
                 value={formData.state}
                 onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                placeholder="Gujarat"
+                placeholder="e.g. Gujarat"
                 className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted shadow-2xs"
               />
             </div>
@@ -450,7 +481,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                 type="text"
                 value={formData.pincode}
                 onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-                placeholder="392130"
+                placeholder="e.g. 392130"
                 className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted shadow-2xs"
               />
             </div>
@@ -485,7 +516,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                   type="text"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+91 2642 24XXXX"
+                  placeholder="e.g. +91 2642 24XXXX"
                   className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl pl-10 pr-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all font-mono placeholder:text-foreground-muted shadow-2xs"
                 />
               </div>
@@ -521,7 +552,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                     type="text"
                     value={formData.contactName}
                     onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-                    placeholder="e.g. Anand Mahindra"
+                    placeholder="e.g. Rajesh Sharma"
                     className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2 border border-border focus:border-fairway-600 focus:outline-none placeholder:text-foreground-muted"
                   />
                 </div>
@@ -532,7 +563,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                     type="text"
                     value={formData.contactDesignation}
                     onChange={(e) => setFormData({ ...formData, contactDesignation: e.target.value })}
-                    placeholder="VP - Supply Chain"
+                    placeholder="e.g. VP - Supply Chain"
                     className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2 border border-border focus:border-fairway-600 focus:outline-none placeholder:text-foreground-muted"
                   />
                 </div>
@@ -543,7 +574,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                     type="text"
                     value={formData.contactPhone}
                     onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
-                    placeholder="+91 98250 XXXXX"
+                    placeholder="e.g. +91 98250 11223"
                     className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2 border border-border focus:border-fairway-600 focus:outline-none font-mono placeholder:text-foreground-muted"
                   />
                 </div>
@@ -554,10 +585,24 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                     type="email"
                     value={formData.contactEmail}
                     onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
-                    placeholder="officer@company.com"
+                    placeholder="rajesh.sharma@company.com"
                     className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2 border border-border focus:border-fairway-600 focus:outline-none placeholder:text-foreground-muted"
                   />
                 </div>
+              </div>
+
+              {/* Initial Notes / Strategy Context */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] font-semibold text-foreground-muted block">
+                  Initial Deal / Account Requirements Note (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={formData.initialNotes}
+                  onChange={(e) => setFormData({ ...formData, initialNotes: e.target.value })}
+                  placeholder="e.g. Seeking 60,000–80,000 sq.ft Grade-A facility in Dahej PCPIR node with heavy industrial flooring and fire systems."
+                  className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl p-3 border border-border focus:border-fairway-600 focus:outline-none transition-all placeholder:text-foreground-muted resize-none shadow-2xs"
+                />
               </div>
             </div>
           )}
@@ -643,7 +688,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                 type="text"
                 value={formData.annualTurnover}
                 onChange={(e) => setFormData({ ...formData, annualTurnover: e.target.value })}
-                placeholder="₹500+ Cr"
+                placeholder="e.g. ₹500+ Cr"
                 className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none"
               />
             </div>
@@ -655,7 +700,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                 type="text"
                 value={formData.employeeCount}
                 onChange={(e) => setFormData({ ...formData, employeeCount: e.target.value })}
-                placeholder="1,000+ employees"
+                placeholder="e.g. 1,000+ employees"
                 className="w-full bg-surface-muted/50 text-foreground text-xs rounded-xl px-3.5 py-2.5 border border-border focus:border-fairway-600 focus:outline-none"
               />
             </div>

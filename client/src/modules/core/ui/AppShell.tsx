@@ -223,13 +223,13 @@ export const AppShell: React.FC<AppShellProps> = ({
               title="Expand Sidebar"
               aria-label="Expand Sidebar"
             >
-              <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-muted border border-border flex items-center justify-center shadow-subtle shrink-0 p-1 group-hover:scale-105 transition-transform">
+              <div className="w-9 h-9 flex items-center justify-center shrink-0 p-1 group-hover:scale-105 transition-transform">
                 <img
-                  src="/images/logo.png"
+                  src="/images/logo-icon.png"
                   alt="Fairway Logo"
                   className="w-full h-full object-contain"
                   onError={(e) => {
-                    (e.currentTarget as HTMLElement).style.display = 'none';
+                    (e.currentTarget as HTMLImageElement).src = '/images/logo.png';
                   }}
                 />
               </div>
@@ -240,27 +240,17 @@ export const AppShell: React.FC<AppShellProps> = ({
               </div>
             </div>
           ) : (
-            /* Expanded Brand Header: Logo + Title, Collapse Button shown on hover */
+            /* Expanded Brand Header: Logo only without text and without extra white background */
             <>
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-lg overflow-hidden bg-surface-muted border border-border flex items-center justify-center shadow-subtle shrink-0 p-1">
-                  <img
-                    src="/images/logo.png"
-                    alt="Fairway Logo"
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-                <div className="truncate">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-black tracking-tight text-foreground leading-none">FAIRWAY</span>
-                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-muted text-foreground-muted border border-border shadow-2xs">
-                      CRM
-                    </span>
-                  </div>
-                </div>
+              <div className="flex items-center min-w-0 py-1 overflow-hidden">
+                <img
+                  src="/images/logo.png"
+                  alt="Fairway Logo"
+                  className="h-8 max-h-8 w-auto max-w-[170px] object-contain object-left"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
+                />
               </div>
 
               {/* Sidebar Collapse Toggle Button (Always visible when sidebar is open) */}
@@ -491,7 +481,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           <div className="flex items-center gap-2 sm:gap-4 flex-1 max-w-xl min-w-0">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-1.5 text-foreground-muted hover:text-foreground rounded-md hover:bg-surface-muted shrink-0"
+              className="md:hidden p-1.5 text-foreground-muted hover:text-foreground rounded-md hover:bg-surface-muted shrink-0"
               aria-label="Open navigation drawer"
             >
               <Menu className="w-5 h-5" />
@@ -632,27 +622,19 @@ export const AppShell: React.FC<AppShellProps> = ({
 
       {/* Mobile Drawer */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
+        <div className="fixed inset-0 z-50 md:hidden flex">
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
           <div className="relative w-64 bg-surface h-full flex flex-col border-r border-border shadow-dialog z-10 p-4">
             <div className="flex items-center justify-between pb-4 border-b border-border mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg overflow-hidden bg-white border border-border flex items-center justify-center shadow-subtle shrink-0 p-1">
-                  <img
-                    src="/images/logo.png"
-                    alt="Fairway Logo"
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-black text-fairway-900 tracking-tight text-sm">FAIRWAY</span>
-                  <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-accent-100 text-accent-900 border border-accent-300 shadow-2xs">
-                    AI CRM
-                  </span>
-                </div>
+              <div className="flex items-center min-w-0">
+                <img
+                  src="/images/logo.png"
+                  alt="Fairway Logo"
+                  className="h-8 w-auto max-w-[170px] object-contain object-left"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
+                />
               </div>
               <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 text-foreground-muted">
                 <X className="w-5 h-5" />

@@ -20,6 +20,11 @@ export interface CreateCompanyPayload {
   annualTurnover?: string;
   employeeCount?: string;
   gujaratPresence?: boolean;
+  contactName?: string;
+  contactDesignation?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  initialNotes?: string;
 }
 
 export interface GetCompaniesParams {

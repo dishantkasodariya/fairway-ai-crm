@@ -300,9 +300,17 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
   const users = StorageService.getUsers();
   const pipelineStages = StorageService.getPipelineStages();
 
-  const loadInquiries = async () => {
-    setIsLoading(true);
+  const loadInquiries = async (showSpin = false) => {
+    if (showSpin) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     try {
+      if (showSpin) {
+        // Smooth visual delay matching Tasks page
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
       const activeSort = sorting[0];
       const res = await InquiryService.getInquiries({
         search: debouncedSearchQuery || undefined,
@@ -330,6 +338,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
       setTotalCount(local.length);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -471,38 +480,8 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     setDraftIndustryFilter('all');
   };
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    setIsLoading(true);
-    handleClearAllFilters();
-    try {
-      // Small visual delay so the skeleton placeholder displays cleanly before rendering fresh data
-      const [res] = await Promise.all([
-        InquiryService.getInquiries({
-          pageNumber: 1,
-          pageSize: pagination.pageSize,
-          sortBy: sorting[0]?.id || 'createdAt',
-          ascending: sorting[0] ? !sorting[0].desc : false,
-        }),
-        new Promise((resolve) => setTimeout(resolve, 600)),
-      ]);
-
-      if (res.success && res.data) {
-        setInquiries(res.data);
-        setTotalCount(res.totalCount !== undefined ? res.totalCount : res.data.length);
-      } else {
-        const local = StorageService.getInquiries();
-        setInquiries(local);
-        setTotalCount(local.length);
-      }
-    } catch {
-      const local = StorageService.getInquiries();
-      setInquiries(local);
-      setTotalCount(local.length);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
+  const handleRefresh = () => {
+    loadInquiries(true);
   };
 
   const getStageBadgeStyle = (stageKey: string) => {
@@ -513,6 +492,8 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
       label: config.label,
     };
   };
+
+  const isBusy = isLoading || isRefreshing;
 
   // Filter inquiries
   const filteredInquiries = inquiries.filter((inq) => {
@@ -1215,7 +1196,8 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         <DataGrid
           table={table}
           recordCount={totalCount || filteredInquiries.length}
-          isLoading={isLoading}
+          isLoading={isBusy}
+          loadingMode="skeleton"
           tableLayout={{
             columnsPinnable: true,
             columnsResizable: true,
@@ -1223,7 +1205,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
           }}
         >
           <div className="w-full space-y-2.5">
-            {filteredInquiries.length === 0 && !isLoading ? (
+            {filteredInquiries.length === 0 && !isBusy ? (
               <WarehouseInquiryEmptyState
                 hasFilters={activeFiltersCount > 0 || !!searchQuery}
                 onClearFilters={handleClearAllFilters}
@@ -1238,7 +1220,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                 </DataGridContainer>
               </Card>
             )}
-            {filteredInquiries.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
+            {filteredInquiries.length > 0 && !isBusy && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
           </div>
         </DataGrid>
       ) : viewMode === 'line' ? (
@@ -1246,11 +1228,12 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         <DataGrid
           table={table}
           recordCount={filteredInquiries.length}
-          isLoading={isLoading}
+          isLoading={isBusy}
+          loadingMode="skeleton"
         >
           <div className="space-y-4">
-            {isLoading ? (
-              <div className="space-y-2">
+            {isBusy ? (
+              <div className="space-y-2 animate-fade-in">
                 {Array.from({ length: Math.min(pagination.pageSize, 6) }).map((_, i) => (
                   <WarehouseInquiryCardSkeleton key={i} mode="line" />
                 ))}
@@ -1262,7 +1245,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                 onNewInquiry={onOpenNewInquiry}
               />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 animate-fade-in">
                 {pagedInquiries.map((inq) => (
                   <WarehouseInquiryLineCard
                     key={inq.id}
@@ -1274,7 +1257,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             )}
 
             {/* Pagination for Single-Line View */}
-            {pagedInquiries.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
+            {pagedInquiries.length > 0 && !isBusy && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
           </div>
         </DataGrid>
       ) : (
@@ -1282,11 +1265,12 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         <DataGrid
           table={table}
           recordCount={filteredInquiries.length}
-          isLoading={isLoading}
+          isLoading={isBusy}
+          loadingMode="skeleton"
         >
           <div className="space-y-4">
-            {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {isBusy ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
                 {Array.from({ length: Math.min(pagination.pageSize, 6) }).map((_, i) => (
                   <WarehouseInquiryCardSkeleton key={i} mode="grid" />
                 ))}
@@ -1298,7 +1282,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                 onNewInquiry={onOpenNewInquiry}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
                 {pagedInquiries.map((inq) => (
                   <WarehouseInquiryCard
                     key={inq.id}
@@ -1310,7 +1294,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             )}
 
             {/* Pagination for Card View */}
-            {pagedInquiries.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
+            {pagedInquiries.length > 0 && !isBusy && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
           </div>
         </DataGrid>
       )}

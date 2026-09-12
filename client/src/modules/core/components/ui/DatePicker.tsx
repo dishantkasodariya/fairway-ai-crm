@@ -13,6 +13,8 @@ export interface DatePickerProps {
   disabled?: boolean;
   minDate?: Date;
   maxDate?: Date;
+  allowPastDates?: boolean;
+  allowToday?: boolean;
   label?: string;
   error?: string;
   id?: string;
@@ -26,6 +28,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   disabled = false,
   minDate,
   maxDate,
+  allowPastDates = false,
+  allowToday = false,
   label,
   error: errorMsg,
   id,
@@ -136,10 +140,18 @@ export const DatePicker: React.FC<DatePickerProps> = ({
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => handleSelect(new Date())}
+                onClick={() => {
+                  if (allowToday) {
+                    handleSelect(new Date());
+                  } else {
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    handleSelect(tomorrow);
+                  }
+                }}
                 className="px-2 py-0.5 text-[11px] font-semibold rounded-md bg-fairway-50 dark:bg-fairway-950/80 text-fairway-700 dark:text-fairway-300 hover:bg-fairway-100 dark:hover:bg-fairway-900 border border-fairway-200 dark:border-fairway-800 transition-colors"
               >
-                Today
+                {allowToday ? 'Today' : 'Tomorrow'}
               </button>
               {selectedDate && (
                 <button
@@ -158,6 +170,12 @@ export const DatePicker: React.FC<DatePickerProps> = ({
             selected={selectedDate}
             onSelect={handleSelect}
             disabled={(date) => {
+              const now = new Date();
+              const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+              const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+              if (!allowPastDates && targetDay < todayStart) return true;
+              if (!allowToday && targetDay === todayStart) return true;
               if (minDate && date < minDate) return true;
               if (maxDate && date > maxDate) return true;
               return false;

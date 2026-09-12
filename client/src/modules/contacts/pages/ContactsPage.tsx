@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Users,
   Search,
@@ -16,7 +16,28 @@ import {
   Loader2,
   Star,
   UserCheck,
+  RefreshCw,
+  List,
+  LayoutGrid,
+  X,
+  Settings,
+  SlidersHorizontal,
+  RotateCcw,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/modules/core/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@/modules/core/components/ui/tooltip';
 import ContactService from '@/modules/core/services/contactService';
 import CompanyService from '@/modules/core/services/companyService';
 import { Contact, Company } from '@/modules/core/types';
@@ -25,12 +46,23 @@ import { Button } from '@/modules/core/components/ui/Button';
 import { Card } from '@/modules/core/components/ui/Card';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { Modal } from '@/modules/core/components/ui/Modal';
-import { Input, Select, Textarea } from '@/modules/core/components/ui/Input';
+import { Input, Textarea } from '@/modules/core/components/ui/Input';
+import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
+import { cn } from '@/modules/core/lib/utils';
 
 interface ContactsPageProps {
   onSelectCompany?: (companyId: string) => void;
   onOpenNewInquiry?: (companyId?: string) => void;
 }
+
+const DEPARTMENT_OPTIONS = [
+  'Supply Chain',
+  'Logistics & Warehousing',
+  'Real Estate & Infrastructure',
+  'Executive Leadership',
+  'Plant Operations',
+  'Procurement',
+];
 
 export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) => {
   const { success, error } = useToast();
@@ -38,6 +70,8 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
   // Filters & Search
   const [search, setSearch] = useState('');
@@ -45,42 +79,59 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
   const [selectedCompanyId, setSelectedCompanyId] = useState('all');
   const [primaryOnly, setPrimaryOnly] = useState(false);
 
+  // Filter Drawer Drafts
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [draftDepartment, setDraftDepartment] = useState('all');
+  const [draftCompanyId, setDraftCompanyId] = useState('all');
+  const [draftPrimaryOnly, setDraftPrimaryOnly] = useState(false);
+
+  // Column Visibility Config
+  const [columns, setColumns] = useState<Record<string, boolean>>({
+    contact: true,
+    company: true,
+    department: true,
+    phone: true,
+    email: true,
+    actions: true,
+  });
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [formSubmitting, setFormSubmitting] = useState(false);
-
   const [formData, setFormData] = useState({
-    companyId: '',
-    companyName: '',
     name: '',
     designation: '',
     department: 'Supply Chain',
     phone: '',
     email: '',
     linkedinUrl: '',
+    companyId: '',
     isPrimary: false,
     notes: '',
   });
+  const [formSubmitting, setFormSubmitting] = useState(false);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async (isSpin = false) => {
+    if (isSpin) setIsRefreshing(true);
+    else setLoading(true);
+
     try {
-      const [contactRes, compRes] = await Promise.all([
+      const [contactsRes, companiesRes] = await Promise.all([
         ContactService.getContacts(),
-        CompanyService.getCompanies({ pageSize: 100 }),
+        CompanyService.getCompanies(),
       ]);
 
-      if (contactRes.success && contactRes.data) {
-        setContacts(contactRes.data);
+      if (contactsRes.success && contactsRes.data) {
+        setContacts(contactsRes.data);
       }
-      if (compRes.success && compRes.data) {
-        setCompanies(compRes.data);
+      if (companiesRes.success && companiesRes.data) {
+        setCompanies(companiesRes.data);
       }
     } catch (err: any) {
       error('Failed to load contacts', err.message);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -88,103 +139,149 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
     loadData();
   }, []);
 
-  // Filter contacts
-  const filteredContacts = contacts.filter((c) => {
-    const matchesSearch =
-      !search ||
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.designation?.toLowerCase().includes(search.toLowerCase()) ||
-      c.companyName?.toLowerCase().includes(search.toLowerCase()) ||
-      c.email?.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone?.includes(search);
+  const openFilterDrawer = () => {
+    setDraftDepartment(selectedDepartment);
+    setDraftCompanyId(selectedCompanyId);
+    setDraftPrimaryOnly(primaryOnly);
+    setIsFilterDrawerOpen(true);
+  };
 
-    const matchesDept = selectedDepartment === 'all' || c.department === selectedDepartment;
-    const matchesCompany = selectedCompanyId === 'all' || c.companyId === selectedCompanyId;
-    const matchesPrimary = !primaryOnly || c.isPrimary;
+  const applyFilters = () => {
+    setSelectedDepartment(draftDepartment);
+    setSelectedCompanyId(draftCompanyId);
+    setPrimaryOnly(draftPrimaryOnly);
+    setIsFilterDrawerOpen(false);
+  };
 
-    return matchesSearch && matchesDept && matchesCompany && matchesPrimary;
-  });
+  const resetFilters = () => {
+    setDraftDepartment('all');
+    setDraftCompanyId('all');
+    setDraftPrimaryOnly(false);
+    setSelectedDepartment('all');
+    setSelectedCompanyId('all');
+    setPrimaryOnly(false);
+    setSearch('');
+    setIsFilterDrawerOpen(false);
+  };
 
-  // KPI calculations
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedDepartment !== 'all') count++;
+    if (selectedCompanyId !== 'all') count++;
+    if (primaryOnly) count++;
+    return count;
+  }, [selectedDepartment, selectedCompanyId, primaryOnly]);
+
+  const filteredContacts = useMemo(() => {
+    return contacts.filter((c) => {
+      const q = search.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        (c.designation && c.designation.toLowerCase().includes(q)) ||
+        (c.companyName && c.companyName.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.includes(q)) ||
+        (c.email && c.email.toLowerCase().includes(q));
+
+      const matchesDept = selectedDepartment === 'all' || c.department === selectedDepartment;
+      const matchesCompany = selectedCompanyId === 'all' || c.companyId === selectedCompanyId;
+      const matchesPrimary = !primaryOnly || c.isPrimary;
+
+      return matchesSearch && matchesDept && matchesCompany && matchesPrimary;
+    });
+  }, [contacts, search, selectedDepartment, selectedCompanyId, primaryOnly]);
+
+  // Top Metrics
   const totalContacts = contacts.length;
   const primaryContacts = contacts.filter((c) => c.isPrimary).length;
   const decisionMakers = contacts.filter((c) =>
-    ['VP', 'Director', 'Head', 'CEO', 'COO', 'Chief', 'General Manager'].some((role) =>
-      c.designation?.toLowerCase().includes(role.toLowerCase())
+    ['VP', 'Director', 'Head', 'CEO', 'COO', 'Chief', 'General Manager'].some(
+      (role) => c.designation?.toLowerCase().includes(role.toLowerCase())
     )
   ).length;
-  const companiesCount = new Set(contacts.map((c) => c.companyId).filter(Boolean)).size;
+  const uniqueCompaniesCount = new Set(contacts.map((c) => c.companyId).filter(Boolean)).size;
 
   const handleOpenAdd = () => {
     setEditingContact(null);
     setFormData({
-      companyId: companies[0]?.id || '',
-      companyName: companies[0]?.name || '',
       name: '',
       designation: '',
       department: 'Supply Chain',
       phone: '',
       email: '',
       linkedinUrl: '',
+      companyId: companies[0]?.id || '',
       isPrimary: false,
       notes: '',
     });
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (c: Contact) => {
-    setEditingContact(c);
+  const handleOpenEdit = (contact: Contact) => {
+    setEditingContact(contact);
     setFormData({
-      companyId: c.companyId,
-      companyName: c.companyName || '',
-      name: c.name,
-      designation: c.designation || '',
-      department: c.department || 'Supply Chain',
-      phone: c.phone || '',
-      email: c.email || '',
-      linkedinUrl: c.linkedinUrl || '',
-      isPrimary: Boolean(c.isPrimary),
-      notes: c.notes || '',
+      name: contact.name,
+      designation: contact.designation || '',
+      department: contact.department || 'Supply Chain',
+      phone: contact.phone || '',
+      email: contact.email || '',
+      linkedinUrl: contact.linkedinUrl || '',
+      companyId: contact.companyId || '',
+      isPrimary: !!contact.isPrimary,
+      notes: contact.notes || '',
     });
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete stakeholder ${name}?`)) return;
+    if (!window.confirm(`Are you sure you want to delete stakeholder "${name}"?`)) return;
+
     try {
       const res = await ContactService.deleteContact(id);
       if (res.success) {
-        success('Contact Deleted', `Removed ${name} from records.`);
-        loadData();
+        setContacts((prev) => prev.filter((c) => c.id !== id));
+        success('Contact Deleted', `${name} has been removed.`);
       } else {
-        error('Delete Failed', res.error || 'Unable to delete contact');
+        error('Delete Failed', res.error || 'Could not delete contact');
       }
     } catch (err: any) {
       error('Error', err.message);
     }
   };
 
-  const handleSaveContact = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.companyId) {
-      error('Validation Error', 'Contact name and target company are required.');
+    if (!formData.name.trim()) {
+      error('Validation Error', 'Contact name is required');
       return;
     }
 
     setFormSubmitting(true);
     try {
-      const targetComp = companies.find((comp) => comp.id === formData.companyId);
-      const res = await ContactService.createContact({
+      const selectedComp = companies.find((c) => c.id === formData.companyId);
+      const payload = {
         ...formData,
-        companyName: targetComp?.name || formData.companyName,
-      });
+        companyName: selectedComp?.name || '',
+      };
 
-      if (res.success) {
-        success('Contact Saved', `Successfully registered ${formData.name}.`);
-        setIsModalOpen(false);
-        loadData();
+      if (editingContact) {
+        const res = await ContactService.updateContact(editingContact.id, payload);
+        if (res.success && res.data) {
+          setContacts((prev) => prev.map((c) => (c.id === editingContact.id ? res.data! : c)));
+          success('Contact Updated', `${payload.name} details saved.`);
+          setIsModalOpen(false);
+        } else {
+          error('Update Failed', res.error || 'Could not update contact');
+        }
       } else {
-        error('Save Failed', res.error || 'Could not save contact.');
+        const res = await ContactService.createContact(payload);
+        if (res.success && res.data) {
+          setContacts((prev) => [res.data!, ...prev]);
+          success('Contact Created', `${payload.name} added to directory.`);
+          setIsModalOpen(false);
+        } else {
+          error('Creation Failed', res.error || 'Could not create contact');
+        }
       }
     } catch (err: any) {
       error('Error', err.message);
@@ -193,21 +290,34 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
     }
   };
 
+  const departmentOptions: ComboboxOption[] = [
+    { value: 'all', label: 'All Departments' },
+    ...DEPARTMENT_OPTIONS.map((d) => ({ value: d, label: d })),
+  ];
+
+  const companyOptions: ComboboxOption[] = useMemo(() => {
+    return [
+      { value: 'all', label: 'All Companies' },
+      ...companies.map((c) => ({ value: c.id, label: c.name })),
+    ];
+  }, [companies]);
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto text-left">
+    <div className="space-y-4 max-w-7xl mx-auto text-left">
       {/* 1. Header with Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+          <span className="text-xs font-semibold text-primary uppercase tracking-wider">CRM / Contacts</span>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5 mt-0.5">
             <Users className="w-6 h-6 text-primary" />
             <span>Contacts & Key Stakeholders</span>
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Enterprise decision-makers, industrial supply chain leads, and warehouse operational heads across Gujarat & Western India.
+          <p className="text-xs text-muted-foreground mt-1">
+            Enterprise decision-makers, supply chain leads, and warehouse operational heads across Gujarat.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button onClick={handleOpenAdd} className="gap-2 shadow-sm font-medium">
+        <div className="flex items-center gap-2">
+          <Button onClick={handleOpenAdd} size="sm" className="gap-1.5 shadow-sm font-semibold">
             <Plus className="w-4 h-4" />
             <span>Add Contact</span>
           </Button>
@@ -215,167 +325,297 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
       </div>
 
       {/* 2. Top Summary Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="p-4 bg-white border border-border/80 shadow-xs">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="p-3.5 bg-surface border border-border shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Contacts</span>
-            <span className="p-2 rounded-lg bg-orange-50 text-primary">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total Contacts</span>
+            <span className="p-1.5 rounded-lg bg-orange-50 dark:bg-orange-950/50 text-primary">
               <Users className="w-4 h-4" />
             </span>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
+          <div className="mt-1.5 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-foreground">{totalContacts}</span>
             <span className="text-xs text-muted-foreground">in database</span>
           </div>
         </Card>
 
-        <Card className="p-4 bg-white border border-border/80 shadow-xs">
+        <Card className="p-3.5 bg-surface border border-border shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Decision Makers</span>
-            <span className="p-2 rounded-lg bg-blue-50 text-blue-600">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Decision Makers</span>
+            <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600">
               <ShieldCheck className="w-4 h-4" />
             </span>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
+          <div className="mt-1.5 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-foreground">{decisionMakers}</span>
-            <span className="text-xs text-muted-foreground">C-Level / VP / Directors</span>
+            <span className="text-xs text-muted-foreground">C-Level / VP / Heads</span>
           </div>
         </Card>
 
-        <Card className="p-4 bg-white border border-border/80 shadow-xs">
+        <Card className="p-3.5 bg-surface border border-border shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Primary Liaisons</span>
-            <span className="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Primary Liaisons</span>
+            <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600">
               <Star className="w-4 h-4" />
             </span>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
+          <div className="mt-1.5 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-foreground">{primaryContacts}</span>
             <span className="text-xs text-muted-foreground">Account heads</span>
           </div>
         </Card>
 
-        <Card className="p-4 bg-white border border-border/80 shadow-xs">
+        <Card className="p-3.5 bg-surface border border-border shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Companies Connected</span>
-            <span className="p-2 rounded-lg bg-purple-50 text-purple-600">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Companies Connected</span>
+            <span className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600">
               <Building2 className="w-4 h-4" />
             </span>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-foreground">{companiesCount}</span>
-            <span className="text-xs text-muted-foreground">industrial firms</span>
+          <div className="mt-1.5 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-foreground">{uniqueCompaniesCount}</span>
+            <span className="text-xs text-muted-foreground">organizations</span>
           </div>
         </Card>
       </div>
 
-      {/* 3. Search & Advanced Filter Bar */}
-      <Card className="p-4 bg-white border border-border/80 shadow-xs">
-        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search by contact name, designation, company, phone or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50/50 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="px-3 py-2 bg-slate-50/50 border border-border rounded-lg text-xs font-medium text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="all">All Departments</option>
-              <option value="Supply Chain">Supply Chain</option>
-              <option value="Logistics & Warehousing">Logistics & Warehousing</option>
-              <option value="Real Estate & Infrastructure">Real Estate & Infrastructure</option>
-              <option value="Executive Leadership">Executive Leadership</option>
-              <option value="Plant Operations">Plant Operations</option>
-              <option value="Procurement">Procurement</option>
-            </select>
-
-            <select
-              value={selectedCompanyId}
-              onChange={(e) => setSelectedCompanyId(e.target.value)}
-              className="px-3 py-2 bg-slate-50/50 border border-border rounded-lg text-xs font-medium text-foreground focus:outline-none focus:border-primary max-w-[180px] truncate"
-            >
-              <option value="all">All Companies</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-
+      {/* 3. Sleek Search & Control Toolbar matching reference */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+        {/* Left: Search Bar */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5" />
+          <input
+            type="text"
+            placeholder="Search by contact name, designation, company, phone or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors"
+          />
+          {search && (
             <button
               type="button"
-              onClick={() => setPrimaryOnly((prev) => !prev)}
-              className={`px-3 py-2 border rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                primaryOnly
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-slate-50 text-slate-700 border-border hover:bg-slate-100'
-              }`}
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-2.5 text-foreground-muted hover:text-foreground p-0.5 rounded-full"
+              title="Clear search"
             >
-              <Star className="w-3.5 h-3.5" />
-              <span>Primary Only</span>
+              <X className="w-3.5 h-3.5" />
             </button>
-          </div>
+          )}
         </div>
-      </Card>
 
-      {/* 4. Table / Data View */}
-      <Card className="bg-white border border-border/80 shadow-xs overflow-hidden">
-        {loading ? (
-          <div className="py-24 flex flex-col items-center justify-center space-y-3">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            <p className="text-sm font-medium text-muted-foreground">Loading stakeholder directory...</p>
-          </div>
-        ) : filteredContacts.length === 0 ? (
-          <div className="py-20 text-center space-y-3">
-            <div className="w-12 h-12 rounded-full bg-slate-100 text-muted-foreground flex items-center justify-center mx-auto">
-              <Users className="w-6 h-6" />
+        {/* Right: Controls & View Switcher */}
+        <TooltipProvider delayDuration={150}>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {/* Filter Drawer Trigger Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={openFilterDrawer}
+                  className={cn(
+                    "relative size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs",
+                    activeFiltersCount > 0 && "text-fairway-600 border-fairway-400 bg-fairway-50 dark:bg-fairway-950/40"
+                  )}
+                >
+                  <Filter className="w-4 h-4" />
+                  {activeFiltersCount > 0 && (
+                    <span className="absolute -top-1 -right-1 size-4 rounded-full bg-fairway-600 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
+                      {activeFiltersCount}
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                Filter
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Column Settings Dropdown */}
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Column
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
+                <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
+                  Toggle Columns
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={columns.contact}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, contact: !!val }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Contact Person
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columns.company}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, company: !!val }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Company
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columns.department}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, department: !!val }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Department
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columns.phone}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, phone: !!val }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Phone Number
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columns.email}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, email: !!val }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Email Address
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={columns.actions}
+                  onSelect={(e) => e.preventDefault()}
+                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, actions: !!val }))}
+                  className="text-xs cursor-pointer"
+                >
+                  Actions
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Refresh Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => loadData(true)}
+                  disabled={isRefreshing || loading}
+                  className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-70"
+                >
+                  <RefreshCw
+                    className={cn(
+                      "w-4 h-4 transition-transform duration-700",
+                      (isRefreshing || loading) && "animate-spin text-fairway-600"
+                    )}
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                Refresh
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Segmented View Switcher */}
+            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={cn(
+                      "w-9 h-full flex items-center justify-center transition-all cursor-pointer",
+                      viewMode === 'table'
+                        ? "bg-fairway-600 text-white font-bold"
+                        : "text-foreground hover:text-foreground hover:bg-surface-muted/60"
+                    )}
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  List
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grid')}
+                    className={cn(
+                      "w-9 h-full flex items-center justify-center transition-all cursor-pointer",
+                      viewMode === 'grid'
+                        ? "bg-fairway-600 text-white font-bold"
+                        : "text-foreground hover:text-foreground hover:bg-surface-muted/60"
+                    )}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Card
+                </TooltipContent>
+              </Tooltip>
             </div>
-            <h3 className="text-base font-semibold text-foreground">No contacts found</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              {search || selectedDepartment !== 'all' || selectedCompanyId !== 'all'
-                ? 'Try adjusting your search criteria or clear active filters.'
-                : 'Get started by adding your first enterprise contact stakeholder.'}
-            </p>
-            <Button size="sm" onClick={handleOpenAdd} className="mt-2 gap-1.5">
-              <Plus className="w-4 h-4" />
-              <span>Add First Contact</span>
-            </Button>
           </div>
-        ) : (
+        </TooltipProvider>
+      </div>
+
+      {/* 4. Content Area */}
+      {loading ? (
+        <div className="py-24 flex flex-col items-center justify-center space-y-3 bg-surface border border-border rounded-card">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm font-medium text-muted-foreground">Loading stakeholder directory...</p>
+        </div>
+      ) : filteredContacts.length === 0 ? (
+        <div className="py-16 text-center space-y-3 bg-surface border border-border rounded-card p-6 shadow-subtle">
+          <div className="w-12 h-12 rounded-full bg-slate-100 text-muted-foreground flex items-center justify-center mx-auto">
+            <Users className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-semibold text-foreground">No contacts found</h3>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            {search || activeFiltersCount > 0
+              ? 'Try adjusting your search criteria or clear active filters.'
+              : 'Get started by adding your first enterprise contact stakeholder.'}
+          </p>
+          {(search || activeFiltersCount > 0) && (
+            <Button size="sm" variant="outline" onClick={resetFilters} leftIcon={<RotateCcw className="w-3.5 h-3.5" />}>
+              Reset Filters
+            </Button>
+          )}
+        </div>
+      ) : viewMode === 'table' ? (
+        /* View 1: Table List */
+        <Card className="bg-surface border border-border shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <th className="py-3 px-4">Contact Person</th>
-                  <th className="py-3 px-4">Company</th>
-                  <th className="py-3 px-4">Department & Role</th>
-                  <th className="py-3 px-4">Phone Number</th>
-                  <th className="py-3 px-4">Email Address</th>
-                  <th className="py-3 px-4 text-center">Status</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                <tr className="bg-surface-muted/60 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {columns.contact && <th className="py-3 px-4">Contact Person</th>}
+                  {columns.company && <th className="py-3 px-4">Company</th>}
+                  {columns.department && <th className="py-3 px-4">Department & Role</th>}
+                  {columns.phone && <th className="py-3 px-4">Phone Number</th>}
+                  {columns.email && <th className="py-3 px-4">Email Address</th>}
+                  {columns.actions && <th className="py-3 px-4 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredContacts.map((c) => {
-                  const isDecisionMaker = ['VP', 'Director', 'Head', 'CEO', 'COO', 'Chief', 'General Manager'].some(
-                    (role) => c.designation?.toLowerCase().includes(role.toLowerCase())
-                  );
-
-                  return (
-                    <tr key={c.id} className="hover:bg-slate-50/60 transition-colors group">
-                      {/* Name & Primary badge */}
+                {filteredContacts.map((c) => (
+                  <tr key={c.id} className="hover:bg-surface-muted/50 transition-colors group">
+                    {columns.contact && (
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-orange-100 text-orange-800 font-bold flex items-center justify-center text-xs shrink-0">
+                          <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-950/70 text-orange-800 dark:text-orange-300 font-bold flex items-center justify-center text-xs shrink-0">
                             {c.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
@@ -391,13 +631,14 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
                           </div>
                         </div>
                       </td>
+                    )}
 
-                      {/* Company */}
+                    {columns.company && (
                       <td className="py-3.5 px-4">
                         {c.companyId ? (
                           <button
                             onClick={() => onSelectCompany && onSelectCompany(c.companyId)}
-                            className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5 text-left"
+                            className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5 text-left cursor-pointer"
                           >
                             <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                             <span className="truncate max-w-[200px]">{c.companyName || 'Enterprise Account'}</span>
@@ -406,21 +647,20 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
                           <span className="text-muted-foreground text-xs">Unassigned</span>
                         )}
                       </td>
+                    )}
 
-                      {/* Department */}
+                    {columns.department && (
                       <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-foreground border border-border">
                           {c.department || 'Supply Chain'}
                         </span>
                       </td>
+                    )}
 
-                      {/* Phone */}
+                    {columns.phone && (
                       <td className="py-3.5 px-4">
                         {c.phone ? (
-                          <a
-                            href={`tel:${c.phone}`}
-                            className="text-foreground hover:text-primary font-mono text-xs flex items-center gap-1.5"
-                          >
+                          <a href={`tel:${c.phone}`} className="text-foreground hover:text-primary font-mono text-xs flex items-center gap-1.5">
                             <Phone className="w-3 h-3 text-muted-foreground" />
                             <span>{c.phone}</span>
                           </a>
@@ -428,14 +668,12 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </td>
+                    )}
 
-                      {/* Email */}
+                    {columns.email && (
                       <td className="py-3.5 px-4">
                         {c.email ? (
-                          <a
-                            href={`mailto:${c.email}`}
-                            className="text-foreground hover:text-primary text-xs flex items-center gap-1.5 truncate max-w-[190px]"
-                          >
+                          <a href={`mailto:${c.email}`} className="text-foreground hover:text-primary text-xs flex items-center gap-1.5 truncate max-w-[190px]">
                             <Mail className="w-3 h-3 text-muted-foreground shrink-0" />
                             <span className="truncate">{c.email}</span>
                           </a>
@@ -443,83 +681,201 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
                           <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </td>
+                    )}
 
-                      {/* Decision Maker badge */}
-                      <td className="py-3.5 px-4 text-center">
-                        {isDecisionMaker ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                            <ShieldCheck className="w-3 h-3" />
-                            <span>Key Decider</span>
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Coordinator</span>
-                        )}
-                      </td>
-
-                      {/* Actions */}
+                    {columns.actions && (
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenEdit(c)}
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button size="xs" variant="ghost" onClick={() => handleOpenEdit(c)} title="Edit Contact" className="h-7 w-7 p-0">
+                            <Edit2 className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(c.id, c.name)}
-                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          >
+                          <Button size="xs" variant="ghost" onClick={() => handleDelete(c.id, c.name)} title="Delete Contact" className="h-7 w-7 p-0 hover:text-destructive">
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       </td>
-                    </tr>
-                  );
-                })}
+                    )}
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-        )}
-      </Card>
+        </Card>
+      ) : (
+        /* View 2: Cards Grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredContacts.map((c) => (
+            <div
+              key={c.id}
+              className="bg-surface rounded-card border border-border p-4 shadow-subtle hover:border-fairway-500/60 hover:shadow-md transition-all flex flex-col justify-between gap-3 text-left"
+            >
+              <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-950/70 text-orange-800 dark:text-orange-300 font-bold flex items-center justify-center text-sm shrink-0">
+                    {c.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="font-bold text-foreground flex items-center gap-1.5">
+                      <span>{c.name}</span>
+                      {c.isPrimary && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                          PRIMARY
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{c.designation || 'Operational Liaison'}</p>
+                  </div>
+                </div>
 
-      {/* 5. Add / Edit Contact Modal */}
+                <div className="flex items-center gap-1">
+                  <Button size="xs" variant="ghost" onClick={() => handleOpenEdit(c)} className="h-7 w-7 p-0">
+                    <Edit2 className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                  </Button>
+                  <Button size="xs" variant="ghost" onClick={() => handleDelete(c.id, c.name)} className="h-7 w-7 p-0 hover:text-destructive">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2 flex-1 text-xs">
+                {c.companyName && (
+                  <div
+                    onClick={() => c.companyId && onSelectCompany && onSelectCompany(c.companyId)}
+                    className="font-semibold text-foreground hover:underline cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>{c.companyName}</span>
+                  </div>
+                )}
+
+                <div className="inline-block">
+                  <span className="bg-surface-muted px-2 py-0.5 rounded border border-border text-[11px] text-muted-foreground">
+                    {c.department || 'Supply Chain'}
+                  </span>
+                </div>
+
+                <div className="pt-2 border-t border-border/60 space-y-1 text-muted-foreground">
+                  {c.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3 h-3 text-muted-foreground" />
+                      <a href={`tel:${c.phone}`} className="hover:text-primary font-mono">{c.phone}</a>
+                    </div>
+                  )}
+                  {c.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3 h-3 text-muted-foreground" />
+                      <a href={`mailto:${c.email}`} className="hover:text-primary truncate">{c.email}</a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Advanced Filters Drawer (Right Slide-out) */}
+      {isFilterDrawerOpen && (
+        <div className="fixed inset-0 z-[99999] flex justify-end animate-fade-in select-none overflow-hidden m-0 p-0">
+          <div
+            className="fixed inset-0 w-full h-full bg-black/60 backdrop-blur-xs transition-opacity"
+            onClick={() => setIsFilterDrawerOpen(false)}
+          />
+          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none text-left">
+            <div className="p-5 border-b border-border bg-surface flex items-start justify-between">
+              <div>
+                <h2 className="text-base font-bold text-foreground tracking-tight flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-fairway-600" />
+                  <span>Contact Filters</span>
+                </h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Filter stakeholders by department and company
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterDrawerOpen(false)}
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground block">Department</label>
+                <Combobox
+                  options={departmentOptions}
+                  value={draftDepartment}
+                  onChange={setDraftDepartment}
+                  placeholder="Select department..."
+                  searchPlaceholder="Search department..."
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground block">Connected Company</label>
+                <Combobox
+                  options={companyOptions}
+                  value={draftCompanyId}
+                  onChange={setDraftCompanyId}
+                  placeholder="Select company..."
+                  searchPlaceholder="Search company..."
+                />
+              </div>
+
+              <div className="pt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={draftPrimaryOnly}
+                    onChange={(e) => setDraftPrimaryOnly(e.target.checked)}
+                    className="w-4 h-4 text-fairway-600 rounded border-border"
+                  />
+                  <span>Primary Liaisons Only</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border bg-surface flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="flex-1 py-2.5 px-4 rounded-button border text-xs font-bold transition-all text-center bg-surface hover:bg-surface-muted border-border text-foreground cursor-pointer shadow-2xs"
+              >
+                Reset All
+              </button>
+              <button
+                type="button"
+                onClick={applyFilters}
+                className="flex-1 py-2.5 px-4 rounded-button bg-fairway-600 hover:bg-fairway-700 text-white text-xs font-bold transition-all text-center shadow-xs cursor-pointer"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit Contact Modal with Combobox */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingContact ? 'Edit Key Contact' : 'Register New Stakeholder'}
-        description="Add operational supply chain heads, decision-makers, and facility coordinators."
+        title={editingContact ? 'Edit Key Stakeholder' : 'Register New Stakeholder'}
       >
-        <form onSubmit={handleSaveContact} className="space-y-4 text-left">
-          <div>
-            <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
+        <form onSubmit={handleSubmit} className="space-y-4 text-left">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-foreground uppercase tracking-wider">
               Associated Company *
             </label>
-            <select
+            <Combobox
+              options={companies.map((c) => ({ value: c.id, label: c.name }))}
               value={formData.companyId}
-              onChange={(e) => {
-                const comp = companies.find((c) => c.id === e.target.value);
-                setFormData({
-                  ...formData,
-                  companyId: e.target.value,
-                  companyName: comp?.name || '',
-                });
-              }}
-              required
-              className="w-full px-3 py-2 bg-white border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="" disabled>
-                Select Company Account
-              </option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.city || 'Gujarat'})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setFormData({ ...formData, companyId: val })}
+              placeholder="Select company..."
+              searchPlaceholder="Search company..."
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -547,22 +903,16 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-foreground uppercase tracking-wider">
                 Department
               </label>
-              <select
+              <Combobox
+                options={DEPARTMENT_OPTIONS.map((d) => ({ value: d, label: d }))}
                 value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
-              >
-                <option value="Supply Chain">Supply Chain</option>
-                <option value="Logistics & Warehousing">Logistics & Warehousing</option>
-                <option value="Real Estate & Infrastructure">Real Estate & Infrastructure</option>
-                <option value="Executive Leadership">Executive Leadership</option>
-                <option value="Plant Operations">Plant Operations</option>
-                <option value="Procurement">Procurement</option>
-              </select>
+                onChange={(val) => setFormData({ ...formData, department: val })}
+                placeholder="Select department..."
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
@@ -606,7 +956,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
                 type="checkbox"
                 checked={formData.isPrimary}
                 onChange={(e) => setFormData({ ...formData, isPrimary: e.target.checked })}
-                className="w-4 h-4 text-primary rounded border-border focus:ring-primary"
+                className="w-4 h-4 text-primary rounded border-border focus:ring-primary cursor-pointer"
               />
               <span>Designate as Primary Company Account Stakeholder</span>
             </label>
@@ -618,19 +968,18 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
             </label>
             <Textarea
               rows={2}
-              placeholder="Prefers WhatsApp updates, structural decisions require board signoff..."
+              placeholder="e.g. Primary decision maker for logistics warehousing across Western India..."
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
-            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+          <div className="flex justify-end gap-3 pt-3 border-t border-border">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={formSubmitting} className="gap-2">
-              {formSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-              <span>{editingContact ? 'Update Contact' : 'Save Contact'}</span>
+            <Button type="submit" size="sm" disabled={formSubmitting}>
+              {formSubmitting ? 'Saving...' : editingContact ? 'Save Changes' : 'Register Stakeholder'}
             </Button>
           </div>
         </form>

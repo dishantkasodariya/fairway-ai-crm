@@ -8,11 +8,29 @@ const startServer = async () => {
   // Initialize PostgreSQL schema and seed data
   await initDatabase();
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`📡 Health endpoint: http://localhost:${PORT}/api/health`);
     console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth/login & /register`);
   });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`⚠️ Port ${PORT} is already in use. Please terminate the conflicting process or change PORT in .env.`);
+      process.exit(1);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+
+  const shutdown = () => {
+    server.close(() => {
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 };
 
 startServer().catch((err) => {

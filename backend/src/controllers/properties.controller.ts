@@ -88,12 +88,12 @@ export const getProperties = async (req: Request, res: Response): Promise<void> 
 
     if (corridor && corridor !== 'all') {
       params.push(corridor);
-      sql += ` AND corridor = $${params.length}`;
+      sql += ` AND corridor ILIKE $${params.length}`;
     }
 
     if (status && status !== 'all') {
       params.push(status);
-      sql += ` AND status = $${params.length}`;
+      sql += ` AND UPPER(status) = UPPER($${params.length})`;
     }
 
     if (minArea) {
@@ -130,8 +130,9 @@ export const getProperties = async (req: Request, res: Response): Promise<void> 
 export const getCorridors = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await query(`
-      SELECT corridor, COUNT(*) as count, SUM(available_area_sq_ft) as total_available_sq_ft
+      SELECT corridor, COUNT(*)::int as count
       FROM properties
+      WHERE corridor IS NOT NULL AND corridor != ''
       GROUP BY corridor
       ORDER BY count DESC;
     `);
@@ -149,7 +150,7 @@ export const getCorridors = async (req: Request, res: Response): Promise<void> =
 export const getPropertyById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const result = await query('SELECT * FROM properties WHERE id = $1;', [id]);
+    const result = await query('SELECT * FROM properties WHERE id = $1 OR code = $1;', [id]);
 
     if (result.rows.length === 0) {
       res.status(404).json({ success: false, error: 'Property not found.' });

@@ -224,6 +224,30 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         : [],
     })
   );
+
+  // Adaptive column pinning: On mobile screens (<768px), pin only 'actions' so it doesn't freeze the whole viewport
+  const [isMobileScreen, setIsMobileScreen] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileScreen(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const effectiveColumnPinning = useMemo<ColumnPinningMap>(() => {
+    if (isMobileScreen) {
+      return {
+        start: columnPinning.start?.filter((c) => c === 'actions') || [],
+        end: columnPinning.end || [],
+      };
+    }
+    return columnPinning;
+  }, [columnPinning, isMobileScreen]);
+
   const [columnOrder, setColumnOrder] = useState<string[]>(() => initialTableState.columnOrder || []);
   const [columnSizing, setColumnSizing] = useState<Record<string, number>>(() => initialTableState.columnSizing || {});
 
@@ -637,7 +661,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       pagination,
       sorting,
       columnVisibility,
-      columnPinning,
+      columnPinning: effectiveColumnPinning,
       columnOrder,
       columnSizing,
     },
@@ -733,10 +757,10 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
   return (
     <div className="space-y-4 w-full text-left">
       {/* Header Pattern with Actions & Full Width */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-2.5 sm:pb-3 border-b border-border">
         <div>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <Building2 className="w-6 h-6 text-fairway-600" />
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
+            <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-fairway-600 shrink-0" />
             <span>Companies Master</span>
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
@@ -745,17 +769,24 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         </div>
 
         {/* Action Toolbar */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             size="sm"
             variant="outline"
             onClick={exportCSV}
             disabled={isExporting}
             leftIcon={isExporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            className="flex-1 sm:flex-initial text-xs px-2.5 sm:px-3 justify-center"
           >
             {isExporting ? 'Exporting...' : 'Export CSV'}
           </Button>
-          <Button size="sm" variant="outline" onClick={onOpenImport} leftIcon={<UploadCloud className="w-3.5 h-3.5" />}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onOpenImport}
+            leftIcon={<UploadCloud className="w-3.5 h-3.5" />}
+            className="flex-1 sm:flex-initial text-xs px-2.5 sm:px-3 justify-center"
+          >
             Import
           </Button>
           {canEdit && (
@@ -767,6 +798,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                 setPageMode('form');
               }}
               leftIcon={<Plus className="w-4 h-4" />}
+              className="flex-1 sm:flex-initial text-xs px-2.5 sm:px-3 justify-center whitespace-nowrap"
             >
               Add Company
             </Button>
@@ -775,14 +807,14 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       </div>
 
       {/* Modern KPI Cards with Glowing Sparkline Waves */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {/* Card 1: Total Corporate Accounts */}
-        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-fairway-400/60 relative overflow-hidden group">
+        <div className="bg-surface border border-border p-3.5 sm:p-5 rounded-xl sm:rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-fairway-400/60 relative overflow-hidden group">
           <div>
-            <span className="text-sm font-bold text-foreground tracking-tight block">
+            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight block">
               Total Corporate Accounts
             </span>
-            <span className="text-xs text-foreground-muted mt-4 block font-medium">
+            <span className="text-xs text-foreground-muted mt-3 sm:mt-4 block font-medium">
               Registered Clients
             </span>
             <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
@@ -791,7 +823,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           </div>
 
           <div className="shrink-0 pb-1">
-            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
+            <svg className="w-20 sm:w-28 md:w-32 lg:w-36 h-10 sm:h-12 overflow-visible" viewBox="0 0 120 40">
               <defs>
                 <linearGradient id="compWave1" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.35" />
@@ -814,12 +846,12 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         </div>
 
         {/* Card 2: Linked Facility Nodes */}
-        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-accent-400/60 relative overflow-hidden group">
+        <div className="bg-surface border border-border p-3.5 sm:p-5 rounded-xl sm:rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-accent-400/60 relative overflow-hidden group">
           <div>
-            <span className="text-sm font-bold text-foreground tracking-tight block">
+            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight block">
               Linked Facility Nodes
             </span>
-            <span className="text-xs text-foreground-muted mt-4 block font-medium">
+            <span className="text-xs text-foreground-muted mt-3 sm:mt-4 block font-medium">
               Industrial Sites Mapped
             </span>
             <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
@@ -828,7 +860,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           </div>
 
           <div className="shrink-0 pb-1">
-            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
+            <svg className="w-20 sm:w-28 md:w-32 lg:w-36 h-10 sm:h-12 overflow-visible" viewBox="0 0 120 40">
               <defs>
                 <linearGradient id="compWave2" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--accent-500, #10B981)" stopOpacity="0.35" />
@@ -850,13 +882,13 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           </div>
         </div>
 
-        {/* Card 3: Active Opportunities */}
-        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-indigo-400/60 relative overflow-hidden group">
+        {/* Card 3: Active Opportunities (spans 2 columns on tablet so grid is nicely balanced) */}
+        <div className="bg-surface border border-border p-3.5 sm:p-5 rounded-xl sm:rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-indigo-400/60 relative overflow-hidden group sm:col-span-2 lg:col-span-1">
           <div>
-            <span className="text-sm font-bold text-foreground tracking-tight block">
+            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight block">
               Active Opportunities
             </span>
-            <span className="text-xs text-foreground-muted mt-4 block font-medium">
+            <span className="text-xs text-foreground-muted mt-3 sm:mt-4 block font-medium">
               Ongoing Inquiries
             </span>
             <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
@@ -865,7 +897,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           </div>
 
           <div className="shrink-0 pb-1">
-            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
+            <svg className="w-20 sm:w-28 md:w-32 lg:w-36 h-10 sm:h-12 overflow-visible" viewBox="0 0 120 40">
               <defs>
                 <linearGradient id="compWave3" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--chart-5, #8B5CF6)" stopOpacity="0.35" />
@@ -889,9 +921,9 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       </div>
 
       {/* Control Bar: Search, Filters, Refresh, Customizer & View Switcher */}
-      <div className="bg-surface border border-border p-3 rounded-2xl shadow-xs flex flex-wrap items-center justify-between gap-3">
-        {/* Left Side: Search Box */}
-        <div className="relative flex-1 min-w-[220px] max-w-md">
+      <div className="bg-surface border border-border p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+        {/* Search Box */}
+        <div className="relative w-full sm:flex-1 sm:min-w-[200px] sm:max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none" />
           <input
             type="text"
@@ -913,13 +945,13 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
 
         {/* Right Side: Tool Buttons & View Toggle */}
         <TooltipProvider delayDuration={200}>
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-0.5 sm:pb-0 scrollbar-none">
             {/* Filter Drawer Trigger Button */}
             <button
               type="button"
               onClick={openFilterDrawer}
               className={cn(
-                "h-9 px-3.5 rounded-button border text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-2xs shrink-0",
+                "h-9 px-3 rounded-button border text-xs font-semibold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer shadow-2xs shrink-0",
                 activeFiltersCount > 0
                   ? "bg-fairway-50 text-fairway-700 border-fairway-300 dark:bg-fairway-950/60 dark:text-fairway-300 dark:border-fairway-700"
                   : "bg-white dark:bg-[#11161d] text-foreground border-border hover:bg-surface-muted"
@@ -1014,8 +1046,8 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
               </DropdownMenu>
             )}
 
-            {/* Segmented View Switcher (List / Card View matching exact reference UI) */}
-            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+            {/* Segmented View Switcher (List / Card View) */}
+            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -1081,6 +1113,11 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
               />
             ) : (
               <Card className="p-0 border border-border bg-surface shadow-xs rounded-xl overflow-hidden">
+                {/* Mobile horizontal scroll helper */}
+                <div className="sm:hidden px-3 py-1.5 bg-surface-muted/40 border-b border-border/80 flex items-center justify-between text-[11px] text-foreground-muted font-medium">
+                  <span>Swipe to view all columns</span>
+                  <span className="text-fairway-600 font-semibold">Scroll &rarr;</span>
+                </div>
                 <DataGridContainer className="w-full">
                   <DataGridScrollArea className="w-full max-h-[calc(100vh-280px)] overflow-auto" orientation="both">
                     <DataGridTable />
@@ -1100,7 +1137,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         >
           <div className="space-y-4">
             {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                 {Array.from({ length: Math.min(pagination.pageSize, 6) }).map((_, i) => (
                   <CompanyCardSkeleton key={i} mode="grid" />
                 ))}
@@ -1112,7 +1149,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                 onNewCompany={onOpenNewCompany}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                 {pagedCompanies.map((comp) => (
                   <CompanyCard
                     key={comp.id}
@@ -1197,7 +1234,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           />
 
           {/* Drawer Container */}
-          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0">
+          <div className="relative w-full max-w-[88vw] sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0">
             {/* Header */}
             <div className="p-5 border-b border-border bg-surface flex items-start justify-between border-t-0">
               <div>

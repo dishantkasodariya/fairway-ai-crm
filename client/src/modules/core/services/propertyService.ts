@@ -1,9 +1,9 @@
 import { Property } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { api, ApiResponse } from './api';
 
 export class PropertyService {
   /**
-   * Fetch all properties with optional filters
+   * Fetch all properties from backend GET /api/properties
    */
   static async getProperties(filters?: {
     corridor?: string;
@@ -11,113 +11,61 @@ export class PropertyService {
     search?: string;
     minArea?: number;
     maxRent?: number;
-  }): Promise<{ success: boolean; data: Property[]; error?: string }> {
-    try {
-      const params = new URLSearchParams();
-      if (filters?.corridor && filters.corridor !== 'all') {
-        params.append('corridor', filters.corridor);
-      }
-      if (filters?.status && filters.status !== 'all') {
-        params.append('status', filters.status);
-      }
-      if (filters?.search) {
-        params.append('search', filters.search);
-      }
-      if (filters?.minArea) {
-        params.append('minArea', filters.minArea.toString());
-      }
-      if (filters?.maxRent) {
-        params.append('maxRent', filters.maxRent.toString());
-      }
-
-      const queryString = params.toString() ? `?${params.toString()}` : '';
-      const res = await fetch(`${API_BASE_URL}/properties${queryString}`);
-      const json = await res.json();
-      return json;
-    } catch (err: any) {
-      console.warn('PropertyService.getProperties failed:', err);
-      return { success: false, data: [], error: err.message || 'Network error' };
+  }): Promise<ApiResponse<Property[]>> {
+    const params = new URLSearchParams();
+    if (filters?.corridor && filters.corridor !== 'all') {
+      params.append('corridor', filters.corridor);
     }
+    if (filters?.status && filters.status !== 'all') {
+      params.append('status', filters.status);
+    }
+    if (filters?.search) {
+      params.append('search', filters.search);
+    }
+    if (filters?.minArea) {
+      params.append('minArea', filters.minArea.toString());
+    }
+    if (filters?.maxRent) {
+      params.append('maxRent', filters.maxRent.toString());
+    }
+
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    return api.get<Property[]>(`/properties${queryString}`);
   }
 
   /**
    * Fetch unique corridors with counts
    */
-  static async getCorridors(): Promise<{ success: boolean; data?: any[]; error?: string }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/properties/corridors`);
-      const json = await res.json();
-      return json;
-    } catch (err: any) {
-      console.warn('PropertyService.getCorridors failed:', err);
-      return { success: false, error: err.message || 'Network error' };
-    }
+  static async getCorridors(): Promise<ApiResponse<any[]>> {
+    return api.get<any[]>('/properties/corridors');
   }
 
   /**
-   * Fetch single property by ID
+   * Fetch single property by ID or Code from backend GET /api/properties/:id
    */
-  static async getPropertyById(id: string): Promise<{ success: boolean; data?: Property; error?: string }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/properties/${id}`);
-      const json = await res.json();
-      return json;
-    } catch (err: any) {
-      console.warn(`PropertyService.getPropertyById(${id}) failed:`, err);
-      return { success: false, error: err.message || 'Network error' };
-    }
+  static async getPropertyById(id: string): Promise<ApiResponse<Property>> {
+    return api.get<Property>(`/properties/${id}`);
   }
 
   /**
-   * Create a new property
+   * Create a new property via backend POST /api/properties
    */
-  static async createProperty(propertyData: Partial<Property>): Promise<{ success: boolean; data?: Property; error?: string }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/properties`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(propertyData),
-      });
-      const json = await res.json();
-      return json;
-    } catch (err: any) {
-      console.warn('PropertyService.createProperty failed:', err);
-      return { success: false, error: err.message || 'Network error' };
-    }
+  static async createProperty(propertyData: Partial<Property>): Promise<ApiResponse<Property>> {
+    return api.post<Property>('/properties', propertyData);
   }
 
   /**
-   * Update an existing property
+   * Update an existing property via backend PUT /api/properties/:id
    */
-  static async updateProperty(id: string, propertyData: Partial<Property>): Promise<{ success: boolean; data?: Property; error?: string }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/properties/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(propertyData),
-      });
-      const json = await res.json();
-      return json;
-    } catch (err: any) {
-      console.warn(`PropertyService.updateProperty(${id}) failed:`, err);
-      return { success: false, error: err.message || 'Network error' };
-    }
+  static async updateProperty(id: string, propertyData: Partial<Property>): Promise<ApiResponse<Property>> {
+    return api.put<Property>(`/properties/${id}`, propertyData);
   }
 
   /**
-   * Delete a property
+   * Delete a property via backend DELETE /api/properties/:id
    */
-  static async deleteProperty(id: string): Promise<{ success: boolean; message?: string; error?: string }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/properties/${id}`, {
-        method: 'DELETE',
-      });
-      const json = await res.json();
-      return json;
-    } catch (err: any) {
-      console.warn(`PropertyService.deleteProperty(${id}) failed:`, err);
-      return { success: false, error: err.message || 'Network error' };
-    }
+  static async deleteProperty(id: string): Promise<ApiResponse<any>> {
+    return api.delete(`/properties/${id}`);
   }
 }
 

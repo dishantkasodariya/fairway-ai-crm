@@ -26,13 +26,7 @@ import {
   ChartPieDonutActive,
   ChartBarStacked,
 } from '@/modules/core/components/ui';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/modules/core/components/ui/Select';
+import { Combobox } from '@/modules/core/components/ui/combobox-1';
 import { useToast } from '@/modules/core/providers/ToastContext';
 
 export const ReportsView: React.FC = () => {
@@ -129,34 +123,30 @@ export const ReportsView: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Owner Filter */}
-          <div className="w-48 sm:w-52">
-            <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-              <SelectTrigger className="h-8 text-xs bg-surface border border-border text-foreground rounded-lg">
-                <SelectValue placeholder="All Team Members" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Team Members</SelectItem>
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name} ({u.role})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="w-48 sm:w-56">
+            <Combobox
+              options={[
+                { value: 'all', label: 'All Team Members' },
+                ...users.map((u) => ({ value: u.id, label: `${u.name} (${u.role})` })),
+              ]}
+              value={ownerFilter}
+              onChange={(val) => setOwnerFilter(val || 'all')}
+              placeholder="All Team Members"
+            />
           </div>
 
           {/* Timeframe Filter */}
-          <div className="w-52 sm:w-56">
-            <Select value={dateRange} onValueChange={(val) => setDateRange(val as any)}>
-              <SelectTrigger className="h-8 text-xs bg-surface border border-border text-foreground rounded-lg">
-                <SelectValue placeholder="Q3 FY27 (Jul - Sep 2026)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="q3_2026">Q3 FY27 (Jul - Sep 2026)</SelectItem>
-                <SelectItem value="ytd">Year to Date (FY 2026-27)</SelectItem>
-                <SelectItem value="all_time">All Time Active Data</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="w-52 sm:w-60">
+            <Combobox
+              options={[
+                { value: 'q3_2026', label: 'Q3 FY27 (Jul - Sep 2026)' },
+                { value: 'ytd', label: 'Year to Date (FY 2026-27)' },
+                { value: 'all_time', label: 'All Time Active Data' },
+              ]}
+              value={dateRange}
+              onChange={(val) => setDateRange((val || 'q3_2026') as any)}
+              placeholder="Select Period"
+            />
           </div>
 
           {/* Export Button */}

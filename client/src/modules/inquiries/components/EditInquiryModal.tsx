@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { Button } from '@/modules/core/components/ui/Button';
-import { Input, Select, Textarea } from '@/modules/core/components/ui/Input';
+import { Input, Textarea } from '@/modules/core/components/ui/Input';
+import { Combobox } from '@/modules/core/components/ui/combobox-1';
+import { DatePicker } from '@/modules/core/components/ui/DatePicker';
 import { StorageService } from '@/modules/core/services/storageService';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
@@ -9,6 +11,7 @@ import { useToast } from '@/modules/core/providers/ToastContext';
 import { Inquiry, PriorityLevel, PipelineStageKey } from '@/modules/core/types';
 import { formatINR, formatSqFt, STAGE_CONFIGS } from '@/modules/core/utils/formatters';
 import { Edit3, CheckCircle2, AlertCircle } from 'lucide-react';
+import { cn } from '@/modules/core/lib/utils';
 
 export interface EditInquiryModalProps {
   isOpen: boolean;
@@ -54,6 +57,11 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
   const { users } = useAuth();
   const { success: toastSuccess, error: toastError } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const PHONE_REGEX = /^(?:\+91[\s-]?)?[6-9]\d{9}$/;
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const TEXT_ONLY_REGEX = /^[a-zA-Z\s.'-]{2,50}$/;
 
   const [formData, setFormData] = useState({
     companyName: '',
@@ -109,16 +117,48 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
     }));
   };
 
+  const validate = () => {
+    const errs: Record<string, string> = {};
+
+    if (!formData.companyName.trim()) {
+      errs.companyName = 'Company name is required';
+    } else if (formData.companyName.trim().length < 2) {
+      errs.companyName = 'Please enter a valid company name';
+    }
+
+    if (!formData.requiredAreaSqFt || formData.requiredAreaSqFt <= 0) {
+      errs.requiredAreaSqFt = 'Required area must be greater than 0 sq.ft';
+    }
+
+    if (formData.budgetMonthlyINR < 0) {
+      errs.budgetMonthlyINR = 'Budget cannot be negative';
+    }
+
+    if (formData.location && formData.location.trim() && !TEXT_ONLY_REGEX.test(formData.location.trim())) {
+      errs.location = 'Please enter a valid location/city (letters only)';
+    }
+
+    if (formData.contactPhone && formData.contactPhone.trim()) {
+      const cleanPhone = formData.contactPhone.replace(/[\s-]/g, '');
+      if (!PHONE_REGEX.test(cleanPhone)) {
+        errs.contactPhone = 'Please enter a valid 10-digit mobile number';
+      }
+    }
+
+    if (formData.contactEmail && formData.contactEmail.trim() && !EMAIL_REGEX.test(formData.contactEmail.trim())) {
+      errs.contactEmail = 'Please enter a valid email address';
+    }
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inquiry) return;
 
-    if (!formData.companyName.trim()) {
-      toastError('Validation Error', 'Company name is required.');
-      return;
-    }
-    if (formData.requiredAreaSqFt <= 0) {
-      toastError('Validation Error', 'Required area must be greater than 0.');
+    if (!validate()) {
+      toastError('Validation Error', 'Please check and correct the highlighted fields.');
       return;
     }
 
@@ -167,6 +207,33 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
     }
   };
 
+  const getStageDotColor = (stageKey: string) => {
+    switch (stageKey) {
+      case 'new':
+        return 'bg-slate-400';
+      case 'contacted':
+        return 'bg-sky-500';
+      case 'requirement_confirmed':
+        return 'bg-indigo-500';
+      case 'property_matched':
+        return 'bg-emerald-500';
+      case 'property_shared':
+        return 'bg-teal-500';
+      case 'proposal':
+        return 'bg-purple-500';
+      case 'site_visit':
+        return 'bg-orange-500';
+      case 'negotiation':
+        return 'bg-amber-500';
+      case 'won':
+        return 'bg-emerald-600';
+      case 'lost':
+        return 'bg-rose-500';
+      default:
+        return 'bg-fairway-500';
+    }
+  };
+
   if (!inquiry) return null;
 
   return (
@@ -175,15 +242,18 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
       onClose={onClose}
       maxWidth="2xl"
       title={
-        <div className="flex items-center gap-2 text-foreground">
-          <div className="w-8 h-8 rounded-lg bg-fairway-50 dark:bg-fairway-950/60 border border-fairway-200 dark:border-fairway-800 flex items-center justify-center text-fairway-700 dark:text-fairway-400">
+        <div className="flex items-center gap-3 text-foreground">
+          <div className="w-9 h-9 rounded-xl bg-fairway-50 dark:bg-fairway-950/60 border border-fairway-200 dark:border-fairway-800 flex items-center justify-center text-fairway-600 dark:text-fairway-400 shrink-0 shadow-2xs">
             <Edit3 className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-base font-bold leading-none">
-              Edit Inquiry <span className="text-fairway-600 dark:text-fairway-400 font-mono">{inquiry.inquiryNumber}</span>
-            </h3>
-            <p className="text-xs text-foreground-muted mt-1 font-normal">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-bold leading-tight">Edit Inquiry</h3>
+              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-fairway-100 dark:bg-fairway-900/60 text-fairway-800 dark:text-fairway-300 border border-fairway-200 dark:border-fairway-700/60 shadow-2xs">
+                {inquiry.inquiryNumber}
+              </span>
+            </div>
+            <p className="text-xs text-foreground-muted mt-0.5 font-normal">
               Update requirement parameters, corridor, budget, and assignment.
             </p>
           </div>
@@ -197,21 +267,27 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
             label="Customer Company"
             required
             value={formData.companyName}
-            onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, companyName: e.target.value });
+              if (errors.companyName) setErrors((prev) => ({ ...prev, companyName: '' }));
+            }}
             placeholder="e.g. Pareek - State head, PMG Group"
+            className="h-10 rounded-xl"
+            error={errors.companyName}
           />
 
-          <Select
-            label="Industry / Segment"
-            value={formData.industry}
-            onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
-          >
-            {INDUSTRY_OPTIONS.map((ind) => (
-              <option key={ind} value={ind}>
-                {ind}
-              </option>
-            ))}
-          </Select>
+          <div className="space-y-1.5 text-left">
+            <label className="text-xs font-semibold text-foreground block">
+              Industry / Segment
+            </label>
+            <Combobox
+              options={INDUSTRY_OPTIONS.map((ind) => ({ value: ind, label: ind }))}
+              value={formData.industry}
+              onChange={(val) => setFormData({ ...formData, industry: val })}
+              placeholder="Select industry sector..."
+              searchPlaceholder="Search industry..."
+            />
+          </div>
         </div>
 
         {/* Row 2: Requirement Notes */}
@@ -222,6 +298,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
             value={formData.requirement}
             onChange={(e) => setFormData({ ...formData, requirement: e.target.value })}
             placeholder="e.g. 60,000 sq.ft grade-A warehouse for FMCG storage with 6 docks..."
+            className="rounded-xl border-border resize-y"
           />
         </div>
 
@@ -234,9 +311,12 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
               min={1}
               required
               value={formData.requiredAreaSqFt || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, requiredAreaSqFt: parseFloat(e.target.value) || 0 })
-              }
+              onChange={(e) => {
+                setFormData({ ...formData, requiredAreaSqFt: parseFloat(e.target.value) || 0 });
+                if (errors.requiredAreaSqFt) setErrors((prev) => ({ ...prev, requiredAreaSqFt: '' }));
+              }}
+              className="h-10 rounded-xl"
+              error={errors.requiredAreaSqFt}
               helperText={
                 formData.requiredAreaSqFt > 0
                   ? `Formatted: ${formatSqFt(formData.requiredAreaSqFt)}`
@@ -251,9 +331,12 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
               type="number"
               min={0}
               value={formData.budgetMonthlyINR || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, budgetMonthlyINR: parseFloat(e.target.value) || 0 })
-              }
+              onChange={(e) => {
+                setFormData({ ...formData, budgetMonthlyINR: parseFloat(e.target.value) || 0 });
+                if (errors.budgetMonthlyINR) setErrors((prev) => ({ ...prev, budgetMonthlyINR: '' }));
+              }}
+              className="h-10 rounded-xl"
+              error={errors.budgetMonthlyINR}
               helperText={
                 formData.budgetMonthlyINR > 0
                   ? `Formatted: ${formatINR(formData.budgetMonthlyINR)} / mo`
@@ -268,96 +351,154 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
           <Input
             label="Location / City"
             value={formData.location}
-            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, location: e.target.value });
+              if (errors.location) setErrors((prev) => ({ ...prev, location: '' }));
+            }}
             placeholder="e.g. United Jhagadia, Aspee Chikhli, Ahmedabad"
+            className="h-10 rounded-xl"
+            error={errors.location}
           />
 
-          <div>
-            <label className="text-xs font-semibold text-foreground inline-flex items-center gap-1 mb-1.5">
-              <span>Target Corridor</span>
+          <div className="space-y-1.5 text-left">
+            <label className="text-xs font-semibold text-foreground block">
+              Target Corridor
             </label>
-            <input
-              type="text"
-              list="corridor-suggestions"
+            <Combobox
+              options={CORRIDOR_OPTIONS.map((c) => ({ value: c, label: c }))}
               value={formData.targetCorridor}
-              onChange={(e) => setFormData({ ...formData, targetCorridor: e.target.value })}
-              placeholder="Select or type corridor..."
-              className="w-full bg-surface border border-border rounded-input text-sm text-foreground px-3 h-9 focus:border-fairway-600 focus:ring-1 focus:ring-fairway-600 focus:outline-none"
+              onChange={(val) => setFormData({ ...formData, targetCorridor: val })}
+              placeholder="Select target corridor..."
+              searchPlaceholder="Search corridor..."
             />
-            <datalist id="corridor-suggestions">
-              {CORRIDOR_OPTIONS.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
           </div>
         </div>
 
         {/* Row 5: Stage & Priority */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label="Pipeline Stage"
-            value={formData.stage}
-            onChange={(e) =>
-              setFormData({ ...formData, stage: e.target.value as PipelineStageKey })
-            }
-          >
-            {pipelineStages.map((stg) => (
-              <option key={stg.key} value={stg.key}>
-                {stg.label}
-              </option>
-            ))}
-          </Select>
+          <div className="space-y-1.5 text-left">
+            <label className="text-xs font-semibold text-foreground block">
+              Pipeline Stage
+            </label>
+            <Combobox
+              options={pipelineStages.map((stg) => ({
+                value: stg.key,
+                label: stg.label,
+                icon: (
+                  <span
+                    className={cn(
+                      'w-2.5 h-2.5 rounded-full shrink-0',
+                      getStageDotColor(stg.key)
+                    )}
+                  />
+                ),
+              }))}
+              value={formData.stage}
+              onChange={(val) => setFormData({ ...formData, stage: val as PipelineStageKey })}
+              placeholder="Select pipeline stage..."
+              searchPlaceholder="Search stage..."
+            />
+          </div>
 
-          <Select
-            label="Priority Level"
-            value={formData.priority}
-            onChange={(e) =>
-              setFormData({ ...formData, priority: e.target.value as PriorityLevel })
-            }
-          >
-            <option value="High">🔴 High Priority</option>
-            <option value="Medium">🟡 Medium Priority</option>
-            <option value="Low">🟢 Low Priority</option>
-          </Select>
+          <div className="space-y-1.5 text-left">
+            <label className="text-xs font-semibold text-foreground block">
+              Priority Level
+            </label>
+            <Combobox
+              options={[
+                { value: 'High', label: 'High Priority' },
+                { value: 'Medium', label: 'Medium Priority' },
+                { value: 'Low', label: 'Low Priority' },
+              ]}
+              value={formData.priority}
+              onChange={(val) => setFormData({ ...formData, priority: val as PriorityLevel })}
+              placeholder="Select priority..."
+            />
+          </div>
         </div>
 
-        {/* Row 6: Salesperson Owner & Contact Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label="Assigned Salesperson"
+        {/* Row 6: Salesperson Owner */}
+        <div className="space-y-1.5 text-left">
+          <label className="text-xs font-semibold text-foreground block">
+            Assigned Salesperson
+          </label>
+          <Combobox
+            options={users.map((u) => ({
+              value: u.id,
+              label: u.name,
+              description: u.role,
+              avatar: u.avatar,
+              initials: u.name?.slice(0, 2).toUpperCase(),
+            }))}
             value={formData.salespersonId}
-            onChange={handleSalespersonChange}
-          >
-            <option value="">Select salesperson...</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} ({u.role})
-              </option>
-            ))}
-          </Select>
-
-          <Input
-            label="Contact Person Name"
-            value={formData.contactName}
-            onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-            placeholder="e.g. Aditya Bhai, Anirudh Ji"
+            onChange={(selectedId) => {
+              const user = users.find((u) => u.id === selectedId);
+              setFormData((prev) => ({
+                ...prev,
+                salespersonId: selectedId,
+                salespersonName: user ? user.name : prev.salespersonName,
+              }));
+            }}
+            placeholder="Select salesperson..."
+            searchPlaceholder="Search salesperson..."
           />
         </div>
 
-        {/* Row 7: Next Action & Follow-up Date */}
+        {/* Row 7: Contact Person, Phone & Email */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Input
+            label="Contact Person Name"
+            value={formData.contactName}
+            onChange={(e) => {
+              setFormData({ ...formData, contactName: e.target.value });
+              if (errors.contactName) setErrors((prev) => ({ ...prev, contactName: '' }));
+            }}
+            placeholder="e.g. Aditya Sharma"
+            className="h-10 rounded-xl"
+            error={errors.contactName}
+          />
+
+          <Input
+            label="Contact Phone"
+            value={formData.contactPhone}
+            onChange={(e) => {
+              setFormData({ ...formData, contactPhone: e.target.value });
+              if (errors.contactPhone) setErrors((prev) => ({ ...prev, contactPhone: '' }));
+            }}
+            placeholder="e.g. 9825011223"
+            className="h-10 rounded-xl"
+            error={errors.contactPhone}
+          />
+
+          <Input
+            label="Contact Email"
+            type="email"
+            value={formData.contactEmail}
+            onChange={(e) => {
+              setFormData({ ...formData, contactEmail: e.target.value });
+              if (errors.contactEmail) setErrors((prev) => ({ ...prev, contactEmail: '' }));
+            }}
+            placeholder="e.g. contact@company.com"
+            className="h-10 rounded-xl"
+            error={errors.contactEmail}
+          />
+        </div>
+
+        {/* Row 8: Next Action & Follow-up Date */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
             label="Next Action"
             value={formData.nextAction}
             onChange={(e) => setFormData({ ...formData, nextAction: e.target.value })}
             placeholder="e.g. Schedule meeting on Tuesday 25/8"
+            className="h-10 rounded-xl"
           />
 
-          <Input
+          <DatePicker
             label="Next Follow-up Date"
-            type="date"
             value={formData.nextFollowUpDate}
-            onChange={(e) => setFormData({ ...formData, nextFollowUpDate: e.target.value })}
+            onChange={(dateStr) => setFormData({ ...formData, nextFollowUpDate: dateStr })}
+            placeholder="Select follow-up date"
           />
         </div>
 

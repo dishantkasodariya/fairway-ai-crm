@@ -22,6 +22,7 @@ import { PermissionsService, RolePermissionItem } from '@/modules/core/services/
 import { Button } from '@/modules/core/components/ui/Button';
 import { Card, CardHeader, CardTitle } from '@/modules/core/components/ui/Card';
 import { Modal } from '@/modules/core/components/ui/Modal';
+import { Combobox } from '@/modules/core/components/ui/combobox-1';
 
 interface RolesPermissionsTabProps {
   roles: RoleItem[];
@@ -691,21 +692,27 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                   value={permSearchQuery}
                   onChange={(e) => setPermSearchQuery(e.target.value)}
                   placeholder="Search capabilities..."
-                  className="pl-8.5 pr-3 py-1.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted/60 focus:outline-none focus:border-fairway-500 focus:ring-1 focus:ring-fairway-500 transition-all w-48 sm:w-56 shadow-2xs"
+                  className="pl-8.5 pr-8 py-1.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted/60 focus:outline-none focus:border-fairway-500 focus:ring-1 focus:ring-fairway-500 transition-all w-48 sm:w-56 shadow-2xs"
                 />
+                {permSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setPermSearchQuery('')}
+                    className="absolute right-2.5 text-foreground-muted hover:text-foreground"
+                  >
+                    <XIcon className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              <select
-                value={permCategoryFilter}
-                onChange={(e) => setPermCategoryFilter(e.target.value)}
-                className="px-2.5 py-1.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground focus:outline-none focus:border-fairway-500 shadow-2xs"
-              >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+              <div className="w-44">
+                <Combobox
+                  options={categories.map((cat) => ({ value: cat, label: cat }))}
+                  value={permCategoryFilter}
+                  onChange={(val) => setPermCategoryFilter(val || 'All')}
+                  placeholder="Category"
+                />
+              </div>
             </div>
           </CardHeader>
 
@@ -929,31 +936,28 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                   </div>
 
                   {/* Value selector */}
-                  <select
-                    value={item.value}
-                    onChange={(e) =>
-                      setRolePermissionsList((prev) =>
-                        prev.map((p) =>
-                          p.id === item.id ? { ...p, value: e.target.value } : p
-                        )
-                      )
-                    }
-                    className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border focus:outline-none transition-all shadow-2xs cursor-pointer ${
-                      item.value === 'Yes'
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-                        : item.value === 'No'
-                          ? 'bg-surface-muted text-foreground-muted border-border'
-                          : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30'
-                    }`}
-                  >
-                    <option value="Yes">Yes (Full Access)</option>
-                    <option value="No">No (Disabled)</option>
-                    <option value="Assigned / All">Assigned / All</option>
-                    <option value="Restricted">Restricted</option>
-                    <option value="Limited">Limited</option>
-                    <option value="View">View Only</option>
-                    <option value="Configurable">Configurable</option>
-                  </select>
+                  <div className="w-48 shrink-0">
+                    <Combobox
+                      options={[
+                        { value: 'Yes', label: 'Yes (Full Access)' },
+                        { value: 'No', label: 'No (Disabled)' },
+                        { value: 'Assigned / All', label: 'Assigned / All' },
+                        { value: 'Restricted', label: 'Restricted' },
+                        { value: 'Limited', label: 'Limited' },
+                        { value: 'View', label: 'View Only' },
+                        { value: 'Configurable', label: 'Configurable' },
+                      ]}
+                      value={item.value}
+                      onChange={(val) => {
+                        if (val) {
+                          setRolePermissionsList((prev) =>
+                            prev.map((p) => (p.id === item.id ? { ...p, value: val } : p))
+                          );
+                        }
+                      }}
+                      placeholder="Access Level"
+                    />
+                  </div>
                 </div>
               ))}
             </div>

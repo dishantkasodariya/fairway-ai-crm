@@ -25,18 +25,24 @@ export const Tabs: React.FC<TabsProps> = ({
 }) => {
   if (variant === 'pills') {
     return (
-      <div className={cn('flex items-center gap-1.5 p-1 bg-surface-muted border border-border rounded-lg inline-flex', className)}>
+      <div
+        className={cn(
+          'flex items-center gap-1.5 p-1 bg-surface-muted/90 dark:bg-[#111722] border border-border rounded-xl inline-flex max-w-full overflow-x-auto select-none shadow-2xs',
+          className
+        )}
+      >
         {tabs.map((t) => {
           const isActive = t.id === activeTab;
           return (
             <button
               key={t.id}
+              type="button"
               onClick={() => onChange(t.id)}
               className={cn(
-                'flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all select-none',
+                'flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg transition-all select-none cursor-pointer whitespace-nowrap shrink-0',
                 isActive
-                  ? 'bg-surface text-fairway-800 font-semibold shadow-subtle border border-border/80'
-                  : 'text-foreground-muted hover:text-foreground hover:bg-white/40'
+                  ? 'bg-surface text-fairway-600 dark:text-fairway-400 font-bold shadow-xs border border-border'
+                  : 'text-foreground-muted hover:text-foreground hover:bg-surface/60 font-medium'
               )}
             >
               {t.icon}
@@ -44,8 +50,10 @@ export const Tabs: React.FC<TabsProps> = ({
               {t.count !== undefined && (
                 <span
                   className={cn(
-                    'text-[10px] px-1.5 py-0.2 rounded-full font-bold',
-                    isActive ? 'bg-fairway-100 text-fairway-800' : 'bg-slate-200 text-slate-700'
+                    'text-[10px] font-mono px-2 py-0.5 rounded-full font-bold transition-colors inline-flex items-center justify-center min-w-[20px]',
+                    isActive
+                      ? 'bg-fairway-500/15 text-fairway-600 dark:text-fairway-300 border border-fairway-500/30'
+                      : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/80'
                   )}
                 >
                   {t.count}
@@ -59,18 +67,19 @@ export const Tabs: React.FC<TabsProps> = ({
   }
 
   return (
-    <div className={cn('flex items-center gap-6 border-b border-border', className)}>
+    <div className={cn('flex items-center gap-6 border-b border-border overflow-x-auto max-w-full select-none', className)}>
       {tabs.map((t) => {
         const isActive = t.id === activeTab;
         return (
           <button
             key={t.id}
+            type="button"
             onClick={() => onChange(t.id)}
             className={cn(
-              'flex items-center gap-2 py-3 text-sm font-medium border-b-2 transition-all relative select-none -mb-px',
+              'flex items-center gap-2 py-3 text-sm border-b-2 transition-all relative select-none -mb-px whitespace-nowrap cursor-pointer',
               isActive
-                ? 'border-fairway-600 text-fairway-800 font-semibold'
-                : 'border-transparent text-foreground-muted hover:text-foreground hover:border-slate-300'
+                ? 'border-fairway-600 text-fairway-600 dark:text-fairway-400 font-bold'
+                : 'border-transparent text-foreground-muted hover:text-foreground hover:border-border font-medium'
             )}
           >
             {t.icon}
@@ -78,8 +87,10 @@ export const Tabs: React.FC<TabsProps> = ({
             {t.count !== undefined && (
               <span
                 className={cn(
-                  'text-xs px-2 py-0.5 rounded-full font-bold',
-                  isActive ? 'bg-fairway-100 text-fairway-800' : 'bg-slate-100 text-slate-600'
+                  'text-xs px-2 py-0.5 rounded-full font-mono font-bold transition-colors inline-flex items-center justify-center min-w-[20px]',
+                  isActive
+                    ? 'bg-fairway-500/15 text-fairway-600 dark:text-fairway-300 border border-fairway-500/30'
+                    : 'bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-slate-700/80'
                 )}
               >
                 {t.count}
@@ -91,3 +102,5 @@ export const Tabs: React.FC<TabsProps> = ({
     </div>
   );
 };
+
+export default Tabs;
