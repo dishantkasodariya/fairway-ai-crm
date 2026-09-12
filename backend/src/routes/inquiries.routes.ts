@@ -3,6 +3,7 @@ import {
   getInquiries,
   getInquiriesDropdownActive,
   getInquiryById,
+  createInquiry,
   createInquiryStepper,
   updateInquiry,
   deleteInquiry,
@@ -12,6 +13,7 @@ const router = Router();
 
 router.get('/dd/active', getInquiriesDropdownActive);
 router.get('/', getInquiries);
+router.post('/', createInquiry);
 router.post('/stepper', createInquiryStepper);
 router.get('/:id', getInquiryById);
 router.put('/:id', updateInquiry);

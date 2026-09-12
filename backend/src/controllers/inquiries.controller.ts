@@ -215,7 +215,10 @@ export const getInquiries = async (req: Request, res: Response): Promise<void> =
 export const getInquiryById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const result = await query('SELECT * FROM inquiries WHERE id = $1;', [id]);
+    const result = await query(
+      'SELECT * FROM inquiries WHERE id = $1 OR LOWER(inquiry_number) = LOWER($1) LIMIT 1;',
+      [id]
+    );
 
     if (result.rows.length === 0) {
       res.status(404).json({ success: false, error: 'Inquiry not found' });
@@ -574,7 +577,7 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
         next_action = COALESCE($20, next_action),
         next_follow_up_date = COALESCE($21, next_follow_up_date),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $22
+      WHERE id = $22 OR LOWER(inquiry_number) = LOWER($22)
       RETURNING *;
     `;
 
@@ -622,7 +625,10 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
 export const deleteInquiry = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const result = await query('DELETE FROM inquiries WHERE id = $1 RETURNING id;', [id]);
+    const result = await query(
+      'DELETE FROM inquiries WHERE id = $1 OR LOWER(inquiry_number) = LOWER($1) RETURNING id;',
+      [id]
+    );
     if (result.rows.length === 0) {
       res.status(404).json({ success: false, error: 'Inquiry not found' });
       return;
@@ -631,5 +637,80 @@ export const deleteInquiry = async (req: Request, res: Response): Promise<void> 
   } catch (error: any) {
     console.error('Error deleting inquiry:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to delete inquiry' });
+  }
+};
+
+/**
+ * POST /api/inquiries
+ * Direct inquiry creation
+ */
+export const createInquiry = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const b = req.body;
+    const id = b.id || `inq_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    const inquiryNumber = b.inquiryNumber || (await generateInquiryNumber());
+
+    const sql = `
+      INSERT INTO inquiries (
+        id, inquiry_number, company_id, company_name, contact_id, contact_name,
+        contact_phone, contact_email, whatsapp, linkedin, source, inquiry_date,
+        salesperson_id, salesperson_name, requirement, required_area_sq_ft,
+        location, target_corridor, industry, possession_date, lease_duration_months,
+        budget_monthly_inr, dock_requirements, clear_height_ft, floor_load_capacity,
+        power_kva, fire_systems_required, special_requirements, broker_name,
+        broker_commission, priority, lead_score, opportunity_score, stage, status,
+        next_action, next_follow_up_date, created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+        $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30,
+        $31, $32, $33, $34, $35, $36, $37, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+      ) RETURNING *;
+    `;
+
+    const values = [
+      id,
+      inquiryNumber,
+      b.companyId || null,
+      b.companyName || 'Industrial Client',
+      b.contactId || null,
+      b.contactName || '',
+      b.contactPhone || '',
+      b.contactEmail || '',
+      b.whatsapp || '',
+      b.linkedin || '',
+      b.source || 'Direct',
+      b.inquiryDate || new Date().toISOString().split('T')[0],
+      b.salespersonId || null,
+      b.salespersonName || 'Unassigned',
+      b.requirement || `${b.requiredAreaSqFt || '50,000'} sq.ft industrial requirement`,
+      b.requiredAreaSqFt ? parseFloat(b.requiredAreaSqFt) : 0,
+      b.location || 'Gujarat',
+      b.targetCorridor || 'Sanand',
+      b.industry || 'Logistics',
+      b.possessionDate || 'Immediate',
+      b.leaseDurationMonths ? parseInt(b.leaseDurationMonths, 10) : 60,
+      b.budgetMonthlyINR ? parseFloat(b.budgetMonthlyINR) : 0,
+      b.dockRequirements ? parseInt(b.dockRequirements, 10) : 0,
+      b.clearHeightFt ? parseFloat(b.clearHeightFt) : 0,
+      b.floorLoadCapacity || '5 MT/sq.m',
+      b.powerKVA ? parseFloat(b.powerKVA) : 0,
+      b.fireSystemsRequired ?? false,
+      b.specialRequirements || '',
+      b.brokerName || '',
+      b.brokerCommission || '',
+      b.priority || 'High',
+      b.leadScore || 85,
+      b.opportunityScore || 90,
+      b.stage || 'new',
+      b.status || 'Active',
+      b.nextAction || '',
+      b.nextFollowUpDate || '',
+    ];
+
+    const result = await query(sql, values);
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error creating inquiry:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to create inquiry' });
   }
 };

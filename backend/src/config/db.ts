@@ -1,6 +1,7 @@
  import pg from 'pg';
 import { config } from './index.js';
 import { hashPassword } from '../utils/password.js';
+import { runAllSchemaFixes } from './migrate_all_schemas.js';
 
 const { Client, Pool } = pg;
 
@@ -1149,6 +1150,9 @@ export const initDatabase = async () => {
       `);
       console.log('✅ Demo communications seeded.');
     }
+
+    // Ensure all CRM schema columns, constraints, and matrix baseline are in sync
+    await runAllSchemaFixes();
 
     client.release();
 

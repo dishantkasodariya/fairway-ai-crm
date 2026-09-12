@@ -116,23 +116,26 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
       console.warn('Could not query max numeric inquiry number:', e);
     }
 
+    const batchSeenInquiries = new Set<string>();
+
     for (let i = 0; i < rows.length; i++) {
       const raw = rows[i];
       const rowIndex = i + 1;
 
       // Extract fields supporting enquiries.xlsx schema & standard schema
-      const compName = getVal(raw, mapping.companyName, mapping.company, 'Company', 'Company Name', 'Client');
-      const siteName = getVal(raw, mapping.siteName, mapping.city, 'Site Name', 'City', 'Location', 'Hub') || 'Gujarat Industrial Cluster';
+      const rawCompName = getVal(raw, mapping.companyName, mapping.company, 'Company', 'Company Name', 'Client');
+      const compName = rawCompName.trim();
+      const siteName = (getVal(raw, mapping.siteName, mapping.city, 'Site Name', 'City', 'Location', 'Hub') || 'Gujarat Industrial Cluster').trim();
       const areaRaw = getVal(raw, mapping.requiredAreaSqFt, mapping.areaRequired, 'Area Required (sq. ft.)', 'Required Area', 'Area').replace(/[^0-9.]/g, '');
       const parsedArea = parseFloat(areaRaw);
       const area = Number.isFinite(parsedArea) && parsedArea >= 0 ? parsedArea : 0;
       const dateVal = raw[mapping.inquiryDate || 'Date'] ?? raw['Date_1'] ?? raw['Date'] ?? getVal(raw, mapping.date, 'Date');
-      const contactName = getVal(raw, mapping.contactName, mapping.contactPerson, 'Contact Person', 'Contact');
-      const rawPhone = getVal(raw, mapping.phone, mapping.contactNumber, 'Contact Number', 'Phone', 'Mobile');
+      const contactName = getVal(raw, mapping.contactName, mapping.contactPerson, 'Contact Person', 'Contact').trim();
+      const rawPhone = getVal(raw, mapping.phone, mapping.contactNumber, 'Contact Number', 'Phone', 'Mobile').trim();
       const phone = rawPhone ? (rawPhone.startsWith('+') ? rawPhone : `+91 ${rawPhone}`) : '+91 98000 00000';
-      const email = getVal(raw, mapping.email, 'Email', 'Email Address') || `contact@${compName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company'}.com`;
+      const email = getVal(raw, mapping.email, 'Email', 'Email Address').trim() || `contact@${compName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company'}.com`;
       const enteredBy = getVal(raw, mapping.enteredBy, mapping.salespersonName, 'Entered By', 'Salesperson', 'Owner') || 'Prapti Shah';
-      const comments = getVal(raw, mapping.comments, mapping.requirement, 'Comments', 'Requirement Description', 'Remarks');
+      const comments = getVal(raw, mapping.comments, mapping.requirement, 'Comments', 'Requirement Description', 'Remarks').trim();
       const remark1Status = getVal(raw, mapping.remark1CurrentStatus, mapping.currentStatus, 'Remark 1 – Current Status', 'Current Status', 'Status');
       const remark2NextAction = getVal(raw, mapping.remark2NextAction, mapping.nextAction, 'Remark 2 – Next Action', 'Next Action');
       const remark3FollowUp = getVal(raw, mapping.remark3FollowUpPlan, mapping.followUpPlan, 'Remark 3 – Follow-up Plan', 'Follow-up Plan');
@@ -145,18 +148,41 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
         continue;
       }
 
+      const normComp = compName
+        .toLowerCase()
+        .replace(/\b(private\s+limited|pvt\.?\s*ltd\.?|limited|ltd\.?|llp|inc\.?|corp\.?|corporation|co\.?)\b/gi, '')
+        .replace(/[^a-z0-9]/gi, '')
+        .trim() || compName.toLowerCase().replace(/[^a-z0-9]/gi, '');
+
+      // Within-batch duplicate check
+      const inqKey = `${normComp}::${area}::${siteName.toLowerCase()}::${comments.toLowerCase()}`;
+      if (batchSeenInquiries.has(inqKey)) {
+        skippedCount++;
+        errors.push({ row: rowIndex, error: `Duplicate row in file for ${compName} (${siteName}, ${area} sq.ft) - skipped.` });
+        continue;
+      }
+
       await client.query('SAVEPOINT row_savepoint');
 
       try {
-        // 1. Resolve or Create Company
+        // 1. Resolve or Create Company with fuzzy/normalized deduplication
         let companyId: string;
         const compCheck = await client.query(
-          'SELECT id, name FROM companies WHERE name ILIKE $1 OR legal_name ILIKE $1 LIMIT 1;',
-          [compName]
+          `SELECT id, name, legal_name, industry FROM companies 
+           WHERE TRIM(LOWER(name)) = TRIM(LOWER($1)) 
+              OR (legal_name IS NOT NULL AND TRIM(LOWER(legal_name)) = TRIM(LOWER($1)))
+              OR LOWER(REGEXP_REPLACE(name, '[^a-zA-Z0-9]', '', 'g')) = $2
+              OR (legal_name IS NOT NULL AND LOWER(REGEXP_REPLACE(legal_name, '[^a-zA-Z0-9]', '', 'g')) = $2)
+           LIMIT 1;`,
+          [compName, normComp]
         );
 
         if (compCheck.rows.length > 0) {
           companyId = compCheck.rows[0].id;
+          // Optionally update industry if previous record had generic or missing industry
+          if (industry && (!compCheck.rows[0].industry || compCheck.rows[0].industry === 'General Industrial')) {
+            await client.query(`UPDATE companies SET industry = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2;`, [industry, companyId]);
+          }
         } else {
           companyId = `comp_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
           await client.query(
@@ -182,7 +208,33 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
           );
         }
 
-        // 2. Resolve or Create Contact
+        // 2. Check for duplicate existing inquiry for this company (across previous imports or manual entries)
+        const inqCheck = await client.query(
+          `SELECT id, inquiry_number FROM inquiries 
+           WHERE company_id = $1 
+             AND (
+               (required_area_sq_ft = $2 AND (LOWER(TRIM(location)) = LOWER(TRIM($3)) OR location IS NULL OR $3 = 'Gujarat Industrial Cluster'))
+               OR ($4 <> '' AND contact_phone IS NOT NULL AND contact_phone = $4 AND required_area_sq_ft = $2)
+               OR ($5 <> '' AND requirement IS NOT NULL AND LOWER(TRIM(requirement)) = LOWER(TRIM($5)))
+             )
+           LIMIT 1;`,
+          [companyId, area, siteName, rawPhone ? phone : '', comments]
+        );
+
+        if (inqCheck.rows.length > 0) {
+          batchSeenInquiries.add(inqKey);
+          skippedCount++;
+          errors.push({
+            row: rowIndex,
+            error: `Duplicate inquiry: already exists in CRM (${inqCheck.rows[0].inquiry_number}) for ${compName} - skipped.`,
+          });
+          await client.query('RELEASE SAVEPOINT row_savepoint');
+          continue;
+        }
+
+        batchSeenInquiries.add(inqKey);
+
+        // 3. Resolve or Create Contact
         let contactId: string | null = null;
         if (contactName) {
           const cntCheck = await client.query(
@@ -205,7 +257,7 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
           }
         }
 
-        // 3. Create Inquiry with strictly incrementing sequence number
+        // 4. Create Inquiry with strictly incrementing sequence number
         highestNum += 1;
         const inquiryNumber = `INQ-${highestNum}`;
         const inquiryId = `inq_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
