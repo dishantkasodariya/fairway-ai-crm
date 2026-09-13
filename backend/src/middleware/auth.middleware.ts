@@ -33,3 +33,28 @@ export const authenticateJWT = (
     });
   }
 };
+
+export const authorizeRoles = (...allowedRoles: string[]) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'Authentication required.' },
+      });
+      return;
+    }
+
+    const userRole = (req.user.role || '').toLowerCase();
+    const hasRole = allowedRoles.some((r) => r.toLowerCase() === userRole);
+
+    if (!hasRole) {
+      res.status(403).json({
+        success: false,
+        error: { message: 'Forbidden. You do not have sufficient permissions to perform this action.' },
+      });
+      return;
+    }
+
+    next();
+  };
+};

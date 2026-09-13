@@ -913,202 +913,204 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       document.head.appendChild(styleTag);
     }
 
-    const darkVars = darkMode
-      ? `
-        --bg-app: #09090B !important;
-        --bg-surface: #121214 !important;
-        --bg-surface-muted: #1C1C1F !important;
-        --bg-card: #121214 !important;
-        --text-foreground: #FFFFFF !important;
-        --text-muted: #D4D4D8 !important;
-        --text-subtle: #A1A1AA !important;
-        --border-color: #27272A !important;
-        --border-strong: #3F3F46 !important;
-        --border-subtle: #18181B !important;
-        --background: 9 9 11 !important;
-        --surface: 18 18 20 !important;
-        --surface-muted: 28 28 31 !important;
-        --foreground: 255 255 255 !important;
-        --foreground-muted: 212 212 216 !important;
-        --border: 39 39 42 !important;
-        --border-strong: 63 63 70 !important;
-        --card: 18 18 20 !important;
-        --card-foreground: 255 255 255 !important;
-        --muted: 28 28 31 !important;
-        --muted-foreground: 212 212 216 !important;
-      `
-      : `
-        --bg-app: #F8FAFC !important;
-        --bg-surface: #FFFFFF !important;
-        --bg-surface-muted: #F1F5F9 !important;
-        --bg-card: #FFFFFF !important;
-        --text-foreground: #000000 !important;
-        --text-muted: #475569 !important;
-        --text-subtle: #64748B !important;
-        --border-color: #E2E8F0 !important;
-        --border-strong: #CBD5E1 !important;
-        --border-subtle: #F1F5F9 !important;
-        --background: 248 250 252 !important;
-        --surface: 255 255 255 !important;
-        --surface-muted: 241 245 249 !important;
-        --foreground: 0 0 0 !important;
-        --foreground-muted: 71 85 105 !important;
-        --border: 226 232 240 !important;
-        --border-strong: 203 213 225 !important;
-        --card: 255 255 255 !important;
-        --card-foreground: 0 0 0 !important;
-        --muted: 241 245 249 !important;
-        --muted-foreground: 71 85 105 !important;
-      `;
+    const lightVars = `
+      --bg-app: #F8FAFC !important;
+      --bg-surface: #FFFFFF !important;
+      --bg-surface-muted: #F1F5F9 !important;
+      --bg-card: #FFFFFF !important;
+      --text-foreground: #000000 !important;
+      --text-muted: #475569 !important;
+      --text-subtle: #64748B !important;
+      --border-color: #E2E8F0 !important;
+      --border-strong: #CBD5E1 !important;
+      --border-subtle: #F1F5F9 !important;
+      --background: 248 250 252 !important;
+      --surface: 255 255 255 !important;
+      --surface-muted: 241 245 249 !important;
+      --foreground: 0 0 0 !important;
+      --foreground-muted: 71 85 105 !important;
+      --border: 226 232 240 !important;
+      --border-strong: 203 213 225 !important;
+      --card: 255 255 255 !important;
+      --card-foreground: 0 0 0 !important;
+      --muted: 241 245 249 !important;
+      --muted-foreground: 71 85 105 !important;
+      --primary-soft: ${hexToRgb(theme.shades[100])} !important;
+      --accent-soft: ${hexToRgb(theme.accentShades[100])} !important;
+    `;
 
-    const darkClassOverrides = darkMode
-      ? `
-        html.dark, body.dark, .dark {
-          background-color: #09090B !important;
-          color: #FFFFFF !important;
-        }
-        html.dark .bg-surface, html.dark .bg-white, html.dark .bg-surface-card {
-          background-color: #121214 !important;
-        }
-        html.dark .bg-background {
-          background-color: #09090B !important;
-        }
-        html.dark .bg-surface-muted, html.dark .bg-slate-50, html.dark .bg-slate-100 {
-          background-color: #1C1C1F !important;
-        }
-        html.dark .bg-surface-muted\\/30, html.dark .bg-surface-muted\\/40, html.dark .bg-surface-muted\\/50, html.dark .bg-surface-muted\\/60, html.dark .bg-surface-muted\\/70 {
-          background-color: rgba(28, 28, 31, 0.7) !important;
-        }
-        html.dark .hover\\:bg-surface-muted:hover,
-        html.dark .hover\\:bg-surface-muted\\/40:hover,
-        html.dark .hover\\:bg-surface-muted\\/60:hover,
-        html.dark .hover\\:bg-slate-50:hover,
-        html.dark .hover\\:bg-slate-100:hover,
-        html.dark .hover\\:bg-slate-200:hover,
-        html.dark .hover\\:bg-gray-50:hover,
-        html.dark .hover\\:bg-gray-100:hover {
-          background-color: #27272A !important;
-        }
-        html.dark .hover\\:bg-surface:hover,
-        html.dark .hover\\:bg-white:hover {
-          background-color: #18181B !important;
-        }
-        html.dark .border-border, html.dark .border-slate-200, html.dark .border-slate-300 {
-          border-color: #27272A !important;
-        }
-        html.dark .border-border\\/40, html.dark .border-border\\/50, html.dark .border-border\\/60, html.dark .border-border\\/70, html.dark .border-border\\/80 {
-          border-color: rgba(63, 63, 70, 0.6) !important;
-        }
-        html.dark .text-foreground,
-        html.dark .text-slate-900, html.dark .text-slate-800, html.dark .text-slate-700,
-        html.dark .text-gray-900, html.dark .text-gray-800, html.dark .text-gray-700,
-        html.dark .text-zinc-900, html.dark .text-zinc-800, html.dark .text-zinc-700,
-        html.dark .text-neutral-900, html.dark .text-neutral-800, html.dark .text-neutral-700,
-        html.dark .text-black, html.dark .text-card-foreground {
-          color: #FFFFFF !important;
-        }
-        html.dark .text-foreground-muted,
-        html.dark .text-muted-foreground,
-        html.dark .text-slate-600, html.dark .text-slate-500, html.dark .text-slate-400,
-        html.dark .text-gray-600, html.dark .text-gray-500, html.dark .text-gray-400,
-        html.dark .text-zinc-600, html.dark .text-zinc-500, html.dark .text-zinc-400,
-        html.dark .text-neutral-600, html.dark .text-neutral-500, html.dark .text-neutral-400 {
-          color: #D4D4D8 !important;
-        }
-        html.dark .text-foreground-subtle,
-        html.dark .text-slate-300, html.dark .text-gray-300, html.dark .text-zinc-300 {
-          color: #A1A1AA !important;
-        }
-        html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6 {
-          color: #FFFFFF !important;
-        }
-        html.dark strong, html.dark b {
-          color: #FFFFFF !important;
-        }
-        html.dark label {
-          color: #F4F4F5 !important;
-        }
-        html.dark th {
-          color: #FFFFFF !important;
-          background-color: #1C1C1F !important;
-        }
-        html.dark td {
-          color: #FFFFFF !important;
-        }
-        html.dark input:not([cmdk-input]):not(.cmdk-input):not([data-transparent]):not(.bg-transparent),
-        html.dark select,
-        html.dark textarea {
-          background-color: #18181B !important;
-          color: #FFFFFF !important;
-          border-color: #27272A !important;
-        }
-        [cmdk-input-wrapper] input,
-        [cmdk-input],
-        .cmdk-input,
-        input.cmdk-input {
-          background-color: transparent !important;
-          background: transparent !important;
-          border: none !important;
-          border-radius: 0px !important;
-          box-shadow: none !important;
-          outline: none !important;
-        }
-        html.dark input::placeholder, html.dark textarea::placeholder {
-          color: #71717A !important;
-        }
-      `
-      : `
-        html:not(.dark), body:not(.dark) {
-          background-color: #F8FAFC !important;
-          color: #000000 !important;
-        }
-        html:not(.dark) .bg-surface {
-          background-color: #FFFFFF !important;
-        }
-        html:not(.dark) .bg-background {
-          background-color: #F8FAFC !important;
-        }
-        html:not(.dark) .bg-surface-muted {
-          background-color: #F1F5F9 !important;
-        }
-        html:not(.dark) .border-border {
-          border-color: #E2E8F0 !important;
-        }
-        html:not(.dark) .text-foreground,
-        html:not(.dark) h1, html:not(.dark) h2, html:not(.dark) h3, html:not(.dark) h4, html:not(.dark) h5, html:not(.dark) h6,
-        html:not(.dark) strong, html:not(.dark) b, html:not(.dark) td, html:not(.dark) label {
-          color: #000000 !important;
-        }
-        html:not(.dark) th {
-          color: #000000 !important;
-          background-color: #F1F5F9 !important;
-        }
-        html:not(.dark) .text-foreground-muted,
-        html:not(.dark) .text-muted-foreground {
-          color: #475569 !important;
-        }
-        html:not(.dark) input:not([cmdk-input]):not(.cmdk-input):not([data-transparent]):not(.bg-transparent),
-        html:not(.dark) select,
-        html:not(.dark) textarea {
-          background-color: #FFFFFF !important;
-          color: #000000 !important;
-          border-color: #E2E8F0 !important;
-        }
-        html:not(.dark) input::placeholder, html:not(.dark) textarea::placeholder {
-          color: #94A3B8 !important;
-        }
-      `;
+    const darkVars = `
+      --bg-app: #09090B !important;
+      --bg-surface: #121214 !important;
+      --bg-surface-muted: #1C1C1F !important;
+      --bg-card: #121214 !important;
+      --text-foreground: #FFFFFF !important;
+      --text-muted: #D4D4D8 !important;
+      --text-subtle: #A1A1AA !important;
+      --border-color: #27272A !important;
+      --border-strong: #3F3F46 !important;
+      --border-subtle: #18181B !important;
+      --background: 9 9 11 !important;
+      --surface: 18 18 20 !important;
+      --surface-muted: 28 28 31 !important;
+      --foreground: 255 255 255 !important;
+      --foreground-muted: 212 212 216 !important;
+      --border: 39 39 42 !important;
+      --border-strong: 63 63 70 !important;
+      --card: 18 18 20 !important;
+      --card-foreground: 255 255 255 !important;
+      --muted: 28 28 31 !important;
+      --muted-foreground: 212 212 216 !important;
+      --primary-soft: ${hexToRgb(theme.shades[950])} !important;
+      --accent-soft: ${hexToRgb(theme.accentShades[900])} !important;
+    `;
+
+    const darkClassOverrides = `
+      html.dark, body.dark, .dark {
+        background-color: #09090B !important;
+        color: #FFFFFF !important;
+      }
+      html.dark .bg-surface, html.dark .bg-white, html.dark .bg-surface-card {
+        background-color: #121214 !important;
+      }
+      html.dark .bg-background {
+        background-color: #09090B !important;
+      }
+      html.dark .bg-surface-muted, html.dark .bg-slate-50, html.dark .bg-slate-100 {
+        background-color: #1C1C1F !important;
+      }
+      html.dark .bg-surface-muted\\/30, html.dark .bg-surface-muted\\/40, html.dark .bg-surface-muted\\/50, html.dark .bg-surface-muted\\/60, html.dark .bg-surface-muted\\/70 {
+        background-color: rgba(28, 28, 31, 0.7) !important;
+      }
+      html.dark .hover\\:bg-surface-muted:hover,
+      html.dark .hover\\:bg-surface-muted\\/40:hover,
+      html.dark .hover\\:bg-surface-muted\\/60:hover,
+      html.dark .hover\\:bg-slate-50:hover,
+      html.dark .hover\\:bg-slate-100:hover,
+      html.dark .hover\\:bg-slate-200:hover,
+      html.dark .hover\\:bg-gray-50:hover,
+      html.dark .hover\\:bg-gray-100:hover {
+        background-color: #27272A !important;
+      }
+      html.dark .hover\\:bg-surface:hover,
+      html.dark .hover\\:bg-white:hover {
+        background-color: #18181B !important;
+      }
+      html.dark .border-border, html.dark .border-slate-200, html.dark .border-slate-300 {
+        border-color: #27272A !important;
+      }
+      html.dark .border-border\\/40, html.dark .border-border\\/50, html.dark .border-border\\/60, html.dark .border-border\\/70, html.dark .border-border\\/80 {
+        border-color: rgba(63, 63, 70, 0.6) !important;
+      }
+      html.dark .text-foreground,
+      html.dark .text-slate-900, html.dark .text-slate-800, html.dark .text-slate-700,
+      html.dark .text-gray-900, html.dark .text-gray-800, html.dark .text-gray-700,
+      html.dark .text-zinc-900, html.dark .text-zinc-800, html.dark .text-zinc-700,
+      html.dark .text-neutral-900, html.dark .text-neutral-800, html.dark .text-neutral-700,
+      html.dark .text-black, html.dark .text-card-foreground {
+        color: #FFFFFF !important;
+      }
+      html.dark .text-foreground-muted,
+      html.dark .text-muted-foreground,
+      html.dark .text-slate-600, html.dark .text-slate-500, html.dark .text-slate-400,
+      html.dark .text-gray-600, html.dark .text-gray-500, html.dark .text-gray-400,
+      html.dark .text-zinc-600, html.dark .text-zinc-500, html.dark .text-zinc-400,
+      html.dark .text-neutral-600, html.dark .text-neutral-500, html.dark .text-neutral-400 {
+        color: #D4D4D8 !important;
+      }
+      html.dark .text-foreground-subtle,
+      html.dark .text-slate-300, html.dark .text-gray-300, html.dark .text-zinc-300 {
+        color: #A1A1AA !important;
+      }
+      html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6 {
+        color: #FFFFFF !important;
+      }
+      html.dark strong, html.dark b {
+        color: #FFFFFF !important;
+      }
+      html.dark label {
+        color: #F4F4F5 !important;
+      }
+      html.dark th {
+        color: #FFFFFF !important;
+        background-color: #1C1C1F !important;
+      }
+      html.dark td {
+        color: #FFFFFF !important;
+      }
+      html.dark input:not([cmdk-input]):not(.cmdk-input):not([data-transparent]):not(.bg-transparent),
+      html.dark select,
+      html.dark textarea {
+        background-color: #18181B !important;
+        color: #FFFFFF !important;
+        border-color: #27272A !important;
+      }
+      [cmdk-input-wrapper] input,
+      [cmdk-input],
+      .cmdk-input,
+      input.cmdk-input {
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0px !important;
+        box-shadow: none !important;
+        outline: none !important;
+      }
+      html.dark input::placeholder, html.dark textarea::placeholder {
+        color: #71717A !important;
+      }
+    `;
+
+    const lightClassOverrides = `
+      html:not(.dark), body:not(.dark) {
+        background-color: #F8FAFC !important;
+        color: #000000 !important;
+      }
+      html:not(.dark) .bg-surface {
+        background-color: #FFFFFF !important;
+      }
+      html:not(.dark) .bg-background {
+        background-color: #F8FAFC !important;
+      }
+      html:not(.dark) .bg-surface-muted {
+        background-color: #F1F5F9 !important;
+      }
+      html:not(.dark) .border-border {
+        border-color: #E2E8F0 !important;
+      }
+      html:not(.dark) .text-foreground,
+      html:not(.dark) h1, html:not(.dark) h2, html:not(.dark) h3, html:not(.dark) h4, html:not(.dark) h5, html:not(.dark) h6,
+      html:not(.dark) strong, html:not(.dark) b, html:not(.dark) td, html:not(.dark) label {
+        color: #000000 !important;
+      }
+      html:not(.dark) th {
+        color: #000000 !important;
+        background-color: #F1F5F9 !important;
+      }
+      html:not(.dark) .text-foreground-muted,
+      html:not(.dark) .text-muted-foreground {
+        color: #475569 !important;
+      }
+      html:not(.dark) input:not([cmdk-input]):not(.cmdk-input):not([data-transparent]):not(.bg-transparent),
+      html:not(.dark) select,
+      html:not(.dark) textarea {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border-color: #E2E8F0 !important;
+      }
+      html:not(.dark) input::placeholder, html:not(.dark) textarea::placeholder {
+        color: #94A3B8 !important;
+      }
+    `;
 
     const cssRules = `
       :root, html, body {
-        ${darkVars}
+        ${lightVars}
         ${Object.entries(theme.shades).map(([shade, val]) => `--fw-${shade}: ${val} !important;`).join('\n        ')}
         ${Object.entries(theme.accentShades).map(([shade, val]) => `--accent-${shade}: ${val} !important;`).join('\n        ')}
         --primary: ${primaryRgb} !important;
         --primary-hover: ${primaryHoverRgb} !important;
-        --primary-soft: ${primarySoftRgb} !important;
         --accent: ${accentRgb} !important;
-        --accent-soft: ${accentSoftRgb} !important;
         --chart-1: ${theme.chartColors[0]} !important;
         --chart-2: ${theme.chartColors[1]} !important;
         --chart-3: ${theme.chartColors[2]} !important;
@@ -1126,6 +1128,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         --radius-card: ${rXl}px !important;
         --radius-panel: ${r2Xl}px !important;
       }
+      .dark, html.dark {
+        ${darkVars}
+      }
+      ${lightClassOverrides}
       ${darkClassOverrides}
       .bg-fairway-600 { background-color: ${theme.shades[600]} !important; }
       .bg-fairway-700 { background-color: ${theme.shades[700]} !important; }
@@ -1159,7 +1165,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     `;
 
-    styleTag.textContent = cssRules;
+    if (styleTag.dataset.themeKey !== `${theme.id}_${currentRadius}`) {
+      styleTag.textContent = cssRules;
+      styleTag.dataset.themeKey = `${theme.id}_${currentRadius}`;
+    }
   };
 
   useLayoutEffect(() => {

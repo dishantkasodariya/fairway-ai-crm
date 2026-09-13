@@ -27,7 +27,7 @@ export const Tabs: React.FC<TabsProps> = ({
     return (
       <div
         className={cn(
-          'flex items-center gap-1.5 p-1 bg-surface-muted/90 dark:bg-[#111722] border border-border rounded-xl inline-flex max-w-full overflow-x-auto select-none shadow-2xs',
+          'flex items-center gap-1.5 p-1 bg-surface-muted/90 dark:bg-[#111722] border border-border rounded-xl inline-flex max-w-full overflow-x-auto no-scrollbar touch-pan-x select-none shadow-2xs',
           className
         )}
       >
@@ -67,7 +67,7 @@ export const Tabs: React.FC<TabsProps> = ({
   }
 
   return (
-    <div className={cn('flex items-center gap-6 border-b border-border overflow-x-auto max-w-full select-none', className)}>
+    <div className={cn('flex items-center gap-6 border-b border-border overflow-x-auto no-scrollbar touch-pan-x max-w-full select-none', className)}>
       {tabs.map((t) => {
         const isActive = t.id === activeTab;
         return (

@@ -1,6 +1,20 @@
 import { Request, Response } from 'express';
 import { query } from '../config/db.js';
 import crypto from 'crypto';
+import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+
+/**
+ * Validate URL to prevent stored XSS (javascript: / data: protocols)
+ */
+const isValidWebUrl = (urlStr?: string): boolean => {
+  if (!urlStr || urlStr === '#' || urlStr === '') return true;
+  try {
+    const parsed = new URL(urlStr);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
 
 /**
  * GET /api/documents
@@ -53,14 +67,14 @@ export const getDocuments = async (req: Request, res: Response): Promise<void> =
     res.status(200).json({ success: true, data: docs });
   } catch (error: any) {
     console.error('Error fetching documents:', error);
-    res.status(500).json({ success: false, error: { message: error.message || 'Failed to fetch documents' } });
+    res.status(500).json({ success: false, error: { message: 'Failed to fetch documents' } });
   }
 };
 
 /**
  * POST /api/documents
  */
-export const createDocument = async (req: Request, res: Response): Promise<void> => {
+export const createDocument = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const {
       name,
@@ -71,15 +85,28 @@ export const createDocument = async (req: Request, res: Response): Promise<void>
       companyName,
       inquiryId,
       inquiryNumber,
-      uploadedById,
-      uploadedByName,
       category = 'Commercial Proposal',
+      uploadedByName,
     } = req.body;
 
     if (!name || !name.trim()) {
       res.status(400).json({ success: false, error: { message: 'Document name is required' } });
       return;
     }
+
+    // Security: Validate URL to prevent XSS (reject javascript: / data: protocols)
+    if (!isValidWebUrl(url)) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Invalid document URL. Only HTTP and HTTPS web addresses are allowed.' },
+      });
+      return;
+    }
+
+    // Security: Bind attribution to authenticated session user
+    const sessionUser = req.user;
+    const finalUploadedById = sessionUser?.userId || '';
+    const finalUploadedByName = uploadedByName || sessionUser?.email || 'CRM Team';
 
     const id = `doc_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
 
@@ -102,8 +129,8 @@ export const createDocument = async (req: Request, res: Response): Promise<void>
       companyName || '',
       inquiryId || null,
       inquiryNumber || '',
-      uploadedById || '',
-      uploadedByName || 'Admin',
+      finalUploadedById,
+      finalUploadedByName,
       category,
     ];
 
@@ -130,24 +157,42 @@ export const createDocument = async (req: Request, res: Response): Promise<void>
     });
   } catch (error: any) {
     console.error('Error creating document:', error);
-    res.status(500).json({ success: false, error: { message: error.message || 'Failed to create document' } });
+    res.status(500).json({ success: false, error: { message: 'Failed to create document' } });
   }
 };
 
 /**
  * DELETE /api/documents/:id
  */
-export const deleteDocument = async (req: Request, res: Response): Promise<void> => {
+export const deleteDocument = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
-    const result = await query('DELETE FROM documents WHERE id = $1 RETURNING id;', [id]);
-    if (result.rows.length === 0) {
+    const sessionUser = req.user;
+
+    // Security (BOLA/IDOR): Verify document existence and ownership/role
+    const existing = await query('SELECT id, uploaded_by_id FROM documents WHERE id = $1;', [id]);
+    if (existing.rows.length === 0) {
       res.status(404).json({ success: false, error: { message: 'Document not found' } });
       return;
     }
+
+    const isAuthorized =
+      sessionUser?.role === 'super_admin' ||
+      sessionUser?.role === 'admin' ||
+      existing.rows[0].uploaded_by_id === sessionUser?.userId;
+
+    if (!isAuthorized) {
+      res.status(403).json({
+        success: false,
+        error: { message: 'Forbidden. You do not have permission to delete this document.' },
+      });
+      return;
+    }
+
+    await query('DELETE FROM documents WHERE id = $1 RETURNING id;', [id]);
     res.status(200).json({ success: true, message: 'Document deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting document:', error);
-    res.status(500).json({ success: false, error: { message: error.message || 'Failed to delete document' } });
+    res.status(500).json({ success: false, error: { message: 'Failed to delete document' } });
   }
 };

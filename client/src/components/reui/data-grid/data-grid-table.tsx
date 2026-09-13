@@ -506,61 +506,19 @@ function hasDataGridTableRightPinnedColumns<TData extends object>(
 }
 
 function DataGridTableFillCol() {
-  const { props } = useDataGrid()
-
-  if (!props.tableLayout?.columnsResizable) return null
-
-  return (
-    <col
-      data-slot="data-grid-table-fill-col"
-      style={{ width: "var(--data-grid-fill-size, 0px)" }}
-    />
-  )
+  return null
 }
 
 function DataGridTableFillHeadCell() {
-  const { props } = useDataGrid()
-
-  if (!props.tableLayout?.columnsResizable) return null
-
-  return (
-    <th
-      aria-hidden="true"
-      data-slot="data-grid-table-fill-head-cell"
-      style={{ width: "var(--data-grid-fill-size, 0px)" }}
-      className={cn("p-0", props.tableLayout?.headerBackground && "bg-muted")}
-    />
-  )
+  return null
 }
 
 function DataGridTableFillBodyCell() {
-  const { props } = useDataGrid()
-
-  if (!props.tableLayout?.columnsResizable) return null
-
-  return (
-    <td
-      aria-hidden="true"
-      data-slot="data-grid-table-fill-body-cell"
-      style={{ width: "var(--data-grid-fill-size, 0px)" }}
-      className="p-0"
-    />
-  )
+  return null
 }
 
 function DataGridTableFillFootCell() {
-  const { props } = useDataGrid()
-
-  if (!props.tableLayout?.columnsResizable) return null
-
-  return (
-    <td
-      aria-hidden="true"
-      data-slot="data-grid-table-fill-foot-cell"
-      style={{ width: "var(--data-grid-fill-size, 0px)" }}
-      className="p-0"
-    />
-  )
+  return null
 }
 
 function DataGridTableBase({ children }: { children: ReactNode }) {
@@ -1504,8 +1462,7 @@ function DataGridTableRenderedRow<TData extends object>({
 function DataGridTableEmpty() {
   const { table, props } = useDataGrid()
   const visibleColumnCount =
-    getDataGridTableOrderedVisibleColumns(table).length +
-    (props.tableLayout?.columnsResizable ? 1 : 0)
+    getDataGridTableOrderedVisibleColumns(table).length
 
   return (
     <tr>

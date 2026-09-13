@@ -84,6 +84,15 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
       return;
     }
 
+    const MAX_IMPORT_ROWS = 1000;
+    if (rows.length > MAX_IMPORT_ROWS) {
+      res.status(400).json({
+        success: false,
+        error: `Import batch exceeds the limit of ${MAX_IMPORT_ROWS} rows. Please split your spreadsheet into smaller files.`,
+      });
+      return;
+    }
+
     const mapping = columnMapping || {};
 
     let importedCount = 0;

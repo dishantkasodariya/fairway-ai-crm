@@ -220,23 +220,23 @@ export const CompanyLineCard: React.FC<CompanyCardProps> = ({ company, onSelect,
   return (
     <div
       onClick={() => onSelect(company.id)}
-      className="bg-surface border border-border hover:border-fairway-400 hover:shadow-subtle rounded-card px-4 py-3 transition-all cursor-pointer flex items-center justify-between gap-4 text-xs select-none shadow-2xs group"
+      className="bg-surface border border-border hover:border-fairway-400 hover:shadow-subtle rounded-card p-3 sm:px-4 sm:py-3 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs select-none shadow-2xs group"
     >
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className="w-8 h-8 rounded-lg bg-fairway-100 text-fairway-900 dark:bg-fairway-950/70 dark:text-fairway-200 dark:border-fairway-700/60 font-bold text-xs flex items-center justify-center shrink-0 border border-fairway-300 shadow-xs">
+      <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+        <div className="w-8 h-8 rounded-lg bg-fairway-100 text-fairway-900 dark:bg-fairway-950/70 dark:text-fairway-200 dark:border-fairway-700/60 font-bold text-xs flex items-center justify-center shrink-0 border border-fairway-300 shadow-xs mt-0.5 sm:mt-0">
           {company.name.substring(0, 2).toUpperCase()}
         </div>
-        <div className="min-w-0">
-          <span className="font-bold text-foreground group-hover:text-fairway-700 transition-colors truncate block">
+        <div className="min-w-0 flex-1">
+          <span className="font-bold text-foreground group-hover:text-fairway-700 transition-colors break-words sm:truncate block text-sm">
             {company.name}
           </span>
-          <span className="text-[10px] text-foreground-muted truncate block">
+          <span className="text-[10px] text-foreground-muted block mt-0.5">
             {company.industry || 'General Industrial'} • {company.city}, {company.state}
           </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
         <Badge
           variant={company.priority === 'High' ? 'danger' : company.priority === 'Medium' ? 'warning' : 'default'}
           size="sm"

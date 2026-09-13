@@ -22,7 +22,7 @@ export const AuditLogsTab: React.FC = () => {
           </div>
         </CardHeader>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto no-scrollbar touch-pan-x">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-surface-muted/80 text-[11px] font-bold uppercase text-foreground-muted border-b border-border">
               <tr>

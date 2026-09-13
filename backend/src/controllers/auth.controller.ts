@@ -18,6 +18,14 @@ interface MemoryUser {
   created_at?: Date;
 }
 
+// Pre-hash default demo password for fallback memory store
+const DEFAULT_DEMO_HASH = '$2a$10$8sB3GjV1v7GqV6pG.uQY..uM8J7v1i7v2g5H6k7l8m9n0o1p2q3r4'; // will be refreshed asynchronously
+hashPassword('fairway123').then((h) => {
+  for (const u of memoryUsers.values()) {
+    if (!u.password) u.password = h;
+  }
+}).catch(() => {});
+
 const memoryUsers: Map<string, MemoryUser> = new Map([
   [
     'amit@fairway.co.in',
@@ -230,7 +238,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const normalizedEmail = email.trim().toLowerCase();
     const hashedPassword = await hashPassword(password);
     const userId = `usr_${Date.now()}`;
-    const userRole = role || 'admin';
+    // Security: Restrict public self-registration to low-privilege roles (never allow self-assignment of admin/super_admin)
+    const allowedSelfRoles = ['sales', 'viewer'];
+    const userRole = (role && allowedSelfRoles.includes(role.toLowerCase())) ? role.toLowerCase() : 'sales';
     const userDept = department || 'Industrial Leasing';
     const userAvatar = avatar || null;
 
@@ -350,14 +360,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     let isMatch = false;
     if (userRow.password) {
       isMatch = await comparePassword(password, userRow.password).catch(() => false);
-      if (!isMatch && userRow.password === password) {
-        isMatch = true;
-      }
-    }
-
-    // Master fallback for demo accounts (ensures fairway123, password, admin123 always work smoothly)
-    if (!isMatch && (password === 'fairway123' || password === 'admin123' || password === 'password')) {
-      isMatch = true;
     }
 
     if (!isMatch) {

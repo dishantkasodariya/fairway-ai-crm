@@ -710,18 +710,18 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
         {/* ========================================================================= */}
         {/* SECTION 4: SUBMIT & ACTION CONTROLS */}
         {/* ========================================================================= */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 bg-surface border border-border rounded-2xl shadow-xs">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-4 sm:p-5 bg-surface border border-border rounded-2xl shadow-xs">
           <div className="flex items-center gap-2 text-xs text-foreground-muted">
             <ShieldCheck className="w-4 h-4 text-fairway-600 shrink-0" />
-            <span>Record will be saved with sequential identifier and synced to CRM audit trail</span>
+            <span className="leading-snug">Record will be saved with sequential identifier and synced to CRM audit trail</span>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
             <button
               type="button"
               onClick={onBack}
               disabled={isSubmitting}
-              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-border bg-surface hover:bg-surface-muted text-foreground text-xs font-semibold transition-colors cursor-pointer"
+              className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-border bg-surface hover:bg-surface-muted text-foreground text-xs font-semibold transition-colors cursor-pointer text-center"
             >
               Cancel
             </button>
@@ -729,10 +729,10 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
               type="submit"
               variant="primary"
               disabled={isSubmitting}
-              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-fairway-600 hover:bg-fairway-700 text-white text-xs font-bold shadow-xs transition-colors"
+              className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-fairway-600 hover:bg-fairway-700 text-white text-xs font-bold shadow-xs transition-colors whitespace-nowrap justify-center"
             >
               {isSubmitting
-                ? (isEditing ? 'Saving Changes...' : 'Registering Company...')
+                ? (isEditing ? 'Saving...' : 'Registering...')
                 : (isEditing ? 'Save Changes' : 'Register Company Account')}
             </Button>
           </div>

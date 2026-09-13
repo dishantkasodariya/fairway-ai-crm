@@ -74,8 +74,10 @@ import {
 } from '@/components/reui/data-grid/data-grid';
 import { DataGridColumnHeader } from '@/components/reui/data-grid/data-grid-column-header';
 import { DataGridPagination } from '@/components/reui/data-grid/data-grid-pagination';
-import { DataGridScrollArea } from '@/components/reui/data-grid/data-grid-scroll-area';
-import { DataGridTable } from '@/components/reui/data-grid/data-grid-table';
+import {
+  CommonDataGrid,
+  DataGridColumnVisibilityMenu,
+} from '@/modules/core/components/ui/CommonDataGrid';
 import {
   ColumnDef,
   PaginationState,
@@ -546,7 +548,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     () => [
       {
         id: 'actions',
-        header: () => <span className="text-[11px] font-semibold text-foreground-muted pl-1 sr-only">Actions</span>,
+        header: ({ column }) => <DataGridColumnHeader title="Action" column={column} />,
         cell: ({ row }) => {
           const inq = row.original;
           return (
@@ -596,9 +598,9 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             </div>
           );
         },
-        size: 55,
-        minSize: 50,
-        maxSize: 65,
+        size: 75,
+        minSize: 65,
+        maxSize: 90,
         enableSorting: false,
         enableResizing: false,
         enablePinning: true,
@@ -1042,9 +1044,9 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
       </div>
 
       {/* Sleek Search & Control Toolbar matching reference */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 pt-1">
         {/* Left: Search Bar */}
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 max-w-md w-full">
           <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5" />
           <input
             type="text"
@@ -1057,7 +1059,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
 
         {/* Right: Controls & View Switcher */}
         <TooltipProvider delayDuration={150}>
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
             {/* Filter Drawer Trigger Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -1082,46 +1084,8 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Column Settings Dropdown */}
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
-                    >
-                      <Settings className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Column
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
-                <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
-                  Toggle Columns
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {table
-                  .getAllLeafColumns()
-                  .filter((col) => col.id !== 'actions' && col.id !== 'inquiryNumber')
-                  .map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col.id}
-                      checked={col.getIsVisible()}
-                      onSelect={(e) => e.preventDefault()}
-                      onCheckedChange={(val) => col.toggleVisibility(!!val)}
-                      className="text-xs cursor-pointer capitalize"
-                    >
-                      {typeof col.columnDef.header === 'string'
-                        ? col.columnDef.header
-                        : col.id.replace(/([A-Z])/g, ' $1')}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Column Settings Dropdown (Common Component) */}
+            <DataGridColumnVisibilityMenu table={table} excludeColumns={['actions', 'inquiryNumber']} />
 
             {/* Refresh / Reset Button */}
             <Tooltip>
@@ -1191,38 +1155,20 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         </TooltipProvider>
       </div>
 
-      {/* ================= VIEW MODE 1: REUI C-DATA-GRID-16 ================= */}
+      {/* ================= VIEW MODE 1: COMMON DATA GRID (MATCHING REFERENCE UI) ================= */}
       {viewMode === 'table' ? (
-        <DataGrid
+        <CommonDataGrid
           table={table}
           recordCount={totalCount || filteredInquiries.length}
           isLoading={isBusy}
-          loadingMode="skeleton"
-          tableLayout={{
-            columnsPinnable: true,
-            columnsResizable: true,
-            headerSticky: true,
-          }}
-        >
-          <div className="w-full space-y-2.5">
-            {filteredInquiries.length === 0 && !isBusy ? (
-              <WarehouseInquiryEmptyState
-                hasFilters={activeFiltersCount > 0 || !!searchQuery}
-                onClearFilters={handleClearAllFilters}
-                onNewInquiry={onOpenNewInquiry}
-              />
-            ) : (
-              <Card className="p-0 border border-border bg-surface shadow-xs rounded-xl overflow-hidden">
-                <DataGridContainer className="w-full">
-                  <DataGridScrollArea className="w-full max-h-[calc(100vh-280px)] overflow-auto" orientation="both">
-                    <DataGridTable />
-                  </DataGridScrollArea>
-                </DataGridContainer>
-              </Card>
-            )}
-            {filteredInquiries.length > 0 && !isBusy && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
-          </div>
-        </DataGrid>
+          emptyState={
+            <WarehouseInquiryEmptyState
+              hasFilters={activeFiltersCount > 0 || !!searchQuery}
+              onClearFilters={handleClearAllFilters}
+              onNewInquiry={onOpenNewInquiry}
+            />
+          }
+        />
       ) : viewMode === 'line' ? (
         /* ================= VIEW MODE 2: SINGLE-LINE DENSE CARDS ================= */
         <DataGrid
@@ -1309,7 +1255,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
           />
 
           {/* Drawer Container */}
-          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0">
+          <div className="relative w-full max-w-full sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0">
             {/* Header */}
             <div className="p-5 border-b border-border bg-surface flex items-start justify-between border-t-0">
               <div>

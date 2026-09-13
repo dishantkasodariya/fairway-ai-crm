@@ -9,16 +9,58 @@ import {
   UserCheck,
   UserX,
   X,
+  LayoutGrid,
+  List,
+  RefreshCw,
+  MoreHorizontal,
+  Shield,
+  ShieldCheck,
+  Phone,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { User, UserRole } from '@/modules/core/types';
 import { RoleItem } from '@/modules/core/services/roleService';
 import { Button } from '@/modules/core/components/ui/Button';
-import { Card, CardHeader, CardTitle } from '@/modules/core/components/ui/Card';
 import { Modal } from '@/modules/core/components/ui/Modal';
+import { Card } from '@/modules/core/components/ui/Card';
 import { UserAvatar } from '@/modules/core/components/ui/UserAvatar';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
+import { cn } from '@/modules/core/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/modules/core/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from '@/modules/core/components/ui/tooltip';
+import {
+  DataGrid,
+  DataGridContainer,
+  dataGridFeatures,
+  type DataGridFeatures,
+} from '@/components/reui/data-grid/data-grid';
+import { DataGridColumnHeader } from '@/components/reui/data-grid/data-grid-column-header';
+import { DataGridPagination } from '@/components/reui/data-grid/data-grid-pagination';
+import {
+  CommonDataGrid,
+  DataGridColumnVisibilityMenu,
+} from '@/modules/core/components/ui/CommonDataGrid';
+import {
+  ColumnDef,
+  PaginationState,
+  SortingState,
+  useTable,
+} from '@tanstack/react-table';
 
 interface UserManagementTabProps {
   roles: RoleItem[];
@@ -39,10 +81,28 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
   } = useAuth();
   const { success, error } = useToast();
 
+  // View state: 'table' (List) vs 'grid' (Cards) matching Inquiries
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Table state (matching Inquiries DataGrid)
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
+  const [columnPinning, setColumnPinning] = useState<{ start: string[]; end: string[] }>({
+    start: ['actions'],
+    end: [],
+  });
+  const [columnOrder, setColumnOrder] = useState<string[]>([]);
+  const [columnSizing, setColumnSizing] = useState<Record<string, number>>({});
 
   // Add User Modal State
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -94,6 +154,21 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
       return matchesSearch && matchesRole && matchesStatus;
     });
   }, [users, searchQuery, roleFilter, statusFilter]);
+
+  // Paged users for current page
+  const pagedUsers = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize;
+    return filteredUsers.slice(start, start + pagination.pageSize);
+  }, [filteredUsers, pagination.pageIndex, pagination.pageSize]);
+
+  // Handle Refresh simulation
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      success('Refreshed', 'User list is up to date.');
+    }, 450);
+  };
 
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     if (!isAdmin) {
@@ -203,53 +278,310 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
     }
   };
 
-  return (
-    <div className="space-y-4 animate-fade-in">
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Users className="w-4 h-4 text-fairway-600" />
-              <span>Team Members & Access Accounts</span>
-            </CardTitle>
-            <p className="text-xs text-foreground-muted mt-0.5">Assign user access roles across configured workspaces</p>
-          </div>
-
-          {/* Search and Filters */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="relative flex items-center">
-              <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search name, email, dept..."
-                className="pl-8.5 pr-8 py-1.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted/60 focus:outline-none focus:border-fairway-500 focus:ring-1 focus:ring-fairway-500 transition-all w-48 sm:w-60 shadow-2xs"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 text-foreground-muted hover:text-foreground"
+  // ================= REUI DATA-GRID COLUMN CONFIGURATION =================
+  const userColumns = useMemo<ColumnDef<DataGridFeatures, User>[]>(
+    () => [
+      {
+        id: 'actions',
+        header: ({ column }) => <DataGridColumnHeader title="Action" column={column} />,
+        cell: ({ row }) => {
+          const u = row.original;
+          const isCurrentUser = u.id === currentUser?.id;
+          return (
+            <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                    title="Actions"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="w-48 bg-surface border border-border shadow-dialog z-50 p-1 rounded-xl"
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+                  {isAdmin && (
+                    <DropdownMenuItem
+                      onClick={() => handleOpenEditModal(u)}
+                      className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Edit Member Details</span>
+                    </DropdownMenuItem>
+                  )}
+                  {isAdmin && !isCurrentUser && (
+                    <>
+                      <DropdownMenuItem
+                        onClick={() => handleToggleUserStatus(u.id, u.status)}
+                        className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
+                      >
+                        {u.status === 'Active' ? (
+                          <>
+                            <UserX className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Deactivate Account</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Activate Account</span>
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator className="my-1 border-border" />
+                      <DropdownMenuItem
+                        onClick={() => setDeletingUser(u)}
+                        className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Member</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
+          );
+        },
+        size: 75,
+        minSize: 65,
+        maxSize: 90,
+        enableSorting: false,
+        enableResizing: false,
+        enablePinning: true,
+      },
+      {
+        accessorKey: 'id',
+        id: 'code',
+        header: ({ column }) => <DataGridColumnHeader title="User #" column={column} />,
+        cell: ({ row }) => {
+          const u = row.original;
+          const userCode = `USR-${String(u.id).padStart(3, '0').slice(-4)}`;
+          return (
+            <span className="font-mono font-bold text-primary dark:text-white bg-primary/10 dark:bg-primary/20 px-2.5 py-1 rounded-full border border-primary/25 dark:border-primary/40 text-xs inline-flex items-center shadow-xs">
+              {userCode}
+            </span>
+          );
+        },
+        size: 130,
+        minSize: 120,
+        enableSorting: true,
+        enablePinning: true,
+      },
+      {
+        accessorKey: 'name',
+        id: 'name',
+        header: ({ column }) => <DataGridColumnHeader title="User / Member" column={column} />,
+        cell: ({ row }) => {
+          const u = row.original;
+          const isCurrentUser = u.id === currentUser?.id;
+          return (
+            <div className="flex items-center gap-2.5">
+              <UserAvatar src={u.avatar} name={u.name} size="sm" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-semibold text-foreground hover:text-fairway-600 dark:hover:text-fairway-400 text-xs truncate">
+                    {u.name}
+                  </span>
+                  {isCurrentUser && (
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 font-bold">
+                      You
+                    </span>
+                  )}
+                </div>
+                <span className="text-[11px] text-foreground-muted font-mono truncate block">
+                  {u.email}
+                </span>
+              </div>
+            </div>
+          );
+        },
+        size: 230,
+        minSize: 190,
+        enableSorting: true,
+      },
+      {
+        accessorKey: 'department',
+        id: 'department',
+        header: ({ column }) => <DataGridColumnHeader title="Department" column={column} />,
+        cell: ({ row }) => (
+          <span className="inline-flex items-center gap-1.5 text-foreground-muted font-medium text-xs truncate">
+            <Building className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+            <span className="truncate">{row.original.department || 'Executive Leadership'}</span>
+          </span>
+        ),
+        size: 180,
+        minSize: 150,
+        enableSorting: true,
+      },
+      {
+        accessorKey: 'role',
+        id: 'role',
+        header: ({ column }) => <DataGridColumnHeader title="Assigned Role" column={column} />,
+        cell: ({ row }) => {
+          const u = row.original;
+          const isCurrentUser = u.id === currentUser?.id;
+          const roleItem = roles.find((r) => r.key === u.role);
+          return isAdmin ? (
+            <div className="w-36" onClick={(e) => e.stopPropagation()}>
+              <Combobox
+                options={roles.map((r) => ({ value: r.key, label: r.name }))}
+                value={u.role}
+                onChange={(val) => {
+                  if (val) handleRoleChange(u.id, val as UserRole);
+                }}
+                disabled={isCurrentUser && isSuperAdmin}
+                placeholder="Select role"
+              />
+            </div>
+          ) : (
+            <span className="font-semibold capitalize bg-surface-muted border border-border px-2.5 py-1 rounded-lg text-foreground text-xs inline-flex items-center gap-1">
+              <Shield className="w-3 h-3 text-fairway-600" />
+              <span>{roleItem?.name || u.role.replace('_', ' ')}</span>
+            </span>
+          );
+        },
+        size: 170,
+        minSize: 150,
+        enableSorting: true,
+      },
+      {
+        accessorKey: 'status',
+        id: 'status',
+        header: ({ column }) => <DataGridColumnHeader title="Status" column={column} />,
+        cell: ({ row }) => {
+          const status = row.original.status || 'Active';
+          return (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs',
+                status === 'Active'
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 dark:bg-emerald-950/40 dark:border-emerald-800'
+                  : 'bg-surface-muted text-foreground-muted border-border'
+              )}
+            >
+              <span
+                className={cn(
+                  'w-1.5 h-1.5 rounded-full',
+                  status === 'Active' ? 'bg-emerald-500' : 'bg-foreground-muted'
+                )}
+              />
+              {status}
+            </span>
+          );
+        },
+        size: 120,
+        minSize: 100,
+        enableSorting: true,
+      },
+      {
+        accessorKey: 'assignedLeadsCount',
+        id: 'assignedLeadsCount',
+        header: ({ column }) => <DataGridColumnHeader title="Assigned Leads" column={column} />,
+        cell: ({ row }) => (
+          <span className="font-bold text-fairway-900 dark:text-fairway-300 text-xs tabular-nums">
+            {row.original.assignedLeadsCount || 0}
+          </span>
+        ),
+        size: 130,
+        minSize: 110,
+        enableSorting: true,
+      },
+      {
+        accessorKey: 'lastActive',
+        id: 'lastActive',
+        header: ({ column }) => <DataGridColumnHeader title="Last Active" column={column} />,
+        cell: ({ row }) => (
+          <span className="text-foreground-muted text-xs truncate">
+            {row.original.lastActive || 'Just now'}
+          </span>
+        ),
+        size: 140,
+        minSize: 120,
+        enableSorting: true,
+      },
+    ],
+    [currentUser, roles, isAdmin, isSuperAdmin]
+  );
 
-            <div className="w-36">
+  const table = useTable({
+    features: dataGridFeatures,
+    columns: userColumns,
+    data: pagedUsers,
+    pageCount: Math.max(1, Math.ceil(filteredUsers.length / (pagination.pageSize || 10))),
+    manualPagination: true,
+    manualSorting: true,
+    getRowId: (row: User) => row.id,
+    state: {
+      pagination,
+      sorting,
+      columnVisibility,
+      columnPinning,
+      columnOrder,
+      columnSizing,
+    },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnPinningChange: setColumnPinning,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+  });
+
+  return (
+    <div className="space-y-4 animate-fade-in text-xs">
+      {/* ================= SLEEK SEARCH & CONTROL TOOLBAR (MATCHING INQUIRIES) ================= */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 pt-1">
+        {/* Left: Search Bar */}
+        <div className="relative flex-1 max-w-md w-full">
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search team members, emails, departments..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+            }}
+            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+              }}
+              className="absolute right-2.5 top-2.5 text-foreground-muted hover:text-foreground cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Right: Controls & View Switcher */}
+        <TooltipProvider delayDuration={150}>
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
+            {/* Role Filter */}
+            <div className="w-36 sm:w-40">
               <Combobox
                 options={[
                   { value: 'all', label: 'All Roles' },
                   ...roles.map((r) => ({ value: r.key, label: r.name })),
                 ]}
                 value={roleFilter}
-                onChange={(val) => setRoleFilter(val || 'all')}
+                onChange={(val) => {
+                  setRoleFilter(val || 'all');
+                  setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+                }}
                 placeholder="All Roles"
               />
             </div>
 
-            <div className="w-32">
+            {/* Status Filter */}
+            <div className="w-32 sm:w-36">
               <Combobox
                 options={[
                   { value: 'all', label: 'All Status' },
@@ -257,157 +589,292 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
                   { value: 'Inactive', label: 'Inactive' },
                 ]}
                 value={statusFilter}
-                onChange={(val) => setStatusFilter(val || 'all')}
+                onChange={(val) => {
+                  setStatusFilter(val || 'all');
+                  setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+                }}
                 placeholder="All Status"
               />
             </div>
 
+            {/* Column Settings Dropdown (Common Component) */}
+            <DataGridColumnVisibilityMenu table={table} excludeColumns={['actions', 'code']} />
+
+            {/* Refresh Button */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-70"
+                >
+                  <RefreshCw
+                    className={cn(
+                      'w-4 h-4 transition-transform duration-700',
+                      isRefreshing && 'animate-spin text-fairway-600'
+                    )}
+                  />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Refresh</TooltipContent>
+            </Tooltip>
+
+            {/* Segmented View Switcher (List / Card View matching exact Inquiries UI) */}
+            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={cn(
+                      'w-9 h-full flex items-center justify-center transition-all cursor-pointer',
+                      viewMode === 'table'
+                        ? 'bg-fairway-600 text-white font-bold'
+                        : 'text-foreground hover:text-foreground hover:bg-surface-muted/60'
+                    )}
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">List</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('grid')}
+                    className={cn(
+                      'w-9 h-full flex items-center justify-center transition-all cursor-pointer',
+                      viewMode === 'grid'
+                        ? 'bg-fairway-600 text-white font-bold'
+                        : 'text-foreground hover:text-foreground hover:bg-surface-muted/60'
+                    )}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Card</TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* Add Member Button */}
             {isAdmin && (
               <Button
+                size="sm"
+                variant="primary"
                 onClick={() => setIsAddUserOpen(true)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-fairway-600 hover:bg-fairway-700 text-white shadow-xs rounded-xl"
+                leftIcon={<Plus className="w-4 h-4" />}
+                className="whitespace-nowrap"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Member</span>
+                Add Member
               </Button>
             )}
           </div>
-        </CardHeader>
+        </TooltipProvider>
+      </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-surface-muted/80 text-[11px] font-bold uppercase text-foreground-muted border-b border-border">
-              <tr>
-                <th className="p-3.5">User</th>
-                <th className="p-3.5">Department</th>
-                <th className="p-3.5">Role</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5 text-center">Assigned Leads</th>
-                <th className="p-3.5">Last Active</th>
-                <th className="p-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-foreground-muted">
-                    No team members found matching your search.
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-surface-muted/30 transition-colors">
-                    <td className="p-3.5">
-                      <div className="flex items-center gap-3">
-                        <UserAvatar src={u.avatar} name={u.name} size="md" />
-                        <div>
+      {/* ================= VIEW MODE 1: COMMON DATA GRID (MATCHING INQUIRIES LIST) ================= */}
+      {viewMode === 'table' ? (
+        <CommonDataGrid
+          table={table}
+          recordCount={filteredUsers.length}
+          isLoading={isRefreshing}
+          emptyState={
+            <div className="p-12 text-center text-foreground-muted bg-surface rounded-xl border border-border">
+              <Users className="w-8 h-8 text-foreground-muted mx-auto mb-2 opacity-50" />
+              <p className="font-semibold text-foreground text-xs">No team members found</p>
+              <p className="text-[11px] text-foreground-muted mt-0.5">
+                Try adjusting your search query or filter criteria.
+              </p>
+            </div>
+          }
+        />
+      ) : (
+        /* ================= VIEW MODE 2: CARD VIEW ================= */
+        <DataGrid
+          table={table}
+          recordCount={filteredUsers.length}
+          isLoading={isRefreshing}
+          loadingMode="skeleton"
+        >
+          <div className="space-y-4">
+          {filteredUsers.length === 0 ? (
+            <div className="p-12 text-center bg-surface rounded-2xl border border-border">
+              <Users className="w-8 h-8 text-foreground-muted mx-auto mb-2 opacity-50" />
+              <p className="text-xs font-semibold text-foreground">No team members match your search</p>
+              <p className="text-[11px] text-foreground-muted mt-0.5">
+                Try adjusting your search criteria or add a new team member.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 animate-fade-in">
+              {pagedUsers.map((u) => {
+                const userCode = `USR-${String(u.id).padStart(3, '0').slice(-4)}`;
+                const roleItem = roles.find((r) => r.key === u.role);
+                const isCurrentUser = u.id === currentUser?.id;
+
+                return (
+                  <div
+                    key={u.id}
+                    className="bg-surface border border-border hover:border-fairway-400 hover:shadow-card rounded-xl p-4 transition-all flex flex-col justify-between group text-xs select-none shadow-2xs"
+                  >
+                    <div>
+                      {/* Top Row: Code Badge + Status Pill + Menu */}
+                      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border">
+                        <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 dark:bg-emerald-950/30 dark:border-emerald-500/30 shadow-xs">
+                          {userCode}
+                        </span>
+
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={cn(
+                              'text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
+                              u.status === 'Active'
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                : 'bg-surface-muted text-foreground-muted border-border'
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'w-1.5 h-1.5 rounded-full',
+                                u.status === 'Active' ? 'bg-emerald-500' : 'bg-foreground-muted'
+                              )}
+                            />
+                            <span>{u.status || 'Active'}</span>
+                          </span>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="w-6 h-6 rounded-md flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                                title="Actions"
+                              >
+                                <MoreHorizontal className="w-3.5 h-3.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-48 bg-surface border border-border shadow-dialog z-50 p-1 rounded-xl"
+                            >
+                              <DropdownMenuItem
+                                onClick={() => handleOpenEditModal(u)}
+                                className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-foreground-muted" />
+                                <span>Edit Member</span>
+                              </DropdownMenuItem>
+                              {isAdmin && !isCurrentUser && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => handleToggleUserStatus(u.id, u.status)}
+                                    className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
+                                  >
+                                    {u.status === 'Active' ? (
+                                      <>
+                                        <UserX className="w-3.5 h-3.5 text-amber-500" />
+                                        <span>Deactivate Account</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                        <span>Activate Account</span>
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator className="my-1 border-border" />
+                                  <DropdownMenuItem
+                                    onClick={() => setDeletingUser(u)}
+                                    className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete Member</span>
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+
+                      {/* User Info (Avatar + Name + Email) */}
+                      <div className="mt-3 flex items-start gap-3">
+                        <UserAvatar src={u.avatar} name={u.name} size="lg" />
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-foreground block text-xs">{u.name}</span>
-                            {u.id === currentUser.id && (
-                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 font-bold">
+                            <h3 className="text-sm font-bold text-foreground group-hover:text-fairway-600 transition-colors truncate">
+                              {u.name}
+                            </h3>
+                            {isCurrentUser && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 font-bold shrink-0">
                                 You
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] text-foreground-muted font-mono">{u.email}</span>
+                          <p className="text-xs text-foreground-muted font-mono truncate mt-0.5">
+                            {u.email}
+                          </p>
+                          {u.phone && (
+                            <p className="text-[11px] text-foreground-muted flex items-center gap-1 mt-1">
+                              <Phone className="w-3 h-3 text-foreground-muted" />
+                              <span>{u.phone}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
-                    </td>
 
-                    <td className="p-3.5 text-foreground-muted font-medium">
-                      <span className="inline-flex items-center gap-1">
-                        <Building className="w-3 h-3 text-foreground-muted" />
-                        <span>{u.department || 'Executive Leadership'}</span>
-                      </span>
-                    </td>
-
-                    <td className="p-3.5">
-                      {isAdmin ? (
-                        <div className="w-36">
-                          <Combobox
-                            options={roles.map((r) => ({ value: r.key, label: r.name }))}
-                            value={u.role}
-                            onChange={(val) => {
-                              if (val) handleRoleChange(u.id, val as UserRole);
-                            }}
-                            disabled={u.id === currentUser.id && isSuperAdmin}
-                            placeholder="Select role"
-                          />
+                      {/* Key Specs Matrix (2-Column Grid Matching WarehouseInquiryCard) */}
+                      <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border/70 text-[11px]">
+                        <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
+                          <span className="text-[10px] text-foreground-muted block">Department</span>
+                          <span className="font-semibold text-foreground truncate flex items-center gap-1 mt-0.5">
+                            <Building className="w-3 h-3 text-fairway-600" />
+                            <span className="truncate">{u.department || 'Industrial Leasing'}</span>
+                          </span>
                         </div>
-                      ) : (
-                        <span className="font-bold capitalize bg-surface-muted border border-border px-2.5 py-1 rounded-lg text-foreground text-xs">
-                          {u.role.replace('_', ' ')}
-                        </span>
+                        <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
+                          <span className="text-[10px] text-foreground-muted block">Assigned Leads</span>
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
+                            <span>{u.assignedLeadsCount || 0} leads</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Footer: Role & Action */}
+                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-foreground-muted">
+                      <span className="font-semibold capitalize bg-surface-muted border border-border px-2 py-0.5 rounded-md text-foreground text-[11px] inline-flex items-center gap-1">
+                        <Shield className="w-3 h-3 text-fairway-600" />
+                        <span>{roleItem?.name || u.role}</span>
+                      </span>
+
+                      {isAdmin && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenEditModal(u)}
+                          className="h-7 px-2.5 text-xs text-foreground hover:border-fairway-500 hover:text-fairway-600 shadow-2xs"
+                          leftIcon={<Edit2 className="w-3 h-3" />}
+                        >
+                          Edit
+                        </Button>
                       )}
-                    </td>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-                    <td className="p-3.5">
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                          u.status === 'Active'
-                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                            : 'bg-surface-muted text-foreground-muted border border-border'
-                        }`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            u.status === 'Active' ? 'bg-emerald-500' : 'bg-foreground-muted'
-                          }`}
-                        />
-                        {u.status}
-                      </span>
-                    </td>
-
-                    <td className="p-3.5 font-mono font-bold text-center text-foreground">
-                      {u.assignedLeadsCount || 0}
-                    </td>
-
-                    <td className="p-3.5 text-foreground-muted text-[11px]">{u.lastActive || 'Just now'}</td>
-
-                    <td className="p-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleOpenEditModal(u)}
-                            className="p-1.5 text-foreground-muted hover:text-foreground hover:bg-surface-muted rounded-lg transition-colors"
-                            title="Edit user details"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-
-                        {isAdmin && u.id !== currentUser.id && (
-                          <>
-                            <button
-                              onClick={() => handleToggleUserStatus(u.id, u.status)}
-                              className="p-1.5 text-foreground-muted hover:text-foreground hover:bg-surface-muted rounded-lg transition-colors"
-                              title={u.status === 'Active' ? 'Deactivate user' : 'Activate user'}
-                            >
-                              {u.status === 'Active' ? (
-                                <UserX className="w-3.5 h-3.5 text-amber-500" />
-                              ) : (
-                                <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-                              )}
-                            </button>
-
-                            <button
-                              onClick={() => setDeletingUser(u)}
-                              className="p-1.5 text-foreground-muted hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
-                              title="Delete user"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          {/* Card View Pagination */}
+          {filteredUsers.length > 0 && !isRefreshing && (
+            <DataGridPagination sizes={[5, 10, 20, 50, 100]} />
+          )}
         </div>
-      </Card>
+      </DataGrid>
+    )}
 
       {/* ================= ADD USER MODAL ================= */}
       {isAddUserOpen && (
@@ -493,11 +960,20 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
-              <Button type="button" variant="outline" onClick={() => setIsAddUserOpen(false)}>
+            <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsAddUserOpen(false)}
+                className="w-full xs:w-auto"
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmittingUser} className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold">
+              <Button
+                type="submit"
+                disabled={isSubmittingUser}
+                className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold w-full xs:w-auto"
+              >
                 {isSubmittingUser ? 'Creating...' : 'Create Member'}
               </Button>
             </div>
@@ -572,7 +1048,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
               />
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+            <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
               <Button
                 type="button"
                 variant="outline"
@@ -580,10 +1056,15 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
                   setIsEditUserOpen(false);
                   setEditingUser(null);
                 }}
+                className="w-full xs:w-auto"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmittingEdit} className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold">
+              <Button
+                type="submit"
+                disabled={isSubmittingEdit}
+                className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold w-full xs:w-auto"
+              >
                 {isSubmittingEdit ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
@@ -601,15 +1082,21 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
         >
           <div className="space-y-4 text-xs text-left">
             <p className="text-foreground-muted">
-              This user will no longer be able to log in to Fairway CRM. Any existing leads assigned to this user will need to be reassigned.
+              This user will no longer be able to log in to Fairway CRM. Any existing leads assigned
+              to this user will need to be reassigned.
             </p>
 
             <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-600 dark:text-rose-400">
               <strong>Warning:</strong> This action permanently deletes user access.
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
-              <Button type="button" variant="outline" onClick={() => setDeletingUser(null)}>
+            <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeletingUser(null)}
+                className="w-full xs:w-auto"
+              >
                 Cancel
               </Button>
               <Button
@@ -617,6 +1104,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
                 variant="danger"
                 disabled={isDeletingUser}
                 onClick={handleConfirmDeleteUser}
+                className="w-full xs:w-auto"
               >
                 {isDeletingUser ? 'Deleting...' : 'Delete User'}
               </Button>

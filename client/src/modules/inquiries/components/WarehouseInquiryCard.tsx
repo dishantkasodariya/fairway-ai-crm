@@ -128,44 +128,47 @@ export const WarehouseInquiryLineCard: React.FC<WarehouseInquiryCardProps> = ({
   return (
     <div
       onClick={() => onSelect(inquiry.id)}
-      className="bg-surface border border-border hover:border-fairway-400 hover:shadow-subtle rounded-xl p-3 sm:px-4 sm:py-3 transition-all cursor-pointer group flex flex-col md:flex-row md:items-center justify-between gap-3 select-none shadow-2xs"
+      className="bg-surface border border-border hover:border-fairway-400 hover:shadow-subtle rounded-xl p-3 sm:px-4 sm:py-3 transition-all cursor-pointer group flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-3 select-none shadow-2xs"
     >
-      {/* Left: Code Badge + Company Name + Requirement */}
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+      {/* Mobile-Adaptive Header / Desktop Left Block */}
+      <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
         <div className="shrink-0 font-mono text-xs font-bold px-2.5 py-1 rounded-lg border bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40 flex items-center gap-1.5 shadow-xs whitespace-nowrap">
           <FileText className="w-3.5 h-3.5 text-primary dark:text-white" />
           <span>{inquiry.inquiryNumber}</span>
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 truncate">
-            <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors truncate">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors break-words">
               {inquiry.companyName}
             </span>
             <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded border border-primary/20 shrink-0 dark:bg-primary/20 dark:text-white dark:border-primary/30">
               {formatSqFt(inquiry.requiredAreaSqFt)}
             </span>
+            <span className={`md:hidden text-[10px] font-bold px-2 py-0.5 rounded-full border ${stageStyle.className}`}>
+              {stageStyle.label}
+            </span>
           </div>
-          <p className="text-xs text-foreground-muted truncate mt-0.5 max-w-xl">
+          <p className="text-xs text-foreground-muted line-clamp-2 sm:truncate mt-0.5 max-w-xl leading-snug">
             {inquiry.requirement}
           </p>
         </div>
       </div>
 
-      {/* Right: Badges & Price */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap md:flex-nowrap justify-between md:justify-end text-xs">
-        <div className="flex items-center gap-1 text-[11px] text-foreground-muted bg-surface-muted/70 px-2 py-1 rounded-md border border-border/80 whitespace-nowrap">
-          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-          <span className="font-medium">{inquiry.location}</span>
+      {/* Badges, Budget, Location & Action Trigger */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap md:flex-nowrap justify-between md:justify-end text-xs pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
+        <div className="flex items-center gap-1 text-[11px] text-foreground-muted bg-surface-muted/70 px-2 py-1 rounded-md border border-border/80">
+          <MapPin className="w-3 h-3 text-primary shrink-0" />
+          <span className="font-medium truncate max-w-[120px] sm:max-w-none">{inquiry.location}</span>
         </div>
 
-        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${stageStyle.className}`}>
+        <span className={`hidden md:inline-flex text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${stageStyle.className}`}>
           {stageStyle.label}
         </span>
 
         <div className="hidden lg:flex items-center gap-1 text-[11px] text-foreground-muted bg-surface-muted/60 px-2 py-1 rounded-md border border-border/60 whitespace-nowrap">
           <User className="w-3 h-3 text-slate-400 shrink-0" />
-          <span>{inquiry.salespersonName}</span>
+          <span className="truncate max-w-[100px]">{inquiry.salespersonName}</span>
         </div>
 
         <Badge
@@ -189,8 +192,8 @@ export const WarehouseInquiryLineCard: React.FC<WarehouseInquiryCardProps> = ({
           </div>
         )}
 
-        <div className="text-right min-w-[90px] whitespace-nowrap">
-          <span className="font-mono font-bold text-foreground text-xs">
+        <div className="text-right whitespace-nowrap">
+          <span className="font-mono font-bold text-foreground text-xs sm:text-sm">
             {formatINR(inquiry.budgetMonthlyINR, true)}
           </span>
           <span className="text-[10px] text-foreground-muted block leading-none">/ month</span>

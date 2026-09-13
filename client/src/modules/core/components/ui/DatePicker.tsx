@@ -130,8 +130,9 @@ export const DatePicker: React.FC<DatePickerProps> = ({
         </PopoverTrigger>
 
         <PopoverContent
-          className="w-auto p-0 border border-border bg-surface rounded-2xl shadow-xl overflow-hidden animate-scale-in"
+          className="w-auto max-w-[calc(100vw-24px)] box-border p-0 border border-border bg-surface rounded-2xl shadow-xl overflow-hidden animate-scale-in"
           align="start"
+          collisionPadding={12}
         >
           <div className="p-2.5 border-b border-border/80 flex items-center justify-between gap-2 bg-surface-muted/30">
             <span className="text-xs font-bold text-foreground">

@@ -433,7 +433,7 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
 
         {/* Right: Controls & View Switcher */}
         <TooltipProvider delayDuration={150}>
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
             {/* Filter Drawer Trigger Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -624,7 +624,7 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
 
                 <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3">
                   <div className="space-y-1.5">
-                    <h3 className="font-bold text-foreground text-sm group-hover:text-fairway-700 transition-colors line-clamp-1">
+                    <h3 className="font-bold text-foreground text-sm group-hover:text-fairway-700 transition-colors line-clamp-2">
                       {p.name}
                     </h3>
                     <p className="text-xs text-foreground-muted flex items-center gap-1 line-clamp-1">
@@ -678,7 +678,7 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
           />
 
           {/* Drawer Container */}
-          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0 text-left">
+          <div className="relative w-full max-w-full sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0 text-left">
             {/* Header */}
             <div className="p-5 border-b border-border bg-surface flex items-start justify-between border-t-0">
               <div>

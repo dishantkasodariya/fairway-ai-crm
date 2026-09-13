@@ -405,7 +405,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
 
         {/* Right: Controls & View Switcher */}
         <TooltipProvider delayDuration={150}>
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
             {/* Filter Drawer Trigger Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -781,7 +781,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
             className="fixed inset-0 w-full h-full bg-black/60 backdrop-blur-xs transition-opacity"
             onClick={() => setIsFilterDrawerOpen(false)}
           />
-          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none text-left">
+          <div className="relative w-full max-w-full sm:max-w-sm bg-surface border-l border-border h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none text-left">
             <div className="p-5 border-b border-border bg-surface flex items-start justify-between">
               <div>
                 <h2 className="text-base font-bold text-foreground tracking-tight flex items-center gap-2">
@@ -974,11 +974,11 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-border">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>
+          <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)} className="w-full xs:w-auto">
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={formSubmitting}>
+            <Button type="submit" size="sm" disabled={formSubmitting} className="w-full xs:w-auto">
               {formSubmitting ? 'Saving...' : editingContact ? 'Save Changes' : 'Register Stakeholder'}
             </Button>
           </div>

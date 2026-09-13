@@ -64,6 +64,59 @@ export const PermissionsService = {
     }
   },
 
+  async createRolePermission(payload: {
+    capability: string;
+    category: string;
+    description?: string;
+    superAdmin?: string;
+    admin?: string;
+    sales?: string;
+    viewer?: string;
+  }): Promise<{ success: boolean; data?: RolePermissionItem; error?: string }> {
+    try {
+      const token = localStorage.getItem('fairway_token') || localStorage.getItem('fw_auth_token');
+      const response = await fetch(`${API_BASE_URL}/roles-permissions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        return { success: false, error: data.error?.message || 'Failed to create permission' };
+      }
+
+      return { success: true, data: data.data };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  async deleteRolePermission(id: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const token = localStorage.getItem('fairway_token') || localStorage.getItem('fw_auth_token');
+      const response = await fetch(`${API_BASE_URL}/roles-permissions/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        return { success: false, error: data.error?.message || 'Failed to delete permission' };
+      }
+
+      return { success: true, message: data.message };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
   async resetRolePermissions(): Promise<{ success: boolean; data?: RolePermissionItem[]; message?: string; error?: string }> {
     try {
       const token = localStorage.getItem('fairway_token') || localStorage.getItem('fw_auth_token');

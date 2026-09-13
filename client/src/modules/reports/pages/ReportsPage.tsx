@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart3,
   TrendingUp,
@@ -28,18 +28,57 @@ import {
 } from '@/modules/core/components/ui';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
 import { useToast } from '@/modules/core/providers/ToastContext';
+import { InquiryService } from '@/modules/core/services/inquiryService';
+import { CompanyService } from '@/modules/core/services/companyService';
+import { PropertyService } from '@/modules/core/services/propertyService';
+import { TaskService } from '@/modules/core/services/taskService';
+import { Inquiry, Company, Property, Task } from '@/modules/core/types';
 
 export const ReportsView: React.FC = () => {
   const [dateRange, setDateRange] = useState<'q3_2026' | 'ytd' | 'all_time'>('q3_2026');
   const [ownerFilter, setOwnerFilter] = useState('all');
   const { success } = useToast();
 
-  const allInquiries = StorageService.getInquiries();
-  const companies = StorageService.getCompanies();
-  const properties = StorageService.getProperties();
+  const [allInquiries, setAllInquiries] = useState<Inquiry[]>(() => StorageService.getInquiries());
+  const [companies, setCompanies] = useState<Company[]>(() => StorageService.getCompanies());
+  const [properties, setProperties] = useState<Property[]>(() => StorageService.getProperties());
+  const [tasks, setTasks] = useState<Task[]>(() => StorageService.getTasks());
   const users = StorageService.getUsers();
-  const tasks = StorageService.getTasks();
   const stages = StorageService.getPipelineStages();
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveData = async () => {
+      try {
+        const [inqRes, compRes, propRes, taskRes] = await Promise.allSettled([
+          InquiryService.getInquiries({ pageSize: 500 }),
+          CompanyService.getCompanies({ pageSize: 500 }),
+          PropertyService.getProperties(),
+          TaskService.getTasks(),
+        ]);
+
+        if (isMounted) {
+          if (inqRes.status === 'fulfilled' && inqRes.value.success && inqRes.value.data) {
+            setAllInquiries(inqRes.value.data);
+          }
+          if (compRes.status === 'fulfilled' && compRes.value.success && compRes.value.data) {
+            setCompanies(compRes.value.data);
+          }
+          if (propRes.status === 'fulfilled' && propRes.value.success && propRes.value.data) {
+            setProperties(propRes.value.data);
+          }
+          if (taskRes.status === 'fulfilled' && taskRes.value.success && taskRes.value.data) {
+            setTasks(taskRes.value.data);
+          }
+        }
+      } catch (e) {
+        console.warn('Reports page live data error:', e);
+      }
+    };
+
+    fetchLiveData();
+    return () => { isMounted = false; };
+  }, []);
 
   const inquiries = useMemo(() => {
     if (ownerFilter === 'all') return allInquiries;
@@ -121,9 +160,9 @@ export const ReportsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col xs:flex-row flex-wrap items-stretch xs:items-center gap-2.5 w-full sm:w-auto">
           {/* Owner Filter */}
-          <div className="w-48 sm:w-56">
+          <div className="w-full xs:w-48 sm:w-56">
             <Combobox
               options={[
                 { value: 'all', label: 'All Team Members' },
@@ -136,7 +175,7 @@ export const ReportsView: React.FC = () => {
           </div>
 
           {/* Timeframe Filter */}
-          <div className="w-52 sm:w-60">
+          <div className="w-full xs:w-52 sm:w-60">
             <Combobox
               options={[
                 { value: 'q3_2026', label: 'Q3 FY27 (Jul - Sep 2026)' },
@@ -155,6 +194,7 @@ export const ReportsView: React.FC = () => {
             variant="outline"
             onClick={handleExportCSV}
             leftIcon={<Download className="w-3.5 h-3.5" />}
+            className="w-full xs:w-auto justify-center font-semibold"
           >
             Export CSV
           </Button>
@@ -321,25 +361,25 @@ export const ReportsView: React.FC = () => {
                 const userVal = userInquiries.reduce((acc, curr) => acc + (curr.budgetMonthlyINR || 0), 0);
 
                 return (
-                  <div key={u.id} className="py-3 flex items-center justify-between hover:bg-surface-muted/30 px-2 rounded-lg transition-colors">
+                  <div key={u.id} className="py-3 flex flex-col xs:flex-row xs:items-center justify-between gap-3 hover:bg-surface-muted/30 px-2 rounded-lg transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
                       <UserAvatar src={u.avatar} name={u.name} size="sm" />
-                      <div className="truncate">
-                        <span className="font-bold text-foreground block truncate">{u.name}</span>
+                      <div className="min-w-0">
+                        <span className="font-bold text-foreground block break-words">{u.name}</span>
                         <span className="text-[10px] text-foreground-muted font-mono">{u.role.replace('_', ' ').toUpperCase()}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-5 sm:gap-6 text-right shrink-0">
+                    <div className="flex items-center justify-between xs:justify-end gap-3.5 sm:gap-6 text-right shrink-0">
                       <div>
-                        <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Active Leads</span>
+                        <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Active</span>
                         <span className="font-bold text-foreground">{userActive}</span>
                       </div>
                       <div>
-                        <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Won Deals</span>
+                        <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Won</span>
                         <span className="font-bold text-emerald-700 dark:text-emerald-400">{userWon}</span>
                       </div>
-                      <div className="min-w-[85px]">
+                      <div className="min-w-[70px] sm:min-w-[85px]">
                         <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Pipeline</span>
                         <span className="font-mono font-bold text-fairway-900 dark:text-fairway-200">{formatINR(userVal, true)}</span>
                       </div>

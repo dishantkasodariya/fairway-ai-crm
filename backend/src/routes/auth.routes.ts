@@ -15,10 +15,10 @@ const router = Router();
 router.post('/register', register);
 router.post('/signup', register);
 router.post('/login', login);
-router.get('/users', getUsers);
 
 // Protected routes
 router.get('/me', authenticateJWT, getMe);
+router.get('/users', authenticateJWT, getUsers);
 router.put('/profile', authenticateJWT, updateProfile);
 router.put('/change-password', authenticateJWT, changePassword);
 

@@ -98,6 +98,22 @@ export function normalizeCompanyName(name?: string): string {
 
 export class StorageService {
   public static init() {
+    // Purge legacy mock data cache once so live backend PostgreSQL records take precedence
+    const MOCK_PURGE_KEY = 'fw_crm_live_pg_synced_v3';
+    if (!localStorage.getItem(MOCK_PURGE_KEY)) {
+      localStorage.removeItem(STORAGE_KEYS.COMPANIES);
+      localStorage.removeItem(STORAGE_KEYS.INQUIRIES);
+      localStorage.removeItem(STORAGE_KEYS.PROPERTIES);
+      localStorage.removeItem(STORAGE_KEYS.FACILITIES);
+      localStorage.removeItem(STORAGE_KEYS.CONTACTS);
+      localStorage.removeItem(STORAGE_KEYS.PROPOSALS);
+      localStorage.removeItem(STORAGE_KEYS.TASKS);
+      localStorage.removeItem(STORAGE_KEYS.ACTIVITIES);
+      localStorage.removeItem(STORAGE_KEYS.NOTES);
+      localStorage.removeItem(STORAGE_KEYS.SITE_VISITS);
+      localStorage.setItem(MOCK_PURGE_KEY, 'true');
+    }
+
     if (!localStorage.getItem(STORAGE_KEYS.INITIALIZED)) {
       this.resetToDefaults();
     }
@@ -105,19 +121,19 @@ export class StorageService {
 
   public static resetToDefaults() {
     setStorageItem(STORAGE_KEYS.USERS, INITIAL_USERS);
-    setStorageItem(STORAGE_KEYS.CURRENT_USER, INITIAL_USERS[0]); // Bhavya (Super Admin)
-    setStorageItem(STORAGE_KEYS.COMPANIES, INITIAL_COMPANIES);
-    setStorageItem(STORAGE_KEYS.FACILITIES, INITIAL_FACILITIES);
-    setStorageItem(STORAGE_KEYS.CONTACTS, INITIAL_CONTACTS);
-    setStorageItem(STORAGE_KEYS.INQUIRIES, INITIAL_INQUIRIES);
-    setStorageItem(STORAGE_KEYS.PROPERTIES, INITIAL_PROPERTIES);
-    setStorageItem(STORAGE_KEYS.PROPOSALS, INITIAL_PROPOSALS);
-    setStorageItem(STORAGE_KEYS.TASKS, INITIAL_TASKS);
-    setStorageItem(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
-    setStorageItem(STORAGE_KEYS.NOTES, INITIAL_NOTES);
-    setStorageItem(STORAGE_KEYS.SITE_VISITS, INITIAL_SITE_VISITS);
-    setStorageItem(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
-    setStorageItem(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
+    setStorageItem(STORAGE_KEYS.CURRENT_USER, INITIAL_USERS[0]);
+    setStorageItem(STORAGE_KEYS.COMPANIES, []);
+    setStorageItem(STORAGE_KEYS.FACILITIES, []);
+    setStorageItem(STORAGE_KEYS.CONTACTS, []);
+    setStorageItem(STORAGE_KEYS.INQUIRIES, []);
+    setStorageItem(STORAGE_KEYS.PROPERTIES, []);
+    setStorageItem(STORAGE_KEYS.PROPOSALS, []);
+    setStorageItem(STORAGE_KEYS.TASKS, []);
+    setStorageItem(STORAGE_KEYS.ACTIVITIES, []);
+    setStorageItem(STORAGE_KEYS.NOTES, []);
+    setStorageItem(STORAGE_KEYS.SITE_VISITS, []);
+    setStorageItem(STORAGE_KEYS.NOTIFICATIONS, []);
+    setStorageItem(STORAGE_KEYS.AUDIT_LOGS, []);
     setStorageItem(STORAGE_KEYS.PIPELINE_STAGES, PIPELINE_STAGES);
     localStorage.setItem(STORAGE_KEYS.INITIALIZED, 'true');
   }

@@ -1234,7 +1234,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           />
 
           {/* Drawer Container */}
-          <div className="relative w-full max-w-[88vw] sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0">
+          <div className="relative w-full max-w-full sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0">
             {/* Header */}
             <div className="p-5 border-b border-border bg-surface flex items-start justify-between border-t-0">
               <div>

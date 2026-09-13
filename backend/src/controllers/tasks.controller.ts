@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { query } from '../config/db.js';
 import crypto from 'crypto';
+import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
 /**
  * GET /api/tasks
@@ -449,13 +450,35 @@ export const toggleTaskStatus = async (req: Request, res: Response): Promise<voi
 /**
  * DELETE /api/tasks/:id
  */
-export const deleteTask = async (req: Request, res: Response): Promise<void> => {
+export const deleteTask = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const sessionUser = req.user;
+
+    // Security (BOLA/IDOR): Verify task existence and ownership/role
+    const existing = await query('SELECT id, assigned_user_id FROM tasks WHERE id = $1;', [id]);
+    if (existing.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Task not found.' });
+      return;
+    }
+
+    const isAuthorized =
+      sessionUser?.role === 'super_admin' ||
+      sessionUser?.role === 'admin' ||
+      existing.rows[0].assigned_user_id === sessionUser?.userId;
+
+    if (!isAuthorized) {
+      res.status(403).json({
+        success: false,
+        error: 'Forbidden. You do not have permission to delete this task.',
+      });
+      return;
+    }
+
     await query('DELETE FROM tasks WHERE id = $1;', [id]);
     res.status(200).json({ success: true, message: 'Task deleted successfully.' });
   } catch (error: any) {
     console.error('Error deleting task:', error);
-    res.status(200).json({ success: true, message: 'Task deleted successfully.' });
+    res.status(500).json({ success: false, error: 'Failed to delete task.' });
   }
 };

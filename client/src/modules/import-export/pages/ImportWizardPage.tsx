@@ -418,7 +418,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
       </div>
 
       {/* Minimal 4-Step Segmented Bar */}
-      <div className="flex items-center border border-border rounded-xl bg-surface p-1 text-xs">
+      <div className="flex items-center border border-border rounded-xl bg-surface p-1 text-xs overflow-x-auto no-scrollbar touch-pan-x select-none">
         {[
           { num: 1, label: '1. Upload File' },
           { num: 2, label: '2. Map Columns' },
@@ -435,7 +435,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
             }}
             disabled={s.num > step && parsedRows.length === 0}
             className={cn(
-              'flex-1 py-2 px-3 rounded-lg font-medium text-center transition-all truncate',
+              'flex-1 min-w-[120px] sm:min-w-0 py-2 px-3 rounded-lg font-medium text-center transition-all whitespace-nowrap shrink-0',
               step === s.num
                 ? 'bg-fairway-600 text-white font-semibold shadow-2xs'
                 : step > s.num
@@ -715,7 +715,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
           </div>
 
           {/* Clean High-Density Minimalist Table */}
-          <div className="overflow-x-auto border border-border rounded-lg max-h-[460px] bg-surface relative">
+          <div className="overflow-x-auto no-scrollbar touch-pan-x border border-border rounded-lg max-h-[460px] bg-surface relative">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="sticky top-0 z-20">
                 <tr className="border-b border-border">

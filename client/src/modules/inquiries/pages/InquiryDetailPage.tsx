@@ -513,27 +513,27 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
           </div>
 
           {/* Quick Actions */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap pt-2 lg:pt-0">
             {canEdit && (
               <>
-                <Button size="sm" variant="outline" onClick={() => setIsProposalModalOpen(true)} leftIcon={<FileSpreadsheet className="w-4 h-4 text-purple-600 dark:text-purple-400" />}>
+                <Button size="sm" variant="outline" onClick={() => setIsProposalModalOpen(true)} leftIcon={<FileSpreadsheet className="w-4 h-4 text-purple-600 dark:text-purple-400" />} className="text-xs">
                   Draft Proposal
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsSiteVisitModalOpen(true)} leftIcon={<Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400" />}>
+                <Button size="sm" variant="outline" onClick={() => setIsSiteVisitModalOpen(true)} leftIcon={<Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400" />} className="text-xs">
                   Schedule Site Visit
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsTaskModalOpen(true)} leftIcon={<Plus className="w-4 h-4 text-amber-600 dark:text-amber-400" />}>
+                <Button size="sm" variant="outline" onClick={() => setIsTaskModalOpen(true)} leftIcon={<Plus className="w-4 h-4 text-amber-600 dark:text-amber-400" />} className="text-xs">
                   Add Task
                 </Button>
               </>
             )}
-            <Button size="sm" variant="secondary" onClick={onNavigateToMap} leftIcon={<MapPin className="w-4 h-4 text-primary" />}>
+            <Button size="sm" variant="secondary" onClick={onNavigateToMap} leftIcon={<MapPin className="w-4 h-4 text-primary" />} className="text-xs">
               Corridor Map
             </Button>
           </div>
         </div>
 
-        {/* 2. Interactive Pipeline Stages Stepper */}
+        {/* 2. Interactive Pipeline Stages Stepper (Responsive Horizontal Scroll Track - Zero Truncation) */}
         <div className="pt-5">
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
@@ -543,7 +543,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
               Current: <strong className="text-foreground capitalize">{inquiry.stage.replace(/_/g, ' ')}</strong>
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+          <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar pb-2 pt-1 touch-pan-x">
             {pipelineStages.map((stage) => {
               const isCurrent = inquiry.stage === stage.key;
               const currentStageOrder = pipelineStages.find((s) => s.key === inquiry.stage)?.order || 1;
@@ -554,7 +554,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
                   key={stage.id}
                   disabled={!canEdit}
                   onClick={() => handleStageChange(stage.key)}
-                  className={`py-2 px-1.5 rounded-lg border text-center transition-all text-xs select-none relative ${
+                  className={`min-w-[125px] sm:min-w-[135px] flex-1 py-2 px-2.5 rounded-lg border text-center transition-all text-xs shrink-0 select-none relative cursor-pointer ${
                     isCurrent
                       ? 'bg-primary text-white font-bold border-primary shadow-sm ring-2 ring-primary/20 scale-[1.02]'
                       : isPassed
@@ -564,7 +564,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
                   title={stage.description}
                 >
                   <span className="text-[10px] block font-mono opacity-75">0{stage.order}</span>
-                  <span className="truncate block font-medium leading-tight mt-0.5">{stage.label}</span>
+                  <span className="block font-medium leading-tight mt-0.5 whitespace-nowrap">{stage.label}</span>
                 </button>
               );
             })}

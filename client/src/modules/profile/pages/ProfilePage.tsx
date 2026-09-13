@@ -318,7 +318,7 @@ export const ProfilePage: React.FC = () => {
             {/* Profile Info */}
             <div className="space-y-2 flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground tracking-tight truncate">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground tracking-tight break-words">
                   {currentUser.name}
                 </h2>
                 <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider bg-fairway-100 text-fairway-900 border border-fairway-300 dark:bg-fairway-950/80 dark:text-fairway-300 dark:border-fairway-800">
@@ -327,11 +327,11 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               {/* Email with copy button */}
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-foreground-muted font-mono">
-                <span className="truncate">{currentUser.email}</span>
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-foreground-muted font-mono flex-wrap">
+                <span className="break-all">{currentUser.email}</span>
                 <button
                   onClick={handleCopyEmail}
-                  className="p-1 text-foreground-muted hover:text-foreground hover:bg-surface-muted rounded transition-colors"
+                  className="p-1 text-foreground-muted hover:text-foreground hover:bg-surface-muted rounded transition-colors shrink-0 cursor-pointer"
                   title="Copy email"
                 >
                   {isCopiedEmail ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}

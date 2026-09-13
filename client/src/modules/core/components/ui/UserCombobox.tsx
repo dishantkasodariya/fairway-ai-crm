@@ -140,7 +140,8 @@ export const UserCombobox: React.FC<UserComboboxProps> = ({
 
         <PopoverContent
           align="start"
-          className="w-[var(--radix-popover-trigger-width)] min-w-[280px] p-0 rounded-2xl border border-border bg-surface dark:bg-[#161B22] shadow-2xl overflow-hidden z-[99999] animate-fade-in"
+          collisionPadding={12}
+          className="w-[var(--radix-popover-trigger-width)] min-w-[min(260px,calc(100vw-24px))] max-w-[calc(100vw-24px)] p-0 rounded-2xl border border-border bg-surface dark:bg-[#161B22] shadow-2xl overflow-hidden z-[99999] animate-fade-in"
         >
           <Command className="w-full bg-transparent">
             <div className="flex items-center border-b border-border px-3.5 py-1 bg-surface-muted/30">

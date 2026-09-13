@@ -19,3 +19,5 @@ export * from './chart-pie-donut-active';
 export * from './chart-bar-stacked';
 export * from './command';
 export * from './combobox-1';
+export * from './CommonDataGrid';
+

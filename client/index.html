@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="preload">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
@@ -17,7 +17,7 @@
     <script>
       (function() {
         try {
-          var mode = localStorage.getItem('fw_crm_color_mode') || 'system';
+          var mode = localStorage.getItem('fw_crm_color_mode') || 'light';
           var isDark = mode === 'dark' || (mode === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
           var themeId = localStorage.getItem('fw_crm_active_theme_id') || 'fairway';
 
@@ -86,19 +86,19 @@
 
           if (isDark) {
             root.classList.add('dark');
-            root.style.setProperty('--bg-app', '#0B0F17', 'important');
-            root.style.setProperty('--bg-surface', '#111827', 'important');
-            root.style.setProperty('--bg-surface-muted', '#1F2937', 'important');
-            root.style.setProperty('--bg-card', '#111827', 'important');
-            root.style.setProperty('--text-foreground', '#F9FAFB', 'important');
-            root.style.setProperty('--border-color', '#374151', 'important');
-            root.style.setProperty('--background', '11 15 23', 'important');
-            root.style.setProperty('--surface', '17 24 39', 'important');
-            root.style.setProperty('--surface-muted', '31 41 55', 'important');
-            root.style.setProperty('--foreground', '249 250 251', 'important');
-            root.style.setProperty('--border', '55 65 81', 'important');
-            root.style.setProperty('--card', '17 24 39', 'important');
-            root.style.setProperty('--card-foreground', '249 250 251', 'important');
+            root.style.setProperty('--bg-app', '#09090B', 'important');
+            root.style.setProperty('--bg-surface', '#121214', 'important');
+            root.style.setProperty('--bg-surface-muted', '#1C1C1F', 'important');
+            root.style.setProperty('--bg-card', '#121214', 'important');
+            root.style.setProperty('--text-foreground', '#FFFFFF', 'important');
+            root.style.setProperty('--border-color', '#27272A', 'important');
+            root.style.setProperty('--background', '9 9 11', 'important');
+            root.style.setProperty('--surface', '18 18 20', 'important');
+            root.style.setProperty('--surface-muted', '28 28 31', 'important');
+            root.style.setProperty('--foreground', '255 255 255', 'important');
+            root.style.setProperty('--border', '39 39 42', 'important');
+            root.style.setProperty('--card', '18 18 20', 'important');
+            root.style.setProperty('--card-foreground', '255 255 255', 'important');
           } else {
             root.classList.remove('dark');
           }
@@ -129,7 +129,7 @@
 
           var css = ':root, html, body {';
           if (isDark) {
-            css += '--bg-app: #0B0F17 !important; --bg-surface: #111827 !important; --bg-surface-muted: #1F2937 !important; --text-foreground: #F9FAFB !important; --border-color: #374151 !important;';
+            css += '--bg-app: #09090B !important; --bg-surface: #121214 !important; --bg-surface-muted: #1C1C1F !important; --text-foreground: #FFFFFF !important; --border-color: #27272A !important;';
           }
           for (var s in pal.shades) {
             css += '--fw-' + s + ': ' + pal.shades[s] + ' !important;';
@@ -144,29 +144,29 @@
           css += '--accent-soft: ' + accentSoftRgb + ' !important;';
           css += '}';
           if (isDark) {
-            css += 'html.dark .hover\\:bg-surface-muted:hover, html.dark .hover\\:bg-slate-50:hover, html.dark .hover\\:bg-slate-100:hover, html.dark .hover\\:bg-slate-200:hover, html.dark .hover\\:bg-gray-50:hover, html.dark .hover\\:bg-gray-100:hover { background-color: #1F2937 !important; }';
-            css += 'html.dark .hover\\:bg-surface:hover, html.dark .hover\\:bg-white:hover { background-color: #111827 !important; }';
-            css += 'html.dark .hover\\:bg-rose-50:hover { background-color: rgba(76, 5, 25, 0.4) !important; }';
-            css += 'html.dark .hover\\:bg-emerald-50:hover { background-color: rgba(6, 78, 59, 0.45) !important; }';
-            css += 'html.dark .hover\\:bg-amber-50:hover { background-color: rgba(69, 26, 3, 0.4) !important; }';
-            css += 'html.dark .text-foreground, html.dark .text-slate-900, html.dark .text-slate-800, html.dark .text-slate-700, html.dark .text-gray-900, html.dark .text-gray-800, html.dark .text-gray-700, html.dark .text-black { color: #F9FAFB !important; }';
-            css += 'html.dark .text-foreground-muted, html.dark .text-muted-foreground, html.dark .text-slate-600, html.dark .text-slate-500, html.dark .text-slate-400, html.dark .text-gray-600, html.dark .text-gray-500, html.dark .text-gray-400 { color: #9CA3AF !important; }';
-            css += 'html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6, html.dark strong, html.dark b { color: #F9FAFB !important; }';
-            css += 'html.dark label { color: #E5E7EB !important; }';
-            css += 'html.dark th { color: #9CA3AF !important; }';
-            css += 'html.dark td { color: #F9FAFB !important; }';
+            css += 'html.dark, body.dark, .dark { background-color: #09090B !important; color: #FFFFFF !important; }';
+            css += 'html.dark .bg-surface, html.dark .bg-white { background-color: #121214 !important; }';
+            css += 'html.dark .bg-surface-muted { background-color: #1C1C1F !important; }';
+            css += 'html.dark .border-border { border-color: #27272A !important; }';
+            css += 'html.dark .text-foreground { color: #FFFFFF !important; }';
+            css += 'html.dark .text-foreground-muted { color: #D4D4D8 !important; }';
           }
           css += '.bg-fairway-600 { background-color: ' + pal.shades[600] + ' !important; }';
           css += '.bg-fairway-700 { background-color: ' + pal.shades[700] + ' !important; }';
           css += '.bg-fairway-800 { background-color: ' + pal.shades[800] + ' !important; }';
-          css += '.bg-fairway-50 { background-color: ' + (isDark ? pal.shades[950] + 'B3' : pal.shades[50]) + ' !important; }';
-          css += '.bg-fairway-100 { background-color: ' + (isDark ? pal.shades[900] + 'CC' : pal.shades[100]) + ' !important; }';
-          css += '.bg-fairway-200 { background-color: ' + (isDark ? pal.shades[800] : pal.shades[200]) + ' !important; }';
-          css += '.text-fairway-600 { color: ' + (isDark ? pal.shades[300] : pal.shades[600]) + ' !important; }';
-          css += '.text-fairway-700 { color: ' + (isDark ? pal.shades[200] : pal.shades[700]) + ' !important; }';
-          css += '.text-fairway-800 { color: ' + (isDark ? pal.shades[200] : pal.shades[800]) + ' !important; }';
-          css += '.text-fairway-900 { color: ' + (isDark ? pal.shades[100] : pal.shades[900]) + ' !important; }';
+          css += '.text-fairway-600 { color: ' + pal.shades[600] + ' !important; }';
+          css += '.text-fairway-700 { color: ' + pal.shades[700] + ' !important; }';
+          css += '.text-fairway-800 { color: ' + pal.shades[800] + ' !important; }';
           styleTag.textContent = css;
+
+          // Remove preload class right after initial paint to enable smooth transitions
+          window.addEventListener('DOMContentLoaded', function() {
+            requestAnimationFrame(function() {
+              requestAnimationFrame(function() {
+                document.documentElement.classList.remove('preload');
+              });
+            });
+          });
         } catch(e) {}
       })();
     </script>

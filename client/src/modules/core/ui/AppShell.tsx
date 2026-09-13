@@ -562,18 +562,18 @@ export const AppShell: React.FC<AppShellProps> = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={toggleColorMode}
-                    className="flex items-center justify-center w-8 h-8 rounded-button border border-border hover:border-fairway-400 bg-surface hover:bg-surface-muted text-foreground-muted hover:text-foreground transition-all shrink-0 shadow-subtle cursor-pointer"
-                    aria-label="Toggle Dark Mode"
+                    className="relative flex items-center justify-center w-8 h-8 rounded-button border border-border hover:border-fairway-400 bg-surface hover:bg-surface-muted text-foreground-muted hover:text-foreground transition-all shrink-0 shadow-subtle cursor-pointer overflow-hidden group"
+                    aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
                   >
                     {isDark ? (
-                      <Sun className="w-4 h-4 text-amber-400 animate-fade-in" />
+                      <Sun className="w-4 h-4 text-amber-400 transition-transform duration-300 rotate-0 scale-100 group-hover:rotate-45" />
                     ) : (
-                      <Moon className="w-4 h-4 text-fairway-700 animate-fade-in" />
+                      <Moon className="w-4 h-4 text-fairway-700 transition-transform duration-300 rotate-0 scale-100 group-hover:-rotate-12" />
                     )}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  {isDark ? 'Light Mode (Shift+D)' : 'Dark Mode (Shift+D)'}
+                  {isDark ? 'Switch to Light Mode (Shift+D)' : 'Switch to Dark Mode (Shift+D)'}
                 </TooltipContent>
               </Tooltip>
 
@@ -680,7 +680,74 @@ export const AppShell: React.FC<AppShellProps> = ({
                   </button>
                 );
               })}
+            </div>
 
+            {/* Mobile Drawer Footer: User Profile & Actions */}
+            <div className="pt-3 border-t border-border mt-auto">
+              <div
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onNavigate('profile');
+                }}
+                className="flex items-center gap-2.5 p-2 rounded-xl bg-surface-muted/60 border border-border/80 cursor-pointer hover:bg-surface-muted transition-colors mb-2"
+              >
+                <UserAvatar
+                  src={currentUser.avatar}
+                  name={currentUser.name}
+                  size="sm"
+                  className="rounded-lg ring-1 ring-border shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-foreground truncate">
+                    {currentUser.name}
+                  </div>
+                  <div className="text-[10px] text-foreground-muted truncate">
+                    {currentUser.email}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-1 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onNavigate('settings');
+                  }}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors font-medium"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Settings</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleColorMode}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors font-medium"
+                  aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+                >
+                  {isDark ? (
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  ) : (
+                    <Moon className="w-3.5 h-3.5 text-fairway-700" />
+                  )}
+                  <span>{isDark ? 'Light' : 'Dark'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    logout();
+                    onSignOut?.();
+                    success('Signed out', 'You have been signed out of Fairway CRM.');
+                  }}
+                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors font-medium"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Log out</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

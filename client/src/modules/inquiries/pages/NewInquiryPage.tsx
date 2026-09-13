@@ -745,7 +745,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
             </div>
 
             {/* Entity Selection Mode Pills */}
-            <div className="flex items-center p-1 bg-surface-muted rounded-xl border border-border self-start sm:self-auto">
+            <div className="flex items-center gap-1 p-1 bg-surface-muted rounded-xl border border-border flex-wrap sm:flex-nowrap w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -754,7 +754,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   clearError('companyIndustry');
                   clearError('companyCity');
                 }}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
                   selectedCompanyMode === 'existing'
                     ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
                     : 'text-foreground-muted hover:text-foreground'
@@ -1766,12 +1766,12 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+          <div className="flex flex-col-reverse xs:flex-row xs:items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={onBack}
-              className="text-xs border-border px-4"
+              className="text-xs border-border px-4 justify-center w-full xs:w-auto"
             >
               Cancel
             </Button>
@@ -1780,7 +1780,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               variant="primary"
               isLoading={isSubmitting}
               disabled={isSubmitting}
-              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs px-6 shadow-xs flex items-center gap-2 cursor-pointer"
+              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs px-4 sm:px-6 shadow-xs flex items-center justify-center gap-2 cursor-pointer text-center w-full xs:w-auto"
             >
               Register Warehouse Inquiry & Match Assets
             </Button>

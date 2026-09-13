@@ -1360,7 +1360,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+          <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
             <Button
               type="button"
               variant="outline"
@@ -1369,10 +1369,11 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 setIsNewTaskOpen(false);
                 setTaskErrors({});
               }}
+              className="w-full xs:w-auto"
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" size="sm" disabled={isSubmitting}>
+            <Button type="submit" variant="primary" size="sm" disabled={isSubmitting} className="w-full xs:w-auto">
               Schedule Task
             </Button>
           </div>

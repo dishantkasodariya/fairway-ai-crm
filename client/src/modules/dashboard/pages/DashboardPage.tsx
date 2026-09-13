@@ -28,6 +28,10 @@ import {
   Flame,
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
+import { InquiryService } from '@/modules/core/services/inquiryService';
+import { CompanyService } from '@/modules/core/services/companyService';
+import { PropertyService } from '@/modules/core/services/propertyService';
+import { TaskService } from '@/modules/core/services/taskService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { formatINR, formatSqFt, formatRelativeDate } from '@/modules/core/utils/formatters';
 import { Button } from '@/modules/core/components/ui/Button';
@@ -35,7 +39,7 @@ import { Card, CardHeader, CardTitle } from '@/modules/core/components/ui/Card';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/modules/core/components/ui/DropdownMenu';
 import { UserAvatar } from '@/modules/core/components/ui/UserAvatar';
 import { useToast } from '@/modules/core/providers/ToastContext';
-import { Task, Inquiry } from '@/modules/core/types';
+import { Task, Inquiry, Company, Property, Activity as ActivityType } from '@/modules/core/types';
 
 export interface DashboardViewProps {
   onNavigate: (view: any, entityId?: string) => void;
@@ -47,17 +51,55 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   const { success } = useToast();
   const [ownerFilter, setOwnerFilter] = useState<string>(isSales ? currentUser.id : 'all');
   const [tasksList, setTasksList] = useState<Task[]>(() => StorageService.getTasks());
-
-  const companies = StorageService.getCompanies();
-  const allInquiries = StorageService.getInquiries();
-  const properties = StorageService.getProperties();
-  const activities = StorageService.getActivities();
+  const [companies, setCompanies] = useState<Company[]>(() => StorageService.getCompanies());
+  const [allInquiries, setAllInquiries] = useState<Inquiry[]>(() => StorageService.getInquiries());
+  const [properties, setProperties] = useState<Property[]>(() => StorageService.getProperties());
+  const [activities, setActivities] = useState<ActivityType[]>(() => StorageService.getActivities());
   const users = StorageService.getUsers();
+
+  // Async load live PostgreSQL data from backend APIs
+  useEffect(() => {
+    let isMounted = true;
+    const loadBackendData = async () => {
+      try {
+        const [inqRes, compRes, propRes, taskRes] = await Promise.allSettled([
+          InquiryService.getInquiries({ pageSize: 500 }),
+          CompanyService.getCompanies({ pageSize: 500 }),
+          PropertyService.getProperties(),
+          TaskService.getTasks(),
+        ]);
+
+        if (isMounted) {
+          if (inqRes.status === 'fulfilled' && inqRes.value.success && inqRes.value.data) {
+            setAllInquiries(inqRes.value.data);
+            try { StorageService.saveInquiries(inqRes.value.data); } catch {}
+          }
+          if (compRes.status === 'fulfilled' && compRes.value.success && compRes.value.data) {
+            setCompanies(compRes.value.data);
+          }
+          if (propRes.status === 'fulfilled' && propRes.value.success && propRes.value.data) {
+            setProperties(propRes.value.data);
+          }
+          if (taskRes.status === 'fulfilled' && taskRes.value.success && taskRes.value.data) {
+            setTasksList(taskRes.value.data);
+          }
+        }
+      } catch (e) {
+        console.warn('Backend live data fetch fallback to local cache:', e);
+      }
+    };
+
+    loadBackendData();
+    return () => { isMounted = false; };
+  }, []);
 
   // Reactive listener for storage changes
   useEffect(() => {
     const handleStorageChange = () => {
       setTasksList(StorageService.getTasks());
+      setAllInquiries(StorageService.getInquiries());
+      setCompanies(StorageService.getCompanies());
+      setProperties(StorageService.getProperties());
     };
     window.addEventListener('fw_storage_change', handleStorageChange);
     return () => window.removeEventListener('fw_storage_change', handleStorageChange);
@@ -131,38 +173,39 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   return (
     <div className="space-y-6 max-w-8xl mx-auto text-left">
       {/* 1. Executive Minimal Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-        <div>
-          <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">
               Fairway Industrial CRM
             </span>
-            <span className="text-xs text-foreground-muted">·</span>
-            <span className="text-xs font-medium text-foreground-muted">Western India Leasing Desk</span>
+            <span className="text-xs text-foreground-muted hidden xs:inline">·</span>
+            <span className="text-xs font-medium text-foreground-muted hidden xs:inline">Western India Leasing Desk</span>
             {isSales && (
               <span className="text-[10px] font-bold bg-surface-muted text-foreground border border-border px-2 py-0.5 rounded-full">
                 My Desk View
               </span>
             )}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight mt-1">
+          <h1 className="text-xl xs:text-2xl sm:text-3xl font-bold text-foreground tracking-tight mt-1 break-words">
             {getGreeting()}, {currentUser?.name || currentUser?.email?.split('@')[0] || 'Member'}
           </h1>
         </div>
 
         {/* Action Tools & Owner Switcher */}
-        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0 max-w-full">
           <DropdownMenu
             align="right"
-            className="w-64 max-h-80 overflow-y-auto"
+            className="w-64 max-w-[calc(100vw-24px)] max-h-80 overflow-y-auto"
+            containerClassName="min-w-0 max-w-full"
             trigger={
               <button
                 type="button"
-                className="flex items-center gap-2 text-xs bg-surface border border-border hover:border-foreground/40 rounded-xl px-3.5 py-2 shadow-xs transition-colors focus:outline-none cursor-pointer"
+                className="flex items-center gap-1.5 xs:gap-2 text-xs bg-surface border border-border hover:border-foreground/40 rounded-xl px-2.5 xs:px-3 py-2 shadow-xs transition-colors focus:outline-none cursor-pointer min-w-0 max-w-[140px] xs:max-w-[170px] sm:max-w-[200px]"
               >
                 <User className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
-                <span className="text-foreground-muted font-medium shrink-0">Desk:</span>
-                <span className="text-xs font-semibold text-foreground truncate max-w-[130px]">
+                <span className="text-foreground-muted font-medium shrink-0 hidden md:inline">Desk:</span>
+                <span className="text-xs font-semibold text-foreground truncate">
                   {ownerFilter === 'all' ? 'All Team Members' : users.find((u) => u.id === ownerFilter)?.name || 'Select Owner'}
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-foreground-muted shrink-0 ml-auto" />
@@ -199,7 +242,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
               variant="primary"
               onClick={onOpenNewInquiry}
               leftIcon={<Plus className="w-4 h-4" />}
-              className="shadow-sm rounded-xl px-4 py-2 font-bold"
+              className="shadow-sm rounded-xl px-3 sm:px-4 py-2 font-bold text-xs shrink-0 whitespace-nowrap"
             >
               New Inquiry
             </Button>
@@ -208,94 +251,94 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
       </div>
 
       {/* 2. Executive 6 KPI Stat Cards Grid - Minimal Swiss Design */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-4">
         {/* Card 1: Companies */}
         <div
           onClick={() => onNavigate('companies')}
-          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
+          className="bg-surface border border-border hover:border-foreground/40 p-3 xs:p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Companies</span>
-            <Building2 className="w-4 h-4 text-foreground-muted" />
+            <span className="text-[10px] xs:text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Companies</span>
+            <Building2 className="w-4 h-4 text-foreground-muted shrink-0" />
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">{totalCompaniesCount}</div>
-            <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">Corporate Accounts</span>
+          <div className="mt-2.5 xs:mt-3">
+            <div className="text-xl xs:text-2xl font-bold text-foreground">{totalCompaniesCount}</div>
+            <span className="text-[10px] xs:text-[11px] text-foreground-muted block mt-0.5 font-medium truncate">Corporate Accounts</span>
           </div>
         </div>
 
         {/* Card 2: New Leads */}
         <div
           onClick={() => onNavigate('inquiries')}
-          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
+          className="bg-surface border border-border hover:border-foreground/40 p-3 xs:p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">New Leads</span>
-            <FileText className="w-4 h-4 text-foreground-muted" />
+            <span className="text-[10px] xs:text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">New Leads</span>
+            <FileText className="w-4 h-4 text-foreground-muted shrink-0" />
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">{newInquiriesCount}</div>
-            <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">Fresh Inquiries</span>
+          <div className="mt-2.5 xs:mt-3">
+            <div className="text-xl xs:text-2xl font-bold text-foreground">{newInquiriesCount}</div>
+            <span className="text-[10px] xs:text-[11px] text-foreground-muted block mt-0.5 font-medium truncate">Fresh Inquiries</span>
           </div>
         </div>
 
         {/* Card 3: Active Pipeline */}
         <div
           onClick={() => onNavigate('pipeline')}
-          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
+          className="bg-surface border border-border hover:border-foreground/40 p-3 xs:p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Active Pipeline</span>
-            <TrendingUp className="w-4 h-4 text-foreground-muted" />
+            <span className="text-[10px] xs:text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Pipeline</span>
+            <TrendingUp className="w-4 h-4 text-foreground-muted shrink-0" />
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">{activeInquiriesCount}</div>
-            <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">{formatINR(totalPipelineValue, true)} / mo</span>
+          <div className="mt-2.5 xs:mt-3">
+            <div className="text-xl xs:text-2xl font-bold text-foreground">{activeInquiriesCount}</div>
+            <span className="text-[10px] xs:text-[11px] text-foreground-muted block mt-0.5 font-medium truncate">{formatINR(totalPipelineValue, true)} / mo</span>
           </div>
         </div>
 
         {/* Card 4: Negotiation */}
         <div
           onClick={() => onNavigate('pipeline')}
-          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
+          className="bg-surface border border-border hover:border-foreground/40 p-3 xs:p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Negotiation</span>
-            <Clock className="w-4 h-4 text-foreground-muted" />
+            <span className="text-[10px] xs:text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Negotiation</span>
+            <Clock className="w-4 h-4 text-foreground-muted shrink-0" />
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">{negotiationCount}</div>
-            <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">Closing Soon</span>
+          <div className="mt-2.5 xs:mt-3">
+            <div className="text-xl xs:text-2xl font-bold text-foreground">{negotiationCount}</div>
+            <span className="text-[10px] xs:text-[11px] text-foreground-muted block mt-0.5 font-medium truncate">Closing Soon</span>
           </div>
         </div>
 
         {/* Card 5: Closed Won */}
         <div
           onClick={() => onNavigate('inquiries')}
-          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
+          className="bg-surface border border-border hover:border-foreground/40 p-3 xs:p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Closed Won</span>
-            <Trophy className="w-4 h-4 text-foreground-muted" />
+            <span className="text-[10px] xs:text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Closed Won</span>
+            <Trophy className="w-4 h-4 text-foreground-muted shrink-0" />
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">{wonCount}</div>
-            <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">{formatINR(totalWonValue, true)} / mo</span>
+          <div className="mt-2.5 xs:mt-3">
+            <div className="text-xl xs:text-2xl font-bold text-foreground">{wonCount}</div>
+            <span className="text-[10px] xs:text-[11px] text-foreground-muted block mt-0.5 font-medium truncate">{formatINR(totalWonValue, true)} / mo</span>
           </div>
         </div>
 
         {/* Card 6: Ready Stock */}
         <div
           onClick={() => onNavigate('properties')}
-          className="bg-surface border border-border hover:border-foreground/40 p-4 rounded-xl transition-all cursor-pointer select-none"
+          className="bg-surface border border-border hover:border-foreground/40 p-3 xs:p-4 rounded-xl transition-all cursor-pointer select-none"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Ready Stock</span>
-            <Warehouse className="w-4 h-4 text-foreground-muted" />
+            <span className="text-[10px] xs:text-[11px] font-semibold uppercase tracking-wider text-foreground-muted">Ready Stock</span>
+            <Warehouse className="w-4 h-4 text-foreground-muted shrink-0" />
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-bold text-foreground">{formatSqFt(totalAvailableSqFt).replace(' sq.ft.', '')}</div>
-            <span className="text-[11px] text-foreground-muted block mt-0.5 font-medium">sq.ft available</span>
+          <div className="mt-2.5 xs:mt-3">
+            <div className="text-xl xs:text-2xl font-bold text-foreground truncate">{formatSqFt(totalAvailableSqFt).replace(' sq.ft.', '')}</div>
+            <span className="text-[10px] xs:text-[11px] text-foreground-muted block mt-0.5 font-medium truncate">sq.ft available</span>
           </div>
         </div>
       </div>

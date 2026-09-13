@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { query } from '../config/db.js';
 import crypto from 'crypto';
+import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
 /**
  * Helper to generate sequential Proposal Number like PR-1044
@@ -356,9 +357,20 @@ export const updateProposal = async (req: Request, res: Response): Promise<void>
 /**
  * DELETE /api/proposals/:id
  */
-export const deleteProposal = async (req: Request, res: Response): Promise<void> => {
+export const deleteProposal = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    const sessionUser = req.user;
+
+    // Security (RBAC): Only super_admin and admin can delete financial proposals
+    if (sessionUser?.role !== 'super_admin' && sessionUser?.role !== 'admin') {
+      res.status(403).json({
+        success: false,
+        error: 'Forbidden. You do not have permission to delete commercial proposals.',
+      });
+      return;
+    }
+
     const result = await query('DELETE FROM proposals WHERE id = $1 RETURNING id;', [id]);
 
     if (result.rows.length === 0) {
@@ -369,6 +381,6 @@ export const deleteProposal = async (req: Request, res: Response): Promise<void>
     res.status(200).json({ success: true, message: 'Proposal deleted successfully.' });
   } catch (error: any) {
     console.error('Error deleting proposal:', error);
-    res.status(500).json({ success: false, error: error.message || 'Failed to delete proposal.' });
+    res.status(500).json({ success: false, error: 'Failed to delete proposal.' });
   }
 };

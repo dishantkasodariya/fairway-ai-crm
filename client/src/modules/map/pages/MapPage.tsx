@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { StorageService } from '@/modules/core/services/storageService';
 import { PropertyService } from '@/modules/core/services/propertyService';
+import { FacilityService } from '@/modules/core/services/facilityService';
 import { Facility, Property } from '@/modules/core/types';
 import { formatINR, formatSqFt } from '@/modules/core/utils/formatters';
 import { Button } from '@/modules/core/components/ui/Button';
@@ -62,19 +63,31 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
   onNavigateToCompany,
   onNavigateToProperty,
 }) => {
-  const facilities = StorageService.getFacilities();
+  const [facilities, setFacilities] = useState<Facility[]>(() => StorageService.getFacilities());
   const [properties, setProperties] = useState<Property[]>([]);
 
   useEffect(() => {
-    const fetchProps = async () => {
+    let isMounted = true;
+    const fetchMapData = async () => {
       try {
-        const res = await PropertyService.getProperties();
-        if (res.success && res.data) {
-          setProperties(res.data);
+        const [propRes, facRes] = await Promise.allSettled([
+          PropertyService.getProperties(),
+          FacilityService.getFacilities(),
+        ]);
+        if (isMounted) {
+          if (propRes.status === 'fulfilled' && propRes.value.success && propRes.value.data) {
+            setProperties(propRes.value.data);
+          }
+          if (facRes.status === 'fulfilled' && facRes.value.success && facRes.value.data) {
+            setFacilities(facRes.value.data);
+          }
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Map live data load error:', err);
+      }
     };
-    fetchProps();
+    fetchMapData();
+    return () => { isMounted = false; };
   }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -249,7 +262,7 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
                     {p.code}
                   </span>
                 </div>
-                <p className="text-[11px] text-foreground-muted mt-1 truncate">
+                <p className="text-[11px] text-foreground-muted mt-1 break-words sm:truncate">
                   {formatSqFt(p.availableAreaSqFt)} avail @ ₹{p.rentPerSqFtINR}/sq.ft · {p.city}
                 </p>
               </div>
@@ -274,7 +287,7 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
                   </div>
                   <span className="text-[10px] text-foreground-muted font-medium">{f.type}</span>
                 </div>
-                <p className="text-[11px] text-foreground-muted mt-1 truncate">
+                <p className="text-[11px] text-foreground-muted mt-1 break-words sm:truncate">
                   {f.companyName} · {f.city}, {f.state}
                 </p>
               </div>

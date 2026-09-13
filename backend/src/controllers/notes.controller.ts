@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { query } from '../config/db.js';
 import crypto from 'crypto';
+import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
 /**
  * GET /api/notes?companyId=...&inquiryId=...
@@ -40,30 +41,34 @@ export const getNotes = async (req: Request, res: Response): Promise<void> => {
     res.status(200).json({ success: true, data: notes });
   } catch (error: any) {
     console.error('Error fetching notes:', error);
-    res.status(500).json({ success: false, error: { message: error.message || 'Failed to fetch notes' } });
+    res.status(500).json({ success: false, error: { message: 'Failed to fetch notes' } });
   }
 };
 
 /**
  * POST /api/notes
  */
-export const createNote = async (req: Request, res: Response): Promise<void> => {
+export const createNote = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const {
       companyId,
       companyName,
       inquiryId,
       inquiryNumber,
-      authorId,
-      authorName,
       content,
       isPinned = false,
+      authorName,
     } = req.body;
 
     if (!content || !content.trim()) {
       res.status(400).json({ success: false, error: { message: 'Note content is required' } });
       return;
     }
+
+    // Security: Bind author to authenticated session user
+    const sessionUser = req.user;
+    const finalAuthorId = sessionUser?.userId || '';
+    const finalAuthorName = authorName || sessionUser?.email || 'CRM User';
 
     const id = `not_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
 
@@ -81,8 +86,8 @@ export const createNote = async (req: Request, res: Response): Promise<void> => 
       companyName || '',
       inquiryId || null,
       inquiryNumber || '',
-      authorId || '',
-      authorName || 'Admin',
+      finalAuthorId,
+      finalAuthorName,
       content.trim(),
       Boolean(isPinned),
     ];
@@ -107,24 +112,42 @@ export const createNote = async (req: Request, res: Response): Promise<void> => 
     });
   } catch (error: any) {
     console.error('Error creating note:', error);
-    res.status(500).json({ success: false, error: { message: error.message || 'Failed to create note' } });
+    res.status(500).json({ success: false, error: { message: 'Failed to create note' } });
   }
 };
 
 /**
  * DELETE /api/notes/:id
  */
-export const deleteNote = async (req: Request, res: Response): Promise<void> => {
+export const deleteNote = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const result = await query('DELETE FROM notes WHERE id = $1 RETURNING id;', [id]);
-    if (result.rows.length === 0) {
+    const sessionUser = req.user;
+
+    // Security (BOLA/IDOR): Verify note existence and ownership/role
+    const existing = await query('SELECT id, author_id FROM notes WHERE id = $1;', [id]);
+    if (existing.rows.length === 0) {
       res.status(404).json({ success: false, error: { message: 'Note not found' } });
       return;
     }
+
+    const isAuthorized =
+      sessionUser?.role === 'super_admin' ||
+      sessionUser?.role === 'admin' ||
+      existing.rows[0].author_id === sessionUser?.userId;
+
+    if (!isAuthorized) {
+      res.status(403).json({
+        success: false,
+        error: { message: 'Forbidden. You do not have permission to delete this note.' },
+      });
+      return;
+    }
+
+    await query('DELETE FROM notes WHERE id = $1 RETURNING id;', [id]);
     res.status(200).json({ success: true, message: 'Note deleted successfully' });
   } catch (error: any) {
     console.error('Error deleting note:', error);
-    res.status(500).json({ success: false, error: { message: error.message || 'Failed to delete note' } });
+    res.status(500).json({ success: false, error: { message: 'Failed to delete note' } });
   }
 };

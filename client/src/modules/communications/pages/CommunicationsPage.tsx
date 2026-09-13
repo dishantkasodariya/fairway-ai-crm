@@ -278,12 +278,12 @@ export const CommunicationsPage: React.FC = () => {
             Omni-channel client touchpoints across Email, WhatsApp, LinkedIn, phone calls, and internal handover notes.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => setIsCallModalOpen(true)} className="gap-2 font-medium">
+        <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+          <Button variant="outline" onClick={() => setIsCallModalOpen(true)} className="gap-2 font-medium justify-center">
             <Phone className="w-4 h-4" />
             <span>Log Call</span>
           </Button>
-          <Button onClick={() => setIsEmailModalOpen(true)} className="gap-2 shadow-sm font-medium">
+          <Button onClick={() => setIsEmailModalOpen(true)} className="gap-2 shadow-sm font-medium justify-center">
             <Send className="w-4 h-4" />
             <span>Compose Email</span>
           </Button>
@@ -663,11 +663,11 @@ export const CommunicationsPage: React.FC = () => {
             </label>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
-            <Button type="button" variant="outline" onClick={() => setIsEmailModalOpen(false)}>
+          <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
+            <Button type="button" variant="outline" onClick={() => setIsEmailModalOpen(false)} className="w-full xs:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting} className="gap-2">
+            <Button type="submit" disabled={submitting} className="gap-2 w-full xs:w-auto">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               <span>Send Email</span>
             </Button>
@@ -714,7 +714,7 @@ export const CommunicationsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
                 Call Direction
@@ -773,11 +773,11 @@ export const CommunicationsPage: React.FC = () => {
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
-            <Button type="button" variant="outline" onClick={() => setIsCallModalOpen(false)}>
+          <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
+            <Button type="button" variant="outline" onClick={() => setIsCallModalOpen(false)} className="w-full xs:w-auto">
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting} className="gap-2">
+            <Button type="submit" disabled={submitting} className="gap-2 w-full xs:w-auto">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
               <span>Log Interaction</span>
             </Button>

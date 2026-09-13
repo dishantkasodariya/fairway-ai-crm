@@ -201,7 +201,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
               <span className="text-xs font-mono font-bold bg-slate-900 text-white dark:bg-slate-800 px-2.5 py-0.5 rounded-lg shadow-xs">
                 {property.code}
               </span>
-              <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight truncate">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-extrabold text-foreground tracking-tight break-words">
                 {property.name}
               </h1>
               <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold border flex items-center gap-1.5', getStatusBadgeVariant(property.status))}>
@@ -341,7 +341,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
 
           {/* Thumbnail Preview Strip */}
           {photos.length > 1 && (
-            <div className="flex items-center gap-2.5 overflow-x-auto pb-1">
+            <div className="flex items-center gap-2.5 overflow-x-auto pb-1 no-scrollbar touch-pan-x">
               {photos.map((ph, idx) => (
                 <button
                   key={idx}
@@ -486,7 +486,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
       </div>
 
       {/* Main Content Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-border overflow-x-auto pb-px">
+      <div className="flex items-center gap-2 border-b border-border overflow-x-auto pb-px no-scrollbar touch-pan-x">
         {[
           { id: 'overview', label: 'Park Overview & Amenities', icon: Building2 },
           { id: 'technical', label: 'Technical & Engineering Specs', icon: Layers },

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { query } from '../config/db.js';
 import crypto from 'crypto';
+import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
 /**
  * GET /api/communications/stats
@@ -137,6 +138,11 @@ export const createCommunication = async (req: Request, res: Response): Promise<
       RETURNING *;
     `;
 
+    // Security: Bind communication attribution to session user
+    const sessionUser = (req as AuthenticatedRequest).user;
+    const finalUserId = sessionUser?.userId || userId || '';
+    const finalUserName = userName || sessionUser?.email || 'CRM Team';
+
     const values = [
       id,
       channel,
@@ -147,8 +153,8 @@ export const createCommunication = async (req: Request, res: Response): Promise<
       companyName || '',
       contactId || null,
       contactName || '',
-      userId || '',
-      userName || 'Admin',
+      finalUserId,
+      finalUserName,
       status,
       JSON.stringify(attachments),
       durationMinutes ? parseInt(durationMinutes, 10) : 0,

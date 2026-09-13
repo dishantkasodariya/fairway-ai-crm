@@ -213,7 +213,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Legal Entity Name"
             value={formData.legalName}
@@ -228,7 +228,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select
             label="Industry Sector"
             value={formData.industry}
@@ -271,7 +271,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
           placeholder="Plot No, GIDC Phase, Landmark..."
         />
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input
             label="Official Phone / Landline"
             value={formData.phone}
@@ -287,7 +287,7 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-3 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
           <UserCombobox
             label="Account Owner"
             users={users}
@@ -319,11 +319,11 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
           />
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
+        <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 pt-4 border-t border-border w-full">
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting} className="w-full xs:w-auto">
             Cancel
           </Button>
-          <Button type="submit" variant="primary" size="sm" disabled={isSubmitting}>
+          <Button type="submit" variant="primary" size="sm" disabled={isSubmitting} className="w-full xs:w-auto">
             {isSubmitting ? (isEditing ? 'Saving Changes...' : 'Creating Company...') : (isEditing ? 'Save Changes' : 'Create Company')}
           </Button>
         </div>

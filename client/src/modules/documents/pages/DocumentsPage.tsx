@@ -350,7 +350,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
       {/* 3. Sleek Search & Control Toolbar matching reference */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
         {/* Left: Search Bar */}
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 w-full max-w-full sm:max-w-md">
           <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5" />
           <input
             type="text"
@@ -373,7 +373,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
 
         {/* Right: Controls & View Switcher */}
         <TooltipProvider delayDuration={150}>
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
             {/* Filter Drawer Trigger Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -708,7 +708,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
                     className="font-medium text-foreground hover:underline cursor-pointer flex items-center gap-1.5 pt-1"
                   >
                     <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <span className="truncate">{doc.companyName}</span>
+                    <span className="break-words sm:truncate">{doc.companyName}</span>
                   </div>
                 )}
               </div>
@@ -733,7 +733,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
             className="fixed inset-0 w-full h-full bg-black/60 backdrop-blur-xs transition-opacity"
             onClick={() => setIsFilterDrawerOpen(false)}
           />
-          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none text-left">
+          <div className="relative w-full max-w-full sm:max-w-sm bg-surface border-l border-border h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none text-left">
             <div className="p-5 border-b border-border bg-surface flex items-start justify-between">
               <div>
                 <h2 className="text-base font-bold text-foreground tracking-tight flex items-center gap-2">
@@ -878,11 +878,11 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
             <p className="text-[11px] text-muted-foreground">Supports PDF, XLSX, CSV, DWG, DOCX up to 50MB</p>
           </div>
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-border">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsUploadOpen(false)}>
+          <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsUploadOpen(false)} className="w-full xs:w-auto">
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={uploading}>
+            <Button type="submit" size="sm" disabled={uploading} className="w-full xs:w-auto">
               {uploading ? 'Saving...' : 'Upload & Publish'}
             </Button>
           </div>

@@ -509,9 +509,9 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
         </div>
 
         {/* 6 Attribute Micro-Cards Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-5 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3 pt-5 text-xs">
           {/* Assigned Owner */}
-          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
               Assigned Owner
             </span>
@@ -522,7 +522,7 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
                 trigger={
                   <button
                     type="button"
-                    className="inline-flex items-center justify-between w-full gap-1.5 font-semibold text-foreground bg-surface px-2.5 py-1 rounded-lg border border-border hover:bg-surface-muted transition-colors shadow-2xs text-xs cursor-pointer"
+                    className="inline-flex items-center justify-between w-full gap-1.5 font-semibold text-foreground bg-surface px-2.5 py-1 rounded-lg border border-border hover:bg-surface-muted transition-colors shadow-2xs text-xs cursor-pointer min-w-0"
                   >
                     <span className="truncate">{company.assignedOwnerName || 'Assign Owner'}</span>
                     <ChevronDown className="w-3 h-3 text-foreground-muted shrink-0" />
@@ -550,42 +550,42 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
           </div>
 
           {/* Prospect Stage */}
-          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
               Prospect Stage
             </span>
-            <span className="font-bold text-foreground mt-0.5 flex items-center gap-1.5 capitalize truncate">
+            <span className="font-bold text-foreground mt-0.5 flex items-center gap-1.5 capitalize break-words">
               <span className="w-2 h-2 rounded-full bg-fairway-500 shrink-0" />
-              <span className="truncate">{company.prospectStage}</span>
+              <span>{company.prospectStage}</span>
             </span>
           </div>
 
           {/* Annual Turnover */}
-          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
               Annual Turnover
             </span>
-            <span className="font-extrabold text-foreground mt-0.5 block truncate">
+            <span className="font-extrabold text-foreground mt-0.5 block break-words">
               {company.annualTurnover || '₹500+ Cr'}
             </span>
           </div>
 
           {/* Workforce */}
-          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
               Workforce
             </span>
-            <span className="font-bold text-foreground mt-0.5 block truncate">
+            <span className="font-bold text-foreground mt-0.5 block break-words">
               {company.employeeCount ? `${company.employeeCount} team` : '1,000+'}
             </span>
           </div>
 
           {/* Gujarat Presence */}
-          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
               Gujarat Presence
             </span>
-            <span className="font-bold text-emerald-700 dark:text-emerald-400 mt-0.5 flex items-center gap-1.5 truncate">
+            <span className="font-bold text-emerald-700 dark:text-emerald-400 mt-0.5 flex items-center gap-1.5 break-words">
               {company.gujaratPresence ? (
                 <>
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -598,11 +598,11 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
           </div>
 
           {/* Account Created */}
-          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between">
+          <div className="bg-surface-muted/50 rounded-xl p-3 border border-border/80 flex flex-col justify-between min-w-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block mb-1">
               Account Created
             </span>
-            <span className="font-medium text-foreground-muted mt-0.5 block truncate">
+            <span className="font-medium text-foreground-muted mt-0.5 block break-words">
               {formatDate(company.createdAt)}
             </span>
           </div>

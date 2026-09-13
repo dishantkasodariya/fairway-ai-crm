@@ -212,7 +212,7 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
 
         {/* Right: Controls & View Switcher */}
         <TooltipProvider delayDuration={150}>
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
             {/* Filter Drawer Trigger Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -566,7 +566,7 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
             className="fixed inset-0 w-full h-full bg-black/60 backdrop-blur-xs transition-opacity"
             onClick={() => setIsFilterDrawerOpen(false)}
           />
-          <div className="relative w-full max-w-xs sm:max-w-sm bg-surface border-l border-border h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none text-left">
+          <div className="relative w-full max-w-full sm:max-w-sm bg-surface border-l border-border h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none text-left">
             <div className="p-5 border-b border-border bg-surface flex items-start justify-between">
               <div>
                 <h2 className="text-base font-bold text-foreground tracking-tight flex items-center gap-2">

@@ -79,7 +79,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
       setInquiries(local);
     }
     try {
-      const res = await InquiryService.getInquiries({ pageSize: 100 });
+      const res = await InquiryService.getInquiries({ pageSize: 500 });
       if (res && res.data && res.data.length > 0) {
         setInquiries(res.data);
         StorageService.saveInquiries(res.data);
@@ -508,7 +508,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
                               className={`p-1 rounded-md transition-all cursor-pointer ${
                                 isMenuOpen
                                   ? 'text-foreground bg-surface-muted ring-1 ring-border opacity-100'
-                                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-muted opacity-0 group-hover:opacity-100'
+                                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-muted opacity-70 sm:opacity-0 group-hover:opacity-100'
                               }`}
                               title="Card Actions"
                             >

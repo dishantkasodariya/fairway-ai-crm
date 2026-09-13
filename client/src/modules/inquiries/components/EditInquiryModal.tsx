@@ -262,7 +262,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
     >
       <form onSubmit={handleSubmit} className="space-y-4 pt-1">
         {/* Row 1: Company & Requirement */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <Input
             label="Customer Company"
             required
@@ -303,7 +303,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
         </div>
 
         {/* Row 3: Area & Budget */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div>
             <Input
               label="Required Area (Sq.Ft.)"
@@ -347,7 +347,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
         </div>
 
         {/* Row 4: Location & Corridor */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <Input
             label="Location / City"
             value={formData.location}
@@ -375,7 +375,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
         </div>
 
         {/* Row 5: Stage & Priority */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <div className="space-y-1.5 text-left">
             <label className="text-xs font-semibold text-foreground block">
               Pipeline Stage
@@ -445,7 +445,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
         </div>
 
         {/* Row 7: Contact Person, Phone & Email */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
           <Input
             label="Contact Person Name"
             value={formData.contactName}
@@ -479,13 +479,13 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
               if (errors.contactEmail) setErrors((prev) => ({ ...prev, contactEmail: '' }));
             }}
             placeholder="e.g. contact@company.com"
-            className="h-10 rounded-xl"
+            className="h-10 rounded-xl sm:col-span-2 lg:col-span-1"
             error={errors.contactEmail}
           />
         </div>
 
         {/* Row 8: Next Action & Follow-up Date */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
           <Input
             label="Next Action"
             value={formData.nextAction}
@@ -503,8 +503,8 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border mt-5">
-          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSaving}>
+        <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-4 border-t border-border mt-5 w-full">
+          <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSaving} className="w-full xs:w-auto">
             Cancel
           </Button>
           <Button
@@ -512,7 +512,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
             variant="primary"
             size="sm"
             disabled={isSaving}
-            className="bg-fairway-600 hover:bg-fairway-700 text-white font-bold"
+            className="w-full xs:w-auto bg-fairway-600 hover:bg-fairway-700 text-white font-bold"
           >
             {isSaving ? 'Saving Changes...' : 'Save Changes'}
           </Button>
