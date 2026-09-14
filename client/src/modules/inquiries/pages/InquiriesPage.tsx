@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   FileText,
   Search,
@@ -48,7 +49,8 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/modules/core/components/ui/tooltip';
-import { StorageService } from '@/modules/core/services/storageService';
+import { PipelineStageService } from '@/modules/core/services/pipelineStageService';
+import { PIPELINE_STAGES } from '@/modules/core/data/seedData';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
@@ -60,11 +62,8 @@ import { Card } from '@/modules/core/components/ui/Card';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
 import { EditInquiryModal } from '../components/EditInquiryModal';
-import {
-  WarehouseInquiryCard,
-  WarehouseInquiryLineCard,
-  WarehouseInquiryCardSkeleton,
-} from '../components/WarehouseInquiryCard';
+import { InquiriesList } from '../components/InquiriesList';
+import { InquiriesCard } from '../components/InquiriesCard';
 import { WarehouseInquiryEmptyState } from '../components/WarehouseInquiryEmptyState';
 import {
   DataGrid,
@@ -133,7 +132,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
   onOpenNewInquiry,
   onOpenImport,
 }) => {
-  const { canEdit, currentUser } = useAuth();
+  const { canEdit, currentUser, canCreate, canEditModule, canDeleteModule, canExport, canImport } = useAuth();
   const initialTableState = useMemo(() => getStoredTableState(), []);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -259,7 +258,6 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     setIsDeleting(true);
     try {
       await InquiryService.deleteInquiry(inquiryToDelete.id);
-      StorageService.deleteInquiry(inquiryToDelete.id);
       toastSuccess('Inquiry Deleted', `Removed ${inquiryToDelete.inquiryNumber} (${inquiryToDelete.companyName}) from CRM.`);
       setIsDeleteModalOpen(false);
       setInquiryToDelete(null);
@@ -299,8 +297,16 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     }
   }, [pagination, sorting, columnVisibility, columnPinning, columnOrder, columnSizing]);
 
-  const users = StorageService.getUsers();
-  const pipelineStages = StorageService.getPipelineStages();
+  const { users } = useAuth();
+  const [pipelineStages, setPipelineStages] = useState(PIPELINE_STAGES);
+
+  useEffect(() => {
+    PipelineStageService.getPipelineStages().then((res) => {
+      if (res.success && res.data && res.data.length > 0) {
+        setPipelineStages(res.data);
+      }
+    });
+  }, []);
 
   const loadInquiries = async (showSpin = false) => {
     if (showSpin) {
@@ -328,16 +334,13 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
       if (res.success && res.data) {
         setInquiries(res.data);
         setTotalCount(res.totalCount !== undefined ? res.totalCount : res.data.length);
-        res.data.forEach((inq) => StorageService.upsertInquiry(inq));
       } else {
-        const local = StorageService.getInquiries();
-        setInquiries(local);
-        setTotalCount(local.length);
+        setInquiries([]);
+        setTotalCount(0);
       }
     } catch {
-      const local = StorageService.getInquiries();
-      setInquiries(local);
-      setTotalCount(local.length);
+      setInquiries([]);
+      setTotalCount(0);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -346,7 +349,6 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
 
   const handleSelectInquiry = useCallback(
     (inq: Inquiry) => {
-      StorageService.upsertInquiry(inq);
       onSelectInquiry(inq.id);
     },
     [onSelectInquiry]
@@ -354,13 +356,9 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
 
   const handleSelectInquiryById = useCallback(
     (id: string) => {
-      const found = inquiries.find((i) => i.id === id || i.inquiryNumber === id);
-      if (found) {
-        StorageService.upsertInquiry(found);
-      }
       onSelectInquiry(id);
     },
-    [inquiries, onSelectInquiry]
+    [onSelectInquiry]
   );
 
   // Reset pageIndex when search or filter values change
@@ -572,27 +570,33 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                     <Eye className="w-3.5 h-3.5 text-fairway-600" />
                     <span>View Inquiry</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setInquiryToEdit(inq);
-                      setIsEditModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 text-xs cursor-pointer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Edit Inquiry</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setInquiryToDelete(inq);
-                      setIsDeleteModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete Inquiry</span>
-                  </DropdownMenuItem>
+                  {canEditModule('inquiries') && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setInquiryToEdit(inq);
+                        setIsEditModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 text-xs cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Edit Inquiry</span>
+                    </DropdownMenuItem>
+                  )}
+                  {canDeleteModule('inquiries') && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setInquiryToDelete(inq);
+                          setIsDeleteModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Inquiry</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -789,12 +793,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
           allData = res.data;
         }
       } catch {
-        // Fallback to local
-      }
-
-      // 2. If backend didn't return all data, load from local storage
-      if (allData.length === 0) {
-        allData = StorageService.getInquiries();
+        // Continue with whatever was fetched
       }
 
       // 3. Apply active filters to full dataset
@@ -908,21 +907,38 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={exportCSV}
-            disabled={isExporting}
-            leftIcon={isExporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-          >
-            {isExporting ? 'Exporting...' : 'Export CSV'}
-          </Button>
-          <Button size="sm" variant="outline" onClick={onOpenImport} leftIcon={<UploadCloud className="w-3.5 h-3.5" />}>
-            Import
-          </Button>
-          {canEdit && (
-            <Button size="sm" variant="primary" onClick={onOpenNewInquiry} leftIcon={<Plus className="w-4 h-4" />}>
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+          {canExport('inquiries') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={exportCSV}
+              disabled={isExporting}
+              leftIcon={isExporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Download className="w-3.5 h-3.5 shrink-0" />}
+              className="flex-1 sm:flex-initial text-[11px] sm:text-xs px-1.5 sm:px-3 justify-center whitespace-nowrap h-8.5"
+            >
+              {isExporting ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          )}
+          {canImport('inquiries') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onOpenImport}
+              leftIcon={<UploadCloud className="w-3.5 h-3.5 shrink-0" />}
+              className="flex-1 sm:flex-initial text-[11px] sm:text-xs px-1.5 sm:px-3 justify-center whitespace-nowrap h-8.5"
+            >
+              Import
+            </Button>
+          )}
+          {canCreate('inquiries') && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={onOpenNewInquiry}
+              leftIcon={<Plus className="w-4 h-4 shrink-0" />}
+              className="flex-1 sm:flex-initial text-[11px] sm:text-xs px-1.5 sm:px-3 justify-center whitespace-nowrap h-8.5"
+            >
               New Inquiry
             </Button>
           )}
@@ -1044,22 +1060,32 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
       </div>
 
       {/* Sleek Search & Control Toolbar matching reference */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 pt-1">
+      <div className="flex items-center justify-between gap-2 sm:gap-3 pt-1 w-full">
         {/* Left: Search Bar */}
-        <div className="relative flex-1 max-w-md w-full">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5" />
+        <div className="relative flex-1 min-w-0 max-w-md">
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5 pointer-events-none" />
           <input
             type="text"
             placeholder="Search inquiries, requirements, companies, cities..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors h-9"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-2.5 text-foreground-muted hover:text-foreground p-0.5 rounded-full"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Right: Controls & View Switcher */}
         <TooltipProvider delayDuration={150}>
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Filter Drawer Trigger Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -1084,8 +1110,10 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Column Settings Dropdown (Common Component) */}
-            <DataGridColumnVisibilityMenu table={table} excludeColumns={['actions', 'inquiryNumber']} />
+            {/* Column Settings Dropdown (Desktop Only) */}
+            <div className="hidden sm:block">
+              <DataGridColumnVisibilityMenu table={table} excludeColumns={['actions', 'inquiryNumber']} />
+            </div>
 
             {/* Refresh / Reset Button */}
             <Tooltip>
@@ -1109,8 +1137,8 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Segmented View Switcher (List / Card View matching exact reference UI) */}
-            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+            {/* Segmented View Switcher (Desktop Only) */}
+            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -1155,109 +1183,62 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         </TooltipProvider>
       </div>
 
-      {/* ================= VIEW MODE 1: COMMON DATA GRID (MATCHING REFERENCE UI) ================= */}
-      {viewMode === 'table' ? (
-        <CommonDataGrid
+      {/* Mobile view: ONLY Card view show, NOT list page show */}
+      <div className="block sm:hidden">
+        <InquiriesCard
           table={table}
-          recordCount={totalCount || filteredInquiries.length}
+          inquiries={pagedInquiries}
+          recordCount={filteredInquiries.length}
           isLoading={isBusy}
-          emptyState={
-            <WarehouseInquiryEmptyState
-              hasFilters={activeFiltersCount > 0 || !!searchQuery}
-              onClearFilters={handleClearAllFilters}
-              onNewInquiry={onOpenNewInquiry}
-            />
-          }
+          mode="grid"
+          hasFilters={activeFiltersCount > 0 || !!searchQuery}
+          onClearFilters={handleClearAllFilters}
+          onNewInquiry={onOpenNewInquiry}
+          onSelectInquiry={handleSelectInquiryById}
+          pageSize={pagination.pageSize}
         />
-      ) : viewMode === 'line' ? (
-        /* ================= VIEW MODE 2: SINGLE-LINE DENSE CARDS ================= */
-        <DataGrid
-          table={table}
-          recordCount={filteredInquiries.length}
-          isLoading={isBusy}
-          loadingMode="skeleton"
-        >
-          <div className="space-y-4">
-            {isBusy ? (
-              <div className="space-y-2 animate-fade-in">
-                {Array.from({ length: Math.min(pagination.pageSize, 6) }).map((_, i) => (
-                  <WarehouseInquiryCardSkeleton key={i} mode="line" />
-                ))}
-              </div>
-            ) : pagedInquiries.length === 0 ? (
-              <WarehouseInquiryEmptyState
-                hasFilters={activeFiltersCount > 0 || !!searchQuery}
-                onClearFilters={handleClearAllFilters}
-                onNewInquiry={onOpenNewInquiry}
-              />
-            ) : (
-              <div className="space-y-2 animate-fade-in">
-                {pagedInquiries.map((inq) => (
-                  <WarehouseInquiryLineCard
-                    key={inq.id}
-                    inquiry={inq}
-                    onSelect={handleSelectInquiryById}
-                  />
-                ))}
-              </div>
-            )}
+      </div>
 
-            {/* Pagination for Single-Line View */}
-            {pagedInquiries.length > 0 && !isBusy && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
-          </div>
-        </DataGrid>
-      ) : (
-        /* ================= VIEW MODE 3: RICH GRID CARDS ================= */
-        <DataGrid
-          table={table}
-          recordCount={filteredInquiries.length}
-          isLoading={isBusy}
-          loadingMode="skeleton"
-        >
-          <div className="space-y-4">
-            {isBusy ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
-                {Array.from({ length: Math.min(pagination.pageSize, 6) }).map((_, i) => (
-                  <WarehouseInquiryCardSkeleton key={i} mode="grid" />
-                ))}
-              </div>
-            ) : pagedInquiries.length === 0 ? (
-              <WarehouseInquiryEmptyState
-                hasFilters={activeFiltersCount > 0 || !!searchQuery}
-                onClearFilters={handleClearAllFilters}
-                onNewInquiry={onOpenNewInquiry}
-              />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
-                {pagedInquiries.map((inq) => (
-                  <WarehouseInquiryCard
-                    key={inq.id}
-                    inquiry={inq}
-                    onSelect={handleSelectInquiryById}
-                  />
-                ))}
-              </div>
-            )}
+      {/* Desktop view: Respects user viewMode (List vs Card) */}
+      <div className="hidden sm:block">
+        {viewMode === 'table' ? (
+          <InquiriesList
+            table={table}
+            recordCount={totalCount || filteredInquiries.length}
+            isLoading={isBusy}
+            hasFilters={activeFiltersCount > 0 || !!searchQuery}
+            onClearFilters={handleClearAllFilters}
+            onNewInquiry={onOpenNewInquiry}
+          />
+        ) : (
+          <InquiriesCard
+            table={table}
+            inquiries={pagedInquiries}
+            recordCount={filteredInquiries.length}
+            isLoading={isBusy}
+            mode={viewMode === 'line' ? 'line' : 'grid'}
+            hasFilters={activeFiltersCount > 0 || !!searchQuery}
+            onClearFilters={handleClearAllFilters}
+            onNewInquiry={onOpenNewInquiry}
+            onSelectInquiry={handleSelectInquiryById}
+            pageSize={pagination.pageSize}
+          />
+        )}
+      </div>
 
-            {/* Pagination for Card View */}
-            {pagedInquiries.length > 0 && !isBusy && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
-          </div>
-        </DataGrid>
-      )}
-
-      {/* Advanced Filters Drawer (Right Slide-out with Combobox & Apply Trigger) */}
-      {isFilterDrawerOpen && (
-        <div className="fixed inset-0 z-[99999] flex justify-end animate-fade-in select-none overflow-hidden m-0 p-0">
-          {/* Backdrop */}
+      {/* Advanced Filters Drawer (Right Slide-out taking reference from sidebar drawer) */}
+      {isFilterDrawerOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[99999] flex justify-end select-none overflow-hidden m-0 p-0">
+          {/* Backdrop taking reference from sidebar drawer */}
           <div
-            className="fixed inset-0 w-full h-full bg-black/60 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs animate-backdrop-fade cursor-pointer"
             onClick={() => setIsFilterDrawerOpen(false)}
           />
 
-          {/* Drawer Container */}
-          <div className="relative w-full max-w-full sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0">
+          {/* Drawer Container (Right-hand side slide-in: w-[85vw] max-w-sm on mobile, sm:w-96) */}
+          <div className="relative w-[85vw] sm:w-96 max-w-sm bg-surface border-l border-border h-full shadow-2xl flex flex-col z-10 animate-slide-drawer-right outline-none">
             {/* Header */}
-            <div className="p-5 border-b border-border bg-surface flex items-start justify-between border-t-0">
+            <div className="p-4 sm:p-5 border-b border-border bg-surface flex items-start justify-between shrink-0">
               <div>
                 <h2 className="text-base font-bold text-foreground tracking-tight">
                   Advanced Filters
@@ -1387,7 +1368,8 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Edit Inquiry Modal */}

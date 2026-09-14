@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Building2,
   Warehouse,
@@ -31,8 +31,10 @@ import { cn } from '@/modules/core/lib/utils';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
+import { UserCombobox } from '@/modules/core/components/ui/UserCombobox';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
-import { StorageService } from '@/modules/core/services/storageService';
+import { PropertyService } from '@/modules/core/services/propertyService';
+import { matchPropertiesForInquiry } from '@/modules/core/utils/propertyMatcher';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { CompanyService } from '@/modules/core/services/companyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
@@ -90,7 +92,15 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessView, setShowSuccessView] = useState(false);
-  const existingCompanies = useMemo(() => StorageService.getCompanies(), []);
+  const [existingCompanies, setExistingCompanies] = useState<Company[]>([]);
+
+  useEffect(() => {
+    CompanyService.getCompanies({ pageSize: 1000 }).then((res) => {
+      if (res && res.data) {
+        setExistingCompanies(res.data);
+      }
+    });
+  }, []);
 
   // Core Inquiry Data
   const [inquiryData, setInquiryData] = useState({
@@ -178,9 +188,20 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
     return existingCompanies.find((c) => c.id === selectedCompanyId);
   }, [existingCompanies, selectedCompanyId]);
 
-  const existingCompanyContacts = useMemo(() => {
-    if (!selectedCompanyId) return [];
-    return StorageService.getContacts(selectedCompanyId);
+  const [existingCompanyContacts, setExistingCompanyContacts] = useState<Contact[]>([]);
+
+  useEffect(() => {
+    if (!selectedCompanyId) {
+      setExistingCompanyContacts([]);
+      return;
+    }
+    CompanyService.getCompanyById(selectedCompanyId).then((res) => {
+      if (res.success && res.data && res.data.contacts) {
+        setExistingCompanyContacts(res.data.contacts);
+      } else {
+        setExistingCompanyContacts([]);
+      }
+    });
   }, [selectedCompanyId]);
 
   // Sync default contact when existing company changes
@@ -194,30 +215,51 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
     }
   }, [existingCompanyContacts]);
 
-  // Duplicate Check on New Company Name
-  const handleNewCompanyNameChange = async (val: string) => {
+  // Duplicate Check on New Company Name (debounced 750ms, minimum 3 chars)
+  const duplicateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCheckedNameRef = useRef<string>('');
+
+  const handleNewCompanyNameChange = (val: string) => {
     setNewCompanyData((prev) => ({ ...prev, name: val }));
-    if (val.trim().length >= 3) {
+
+    if (duplicateTimerRef.current) {
+      clearTimeout(duplicateTimerRef.current);
+      duplicateTimerRef.current = null;
+    }
+
+    const trimmed = val.trim();
+    if (trimmed.length < 3) {
+      lastCheckedNameRef.current = '';
+      setDuplicateWarnings([]);
+      return;
+    }
+
+    if (trimmed.toLowerCase() === lastCheckedNameRef.current.toLowerCase()) {
+      return;
+    }
+
+    duplicateTimerRef.current = setTimeout(async () => {
       try {
-        const res = await CompanyService.checkDuplicates(val);
-        if (res.success && res.duplicates && res.duplicates.length > 0) {
+        lastCheckedNameRef.current = trimmed;
+        const res = await CompanyService.checkDuplicates(trimmed);
+        if (res.success && res.duplicates) {
           setDuplicateWarnings(res.duplicates);
         } else {
-          const local = StorageService.getCompanies().filter((c) =>
-            c.name.toLowerCase().includes(val.toLowerCase())
-          );
-          setDuplicateWarnings(local);
+          setDuplicateWarnings([]);
         }
       } catch {
-        const local = StorageService.getCompanies().filter((c) =>
-          c.name.toLowerCase().includes(val.toLowerCase())
-        );
-        setDuplicateWarnings(local);
+        setDuplicateWarnings([]);
       }
-    } else {
-      setDuplicateWarnings([]);
-    }
+    }, 750);
   };
+
+  useEffect(() => {
+    return () => {
+      if (duplicateTimerRef.current) {
+        clearTimeout(duplicateTimerRef.current);
+      }
+    };
+  }, []);
 
   // Validation Errors State
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -459,14 +501,6 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
     { value: '120', label: '10 Years (120 Months)' },
   ];
 
-  const userComboboxOptions = useMemo<ComboboxOption[]>(() => {
-    return users.map((u) => ({
-      value: u.id,
-      label: u.name,
-      description: u.role || 'Sales',
-    }));
-  }, [users]);
-
   const contactComboboxOptions = useMemo<ComboboxOption[]>(() => {
     return existingCompanyContacts.map((cnt) => ({
       value: cnt.id,
@@ -510,123 +544,25 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
 
       const res = await InquiryService.createInquiryStepper(payload);
 
-      let finalInq: Inquiry;
-
-      if (res.success && res.data) {
-        finalInq = res.data;
-        try {
-          StorageService.createInquiry(res.data);
-        } catch {}
-      } else {
-        // Fallback to local storage
-        let finalCompany: Company;
-        if (selectedCompanyMode === 'existing') {
-          const existing = StorageService.getCompanyById(selectedCompanyId);
-          if (!existing) throw new Error('Company not found');
-          finalCompany = existing;
-        } else {
-          finalCompany = StorageService.createCompany({
-            name: newCompanyData.name || 'New Industrial Client',
-            legalName: newCompanyData.legalName || `${newCompanyData.name} Pvt Ltd`,
-            website: newCompanyData.website || `https://${newCompanyData.name.toLowerCase().replace(/\s+/g, '')}.com`,
-            industry: newCompanyData.industry,
-            status: 'Active',
-            address: newCompanyData.address,
-            city: newCompanyData.city,
-            state: newCompanyData.state,
-            pincode: newCompanyData.pincode,
-            phone: newCompanyData.phone,
-            email: newCompanyData.email,
-            assignedOwnerId: assignedSalespersonId,
-            assignedOwnerName: salesperson?.name || 'Admin',
-            prospectStage: 'Requirement Confirmed',
-            priority: newCompanyData.priority,
-          });
-        }
-
-        let finalContactName = contactData.name;
-        let finalContactPhone = contactData.phone;
-        let finalContactEmail = contactData.email;
-        let finalContactId = selectedContactId;
-
-        if (contactMode === 'new' && contactData.name) {
-          const newCnt = StorageService.createContact({
-            companyId: finalCompany.id,
-            companyName: finalCompany.name,
-            name: contactData.name,
-            designation: contactData.designation,
-            department: contactData.department,
-            phone: contactData.phone,
-            email: contactData.email,
-            linkedinUrl: contactData.linkedinUrl,
-            isPrimary: contactData.isPrimary,
-          });
-          finalContactId = newCnt.id;
-          finalContactName = newCnt.name;
-        }
-
-        if (createFacility && facilityData.name) {
-          StorageService.createFacility({
-            companyId: finalCompany.id,
-            companyName: finalCompany.name,
-            name: facilityData.name,
-            type: facilityData.type,
-            address: facilityData.address,
-            city: facilityData.city,
-            state: facilityData.state,
-            pincode: facilityData.pincode,
-            latitude: facilityData.latitude,
-            longitude: facilityData.longitude,
-            status: 'Active',
-            builtUpAreaSqFt: facilityData.builtUpAreaSqFt,
-            corridor: inquiryData.targetCorridor,
-          });
-        }
-
-        finalInq = StorageService.createInquiry({
-          companyId: finalCompany.id,
-          companyName: finalCompany.name,
-          contactId: finalContactId || undefined,
-          contactName: finalContactName,
-          contactPhone: finalContactPhone,
-          contactEmail: finalContactEmail,
-          stage: 'requirement_confirmed',
-          status: 'Active',
-          priority: inquiryData.priority,
-          source: inquiryData.source,
-          inquiryDate: new Date().toISOString().split('T')[0],
-          salespersonId: salesperson?.id || 'usr_1',
-          salespersonName: salesperson?.name || 'Assigned Lead',
-          leadScore: 85,
-          opportunityScore: 75,
-          industry: finalCompany.industry,
-          requiredAreaSqFt: inquiryData.requiredAreaSqFt,
-          location: inquiryData.location,
-          targetCorridor: inquiryData.targetCorridor,
-          budgetMonthlyINR: inquiryData.budgetMonthlyINR,
-          possessionDate: inquiryData.possessionDate,
-          leaseDurationMonths: inquiryData.leaseDurationMonths,
-          requirement: inquiryData.requirement,
-          dockRequirements: inquiryData.dockRequirements,
-          clearHeightFt: inquiryData.clearHeightFt,
-          floorLoadCapacity: inquiryData.floorLoadCapacity,
-          powerKVA: inquiryData.powerKVA,
-          fireSystemsRequired: inquiryData.fireSystemsRequired,
-          specialRequirements: inquiryData.specialRequirements,
-          nextAction: inquiryData.nextAction,
-          nextFollowUpDate: inquiryData.nextFollowUpDate,
-        });
+      if (!res.success || !res.data) {
+        throw new Error(res.error || 'Failed to register inquiry on backend server');
       }
 
+      const finalInq = res.data;
       setCreatedInquiry(finalInq);
 
-      // Fetch matches
-      const matches = StorageService.matchPropertiesForInquiry(finalInq);
-      setPropertyMatches(matches);
+      // Fetch dynamic property matches
+      try {
+        const propRes = await PropertyService.getProperties();
+        const allProps = propRes.success && propRes.data ? propRes.data : [];
+        const matches = matchPropertiesForInquiry(finalInq, allProps);
+        setPropertyMatches(matches);
+      } catch {
+        setPropertyMatches([]);
+      }
 
       success('Inquiry Created Successfully', `${finalInq.inquiryNumber} registered in CRM pipeline.`);
-      setShowSuccessView(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      onBack();
     } catch (err: any) {
       error('Creation Failed', err?.message || 'Unable to register new inquiry.');
     } finally {
@@ -693,17 +629,17 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
   return (
     <div className="w-full text-left space-y-6 pb-20">
       {/* Top Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-fairway-500/10 text-fairway-600 dark:bg-fairway-500/20 dark:text-fairway-400 border border-fairway-500/20 flex items-center justify-center shrink-0 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 pb-4 border-b border-border">
+        <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-fairway-500/10 text-fairway-600 dark:bg-fairway-500/20 dark:text-fairway-400 border border-fairway-500/20 flex items-center justify-center shrink-0 shadow-xs mt-0.5 sm:mt-0">
             <Warehouse className="w-5 h-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-foreground tracking-tight">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
                 Create Warehouse Inquiry
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 border border-fairway-500/20">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 border border-fairway-500/20 whitespace-nowrap shrink-0">
                 New Requirement
               </span>
             </div>
@@ -713,15 +649,15 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
           </div>
         </div>
 
-        {/* Right Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        {/* Right Action Buttons - Full Width on Mobile */}
+        <div className="flex items-center w-full sm:w-auto">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={onBack}
-            leftIcon={<ArrowLeft className="w-4 h-4" />}
-            className="rounded-xl font-semibold"
+            leftIcon={<ArrowLeft className="w-4 h-4 shrink-0" />}
+            className="w-full sm:w-auto rounded-xl font-semibold justify-center h-9 shadow-2xs"
           >
             Back
           </Button>
@@ -745,7 +681,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
             </div>
 
             {/* Entity Selection Mode Pills */}
-            <div className="flex items-center gap-1 p-1 bg-surface-muted rounded-xl border border-border flex-wrap sm:flex-nowrap w-full sm:w-auto">
+            <div className="flex items-center gap-1 p-1 bg-surface-muted rounded-xl border border-border w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -754,13 +690,16 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   clearError('companyIndustry');
                   clearError('companyCity');
                 }}
-                className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
+                className={`flex-1 sm:flex-initial px-2 sm:px-3.5 py-2 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer text-center whitespace-nowrap flex items-center justify-center ${
                   selectedCompanyMode === 'existing'
                     ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
                     : 'text-foreground-muted hover:text-foreground'
                 }`}
               >
-                Select Existing Company ({existingCompanies.length})
+                <span>
+                  <span className="hidden sm:inline">Select </span>Existing Company
+                  <span className="ml-1 text-[10px] sm:text-xs font-mono font-medium opacity-80">({existingCompanies.length})</span>
+                </span>
               </button>
               <button
                 type="button"
@@ -768,14 +707,16 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   setSelectedCompanyMode('new');
                   clearError('selectedCompanyId');
                 }}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`flex-1 sm:flex-initial px-2 sm:px-3.5 py-2 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
                   selectedCompanyMode === 'new'
                     ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
                     : 'text-foreground-muted hover:text-foreground'
                 }`}
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Register New Entity</span>
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  <span className="hidden sm:inline">Register </span>New Entity
+                </span>
               </button>
             </div>
           </div>
@@ -1345,7 +1286,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
             </div>
 
             {selectedCompanyMode === 'existing' && existingCompanyContacts.length > 0 && (
-              <div className="flex items-center p-1 bg-surface-muted rounded-xl border border-border">
+              <div className="flex items-center gap-1 p-1 bg-surface-muted rounded-xl border border-border w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => {
@@ -1353,13 +1294,16 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     clearError('contactName');
                     clearError('contactPhone');
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex-1 sm:flex-initial px-2 sm:px-3.5 py-2 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer text-center whitespace-nowrap flex items-center justify-center ${
                     contactMode === 'existing'
                       ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
                       : 'text-foreground-muted hover:text-foreground'
                   }`}
                 >
-                  Select Existing Contact ({existingCompanyContacts.length})
+                  <span>
+                    <span className="hidden sm:inline">Select </span>Existing Contact
+                    <span className="ml-1 text-[10px] sm:text-xs font-mono font-medium opacity-80">({existingCompanyContacts.length})</span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -1367,14 +1311,16 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     setContactMode('new');
                     clearError('selectedContactId');
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                  className={`flex-1 sm:flex-initial px-2 sm:px-3.5 py-2 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
                     contactMode === 'new'
                       ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
                       : 'text-foreground-muted hover:text-foreground'
                   }`}
                 >
-                  <Plus className="w-3 h-3" />
-                  <span>Add New Contact</span>
+                  <Plus className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    <span className="hidden sm:inline">Add </span>New Contact
+                  </span>
                 </button>
               </div>
             )}
@@ -1692,17 +1638,19 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               </div>
 
               <div id="field-assignedSalespersonId" className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">
-                  Assigned Sales Owner <span className="text-rose-500 font-bold">*</span>
-                </label>
-                <Combobox
-                  options={userComboboxOptions}
+                <UserCombobox
+                  label={
+                    <span>
+                      Assigned Sales Owner <span className="text-rose-500 font-bold">*</span>
+                    </span>
+                  }
+                  users={users}
                   value={assignedSalespersonId}
                   onChange={(val) => {
                     setAssignedSalespersonId(val);
                     clearError('assignedSalespersonId');
                   }}
-                  placeholder="Select deal owner..."
+                  placeholder="Select sales owner..."
                   triggerClassName={errors.assignedSalespersonId ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                 />
                 {errors.assignedSalespersonId && (
@@ -1744,34 +1692,34 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* BOTTOM SUBMISSION FOOTER */}
+        {/* BOTTOM SUBMISSION FOOTER (STICKY) */}
         {/* ========================================================================= */}
-        <div className="bg-surface border border-border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
-          <div className="flex items-center gap-3 text-xs">
+        <div className="sticky bottom-2 sm:bottom-4 z-30 bg-surface/95 dark:bg-surface/95 backdrop-blur-md border border-border rounded-2xl p-3.5 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 shadow-lg sm:shadow-xl transition-all">
+          <div className="flex items-center gap-2.5 sm:gap-3 text-xs min-w-0">
             {Object.keys(errors).length > 0 ? (
-              <span className="flex items-center gap-1.5 text-rose-500 font-semibold">
+              <span className="flex items-center gap-1.5 text-rose-500 font-semibold truncate">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-                <span>{Object.keys(errors).length} required {Object.keys(errors).length === 1 ? 'field needs' : 'fields need'} your attention</span>
+                <span className="truncate">{Object.keys(errors).length} required {Object.keys(errors).length === 1 ? 'field needs' : 'fields need'} your attention</span>
               </span>
             ) : isValid ? (
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold truncate">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>All mandatory fields verified</span>
+                <span className="truncate">All mandatory fields verified</span>
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-foreground-muted">
-                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                <span>Please complete all fields marked with *</span>
+              <span className="flex items-center gap-1.5 text-foreground-muted text-[11px] sm:text-xs min-w-0">
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
+                <span className="truncate sm:whitespace-normal">Please complete all fields marked with *</span>
               </span>
             )}
           </div>
 
-          <div className="flex flex-col-reverse xs:flex-row xs:items-center gap-2.5 sm:gap-3 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto shrink-0 justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={onBack}
-              className="text-xs border-border px-4 justify-center w-full xs:w-auto"
+              className="text-xs border-border px-4 justify-center flex-1 sm:flex-initial"
             >
               Cancel
             </Button>
@@ -1780,7 +1728,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               variant="primary"
               isLoading={isSubmitting}
               disabled={isSubmitting}
-              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs px-4 sm:px-6 shadow-xs flex items-center justify-center gap-2 cursor-pointer text-center w-full xs:w-auto"
+              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs px-4 sm:px-6 shadow-xs flex items-center justify-center gap-2 cursor-pointer text-center flex-1 sm:flex-initial whitespace-nowrap"
             >
               Register Warehouse Inquiry & Match Assets
             </Button>

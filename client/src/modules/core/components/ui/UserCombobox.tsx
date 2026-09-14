@@ -34,7 +34,7 @@ export interface UserComboboxProps {
   disabled?: boolean;
   className?: string;
   triggerClassName?: string;
-  label?: string;
+  label?: React.ReactNode;
   showEmail?: boolean;
   allowClear?: boolean;
 }

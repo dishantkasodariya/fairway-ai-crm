@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export interface DocumentItem {
   id: string;
@@ -33,7 +33,9 @@ export class DocumentService {
       if (params?.category && params.category !== 'all') q.append('category', params.category);
       if (params?.search) q.append('search', params.search);
 
-      const res = await fetch(`${API_BASE_URL}/documents?${q.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/documents?${q.toString()}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -61,7 +63,7 @@ export class DocumentService {
     try {
       const res = await fetch(`${API_BASE_URL}/documents`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -79,6 +81,7 @@ export class DocumentService {
     try {
       const res = await fetch(`${API_BASE_URL}/documents/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const json = await res.json();
       return json;

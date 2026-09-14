@@ -7,14 +7,15 @@ import {
   toggleTaskStatus,
   deleteTask,
 } from '../controllers/tasks.controller.js';
+import { requirePermission } from '../middleware/permission.middleware.js';
 
 const router = Router();
 
-router.get('/', getTasks);
-router.get('/:id', getTaskById);
-router.post('/', createTask);
-router.put('/:id', updateTask);
-router.patch('/:id/toggle', toggleTaskStatus);
-router.delete('/:id', deleteTask);
+router.get('/', requirePermission('tasks', 'view'), getTasks);
+router.get('/:id', requirePermission('tasks', 'view'), getTaskById);
+router.post('/', requirePermission('tasks', 'create'), createTask);
+router.put('/:id', requirePermission('tasks', 'edit'), updateTask);
+router.patch('/:id/toggle', requirePermission('tasks', 'edit'), toggleTaskStatus);
+router.delete('/:id', requirePermission('tasks', 'delete'), deleteTask);
 
 export default router;

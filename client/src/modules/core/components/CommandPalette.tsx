@@ -9,7 +9,10 @@ import {
   ArrowRight,
   X,
 } from 'lucide-react';
-import { StorageService } from '@/modules/core/services/storageService';
+import { InquiryService } from '@/modules/core/services/inquiryService';
+import { CompanyService } from '@/modules/core/services/companyService';
+import { PropertyService } from '@/modules/core/services/propertyService';
+import { Inquiry, Company, Property, Contact, Facility } from '@/modules/core/types';
 import { formatSqFt } from '@/modules/core/utils/formatters';
 
 export interface CommandPaletteProps {
@@ -24,11 +27,43 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   const inputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+
   // Focus input when opened and reset when closed
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 40);
       setSelectedIndex(0);
+
+      // Async load live CRM data
+      Promise.allSettled([
+        InquiryService.getInquiries({ pageSize: 200 }),
+        CompanyService.getCompanies({ pageSize: 200 }),
+        PropertyService.getProperties(),
+      ]).then(([inqRes, compRes, propRes]) => {
+        if (inqRes.status === 'fulfilled' && inqRes.value.success && inqRes.value.data) {
+          setInquiries(inqRes.value.data);
+        }
+        if (compRes.status === 'fulfilled' && compRes.value.success && compRes.value.data) {
+          setCompanies(compRes.value.data);
+          const allContacts: Contact[] = [];
+          const allFacilities: Facility[] = [];
+          compRes.value.data.forEach((c) => {
+            const compAny = c as any;
+            if (compAny.contacts && Array.isArray(compAny.contacts)) allContacts.push(...compAny.contacts);
+            if (compAny.facilities && Array.isArray(compAny.facilities)) allFacilities.push(...compAny.facilities);
+          });
+          setContacts(allContacts);
+          setFacilities(allFacilities);
+        }
+        if (propRes.status === 'fulfilled' && propRes.value.success && propRes.value.data) {
+          setProperties(propRes.value.data);
+        }
+      });
     } else {
       setQuery('');
       setSelectedIndex(0);
@@ -50,12 +85,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     window.addEventListener('keydown', handleWindowKeyDown, true);
     return () => window.removeEventListener('keydown', handleWindowKeyDown, true);
   }, [isOpen, onClose]);
-
-  const companies = StorageService.getCompanies();
-  const inquiries = StorageService.getInquiries();
-  const contacts = StorageService.getContacts();
-  const properties = StorageService.getProperties();
-  const facilities = StorageService.getFacilities();
 
   const q = query.trim().toLowerCase();
 

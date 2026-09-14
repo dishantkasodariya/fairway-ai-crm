@@ -110,7 +110,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
   const [newUserForm, setNewUserForm] = useState({
     name: '',
     email: '',
-    role: 'sales' as UserRole,
+    role: (roles[0]?.key as UserRole) || 'admin',
     department: 'Industrial Leasing',
     phone: '+91 988496151',
     password: '',
@@ -122,7 +122,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [editUserForm, setEditUserForm] = useState({
     name: '',
-    role: 'sales' as UserRole,
+    role: (roles[0]?.key as UserRole) || 'admin',
     department: 'Industrial Leasing',
     phone: '+91 988496151',
   });
@@ -217,7 +217,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
       setNewUserForm({
         name: '',
         email: '',
-        role: 'sales',
+        role: (roles[0]?.key as UserRole) || 'admin',
         department: 'Industrial Leasing',
         phone: '+91 988496151',
         password: '',
@@ -597,8 +597,10 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
               />
             </div>
 
-            {/* Column Settings Dropdown (Common Component) */}
-            <DataGridColumnVisibilityMenu table={table} excludeColumns={['actions', 'code']} />
+            {/* Column Settings Dropdown (Common Component - Desktop Only) */}
+            <div className="hidden sm:block">
+              <DataGridColumnVisibilityMenu table={table} excludeColumns={['actions', 'code']} />
+            </div>
 
             {/* Refresh Button */}
             <Tooltip>
@@ -620,8 +622,8 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
               <TooltipContent side="top">Refresh</TooltipContent>
             </Tooltip>
 
-            {/* Segmented View Switcher (List / Card View matching exact Inquiries UI) */}
-            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+            {/* Segmented View Switcher (Desktop Only) */}
+            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -675,24 +677,8 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
         </TooltipProvider>
       </div>
 
-      {/* ================= VIEW MODE 1: COMMON DATA GRID (MATCHING INQUIRIES LIST) ================= */}
-      {viewMode === 'table' ? (
-        <CommonDataGrid
-          table={table}
-          recordCount={filteredUsers.length}
-          isLoading={isRefreshing}
-          emptyState={
-            <div className="p-12 text-center text-foreground-muted bg-surface rounded-xl border border-border">
-              <Users className="w-8 h-8 text-foreground-muted mx-auto mb-2 opacity-50" />
-              <p className="font-semibold text-foreground text-xs">No team members found</p>
-              <p className="text-[11px] text-foreground-muted mt-0.5">
-                Try adjusting your search query or filter criteria.
-              </p>
-            </div>
-          }
-        />
-      ) : (
-        /* ================= VIEW MODE 2: CARD VIEW ================= */
+      {/* Mobile view: ONLY Card View show, NOT list page show */}
+      <div className="block sm:hidden">
         <DataGrid
           table={table}
           recordCount={filteredUsers.length}
@@ -700,181 +686,383 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
           loadingMode="skeleton"
         >
           <div className="space-y-4">
-          {filteredUsers.length === 0 ? (
-            <div className="p-12 text-center bg-surface rounded-2xl border border-border">
-              <Users className="w-8 h-8 text-foreground-muted mx-auto mb-2 opacity-50" />
-              <p className="text-xs font-semibold text-foreground">No team members match your search</p>
-              <p className="text-[11px] text-foreground-muted mt-0.5">
-                Try adjusting your search criteria or add a new team member.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 animate-fade-in">
-              {pagedUsers.map((u) => {
-                const userCode = `USR-${String(u.id).padStart(3, '0').slice(-4)}`;
-                const roleItem = roles.find((r) => r.key === u.role);
-                const isCurrentUser = u.id === currentUser?.id;
+            {filteredUsers.length === 0 ? (
+              <div className="p-12 text-center bg-surface rounded-2xl border border-border">
+                <Users className="w-8 h-8 text-foreground-muted mx-auto mb-2 opacity-50" />
+                <p className="text-xs font-semibold text-foreground">No team members match your search</p>
+                <p className="text-[11px] text-foreground-muted mt-0.5">
+                  Try adjusting your search criteria or add a new team member.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 animate-fade-in">
+                {pagedUsers.map((u) => {
+                  const userCode = `USR-${String(u.id).padStart(3, '0').slice(-4)}`;
+                  const roleItem = roles.find((r) => r.key === u.role);
+                  const isCurrentUser = u.id === currentUser?.id;
 
-                return (
-                  <div
-                    key={u.id}
-                    className="bg-surface border border-border hover:border-fairway-400 hover:shadow-card rounded-xl p-4 transition-all flex flex-col justify-between group text-xs select-none shadow-2xs"
-                  >
-                    <div>
-                      {/* Top Row: Code Badge + Status Pill + Menu */}
-                      <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border">
-                        <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 dark:bg-emerald-950/30 dark:border-emerald-500/30 shadow-xs">
-                          {userCode}
-                        </span>
-
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={cn(
-                              'text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
-                              u.status === 'Active'
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                                : 'bg-surface-muted text-foreground-muted border-border'
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                'w-1.5 h-1.5 rounded-full',
-                                u.status === 'Active' ? 'bg-emerald-500' : 'bg-foreground-muted'
-                              )}
-                            />
-                            <span>{u.status || 'Active'}</span>
+                  return (
+                    <div
+                      key={u.id}
+                      className="bg-surface border border-border hover:border-fairway-400 hover:shadow-card rounded-xl p-4 transition-all flex flex-col justify-between group text-xs select-none shadow-2xs"
+                    >
+                      <div>
+                        {/* Top Row: Code Badge + Status Pill + Menu */}
+                        <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border">
+                          <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 dark:bg-emerald-950/30 dark:border-emerald-500/30 shadow-xs">
+                            {userCode}
                           </span>
 
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                type="button"
-                                className="w-6 h-6 rounded-md flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
-                                title="Actions"
-                              >
-                                <MoreHorizontal className="w-3.5 h-3.5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="w-48 bg-surface border border-border shadow-dialog z-50 p-1 rounded-xl"
-                            >
-                              <DropdownMenuItem
-                                onClick={() => handleOpenEditModal(u)}
-                                className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
-                              >
-                                <Edit2 className="w-3.5 h-3.5 text-foreground-muted" />
-                                <span>Edit Member</span>
-                              </DropdownMenuItem>
-                              {isAdmin && !isCurrentUser && (
-                                <>
-                                  <DropdownMenuItem
-                                    onClick={() => handleToggleUserStatus(u.id, u.status)}
-                                    className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
-                                  >
-                                    {u.status === 'Active' ? (
-                                      <>
-                                        <UserX className="w-3.5 h-3.5 text-amber-500" />
-                                        <span>Deactivate Account</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                        <span>Activate Account</span>
-                                      </>
-                                    )}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator className="my-1 border-border" />
-                                  <DropdownMenuItem
-                                    onClick={() => setDeletingUser(u)}
-                                    className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    <span>Delete Member</span>
-                                  </DropdownMenuItem>
-                                </>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={cn(
+                                'text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
+                                u.status === 'Active'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                  : 'bg-surface-muted text-foreground-muted border-border'
                               )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                            >
+                              <span
+                                className={cn(
+                                  'w-1.5 h-1.5 rounded-full',
+                                  u.status === 'Active' ? 'bg-emerald-500' : 'bg-foreground-muted'
+                                )}
+                              />
+                              <span>{u.status || 'Active'}</span>
+                            </span>
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="w-6 h-6 rounded-md flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                                  title="Actions"
+                                >
+                                  <MoreHorizontal className="w-3.5 h-3.5" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent
+                                align="end"
+                                className="w-48 bg-surface border border-border shadow-dialog z-50 p-1 rounded-xl"
+                              >
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenEditModal(u)}
+                                  className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 text-foreground-muted" />
+                                  <span>Edit Member</span>
+                                </DropdownMenuItem>
+                                {isAdmin && !isCurrentUser && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onClick={() => handleToggleUserStatus(u.id, u.status)}
+                                      className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
+                                    >
+                                      {u.status === 'Active' ? (
+                                        <>
+                                          <UserX className="w-3.5 h-3.5 text-amber-500" />
+                                          <span>Deactivate Account</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                          <span>Activate Account</span>
+                                        </>
+                                      )}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="my-1 border-border" />
+                                    <DropdownMenuItem
+                                      onClick={() => setDeletingUser(u)}
+                                      className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <span>Delete Member</span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+
+                        {/* User Info (Avatar + Name + Email) */}
+                        <div className="mt-3 flex items-start gap-3">
+                          <UserAvatar src={u.avatar} name={u.name} size="lg" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="text-sm font-bold text-foreground group-hover:text-fairway-600 transition-colors truncate">
+                                {u.name}
+                              </h3>
+                              {isCurrentUser && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 font-bold shrink-0">
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-foreground-muted font-mono truncate mt-0.5">
+                              {u.email}
+                            </p>
+                            {u.phone && (
+                              <p className="text-[11px] text-foreground-muted flex items-center gap-1 mt-1">
+                                <Phone className="w-3 h-3 text-foreground-muted" />
+                                <span>{u.phone}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Key Specs Matrix (2-Column Grid Matching WarehouseInquiryCard) */}
+                        <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border/70 text-[11px]">
+                          <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
+                            <span className="text-[10px] text-foreground-muted block">Department</span>
+                            <span className="font-semibold text-foreground truncate flex items-center gap-1 mt-0.5">
+                              <Building className="w-3 h-3 text-fairway-600" />
+                              <span className="truncate">{u.department || 'Industrial Leasing'}</span>
+                            </span>
+                          </div>
+                          <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
+                            <span className="text-[10px] text-foreground-muted block">Assigned Leads</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
+                              <span>{u.assignedLeadsCount || 0} leads</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* User Info (Avatar + Name + Email) */}
-                      <div className="mt-3 flex items-start gap-3">
-                        <UserAvatar src={u.avatar} name={u.name} size="lg" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="text-sm font-bold text-foreground group-hover:text-fairway-600 transition-colors truncate">
-                              {u.name}
-                            </h3>
-                            {isCurrentUser && (
-                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 font-bold shrink-0">
-                                You
+                      {/* Bottom Footer: Role & Action */}
+                      <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-foreground-muted">
+                        <span className="font-semibold capitalize bg-surface-muted border border-border px-2 py-0.5 rounded-md text-foreground text-[11px] inline-flex items-center gap-1">
+                          <Shield className="w-3 h-3 text-fairway-600" />
+                          <span>{roleItem?.name || u.role}</span>
+                        </span>
+
+                        {isAdmin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenEditModal(u)}
+                            className="h-7 px-2.5 text-xs text-foreground hover:border-fairway-500 hover:text-fairway-600 shadow-2xs"
+                            leftIcon={<Edit2 className="w-3 h-3" />}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Card View Pagination */}
+            {filteredUsers.length > 0 && !isRefreshing && (
+              <DataGridPagination sizes={[5, 10, 20, 50, 100]} />
+            )}
+          </div>
+        </DataGrid>
+      </div>
+
+      {/* Desktop view: Respects user viewMode (List vs Card) */}
+      <div className="hidden sm:block">
+        {viewMode === 'table' ? (
+          <CommonDataGrid
+            table={table}
+            recordCount={filteredUsers.length}
+            isLoading={isRefreshing}
+            emptyState={
+              <div className="p-12 text-center text-foreground-muted bg-surface rounded-xl border border-border">
+                <Users className="w-8 h-8 text-foreground-muted mx-auto mb-2 opacity-50" />
+                <p className="font-semibold text-foreground text-xs">No team members found</p>
+                <p className="text-[11px] text-foreground-muted mt-0.5">
+                  Try adjusting your search query or filter criteria.
+                </p>
+              </div>
+            }
+          />
+        ) : (
+          <DataGrid
+            table={table}
+            recordCount={filteredUsers.length}
+            isLoading={isRefreshing}
+            loadingMode="skeleton"
+          >
+            <div className="space-y-4">
+              {filteredUsers.length === 0 ? (
+                <div className="p-12 text-center bg-surface rounded-2xl border border-border">
+                  <Users className="w-8 h-8 text-foreground-muted mx-auto mb-2 opacity-50" />
+                  <p className="text-xs font-semibold text-foreground">No team members match your search</p>
+                  <p className="text-[11px] text-foreground-muted mt-0.5">
+                    Try adjusting your search criteria or add a new team member.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 animate-fade-in">
+                  {pagedUsers.map((u) => {
+                    const userCode = `USR-${String(u.id).padStart(3, '0').slice(-4)}`;
+                    const roleItem = roles.find((r) => r.key === u.role);
+                    const isCurrentUser = u.id === currentUser?.id;
+
+                    return (
+                      <div
+                        key={u.id}
+                        className="bg-surface border border-border hover:border-fairway-400 hover:shadow-card rounded-xl p-4 transition-all flex flex-col justify-between group text-xs select-none shadow-2xs"
+                      >
+                        <div>
+                          {/* Top Row: Code Badge + Status Pill + Menu */}
+                          <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border">
+                            <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25 dark:bg-emerald-950/30 dark:border-emerald-500/30 shadow-xs">
+                              {userCode}
+                            </span>
+
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  'text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1',
+                                  u.status === 'Active'
+                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                    : 'bg-surface-muted text-foreground-muted border-border'
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    'w-1.5 h-1.5 rounded-full',
+                                    u.status === 'Active' ? 'bg-emerald-500' : 'bg-foreground-muted'
+                                  )}
+                                />
+                                <span>{u.status || 'Active'}</span>
                               </span>
-                            )}
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="w-6 h-6 rounded-md flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                                    title="Actions"
+                                  >
+                                    <MoreHorizontal className="w-3.5 h-3.5" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="w-48 bg-surface border border-border shadow-dialog z-50 p-1 rounded-xl"
+                                >
+                                  <DropdownMenuItem
+                                    onClick={() => handleOpenEditModal(u)}
+                                    className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5 text-foreground-muted" />
+                                    <span>Edit Member</span>
+                                  </DropdownMenuItem>
+                                  {isAdmin && !isCurrentUser && (
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={() => handleToggleUserStatus(u.id, u.status)}
+                                        className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg"
+                                      >
+                                        {u.status === 'Active' ? (
+                                          <>
+                                            <UserX className="w-3.5 h-3.5 text-amber-500" />
+                                            <span>Deactivate Account</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                            <span>Activate Account</span>
+                                          </>
+                                        )}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator className="my-1 border-border" />
+                                      <DropdownMenuItem
+                                        onClick={() => setDeletingUser(u)}
+                                        className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span>Delete Member</span>
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </div>
-                          <p className="text-xs text-foreground-muted font-mono truncate mt-0.5">
-                            {u.email}
-                          </p>
-                          {u.phone && (
-                            <p className="text-[11px] text-foreground-muted flex items-center gap-1 mt-1">
-                              <Phone className="w-3 h-3 text-foreground-muted" />
-                              <span>{u.phone}</span>
-                            </p>
+
+                          {/* User Info (Avatar + Name + Email) */}
+                          <div className="mt-3 flex items-start gap-3">
+                            <UserAvatar src={u.avatar} name={u.name} size="lg" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <h3 className="text-sm font-bold text-foreground group-hover:text-fairway-600 transition-colors truncate">
+                                  {u.name}
+                                </h3>
+                                {isCurrentUser && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 font-bold shrink-0">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-foreground-muted font-mono truncate mt-0.5">
+                                {u.email}
+                              </p>
+                              {u.phone && (
+                                <p className="text-[11px] text-foreground-muted flex items-center gap-1 mt-1">
+                                  <Phone className="w-3 h-3 text-foreground-muted" />
+                                  <span>{u.phone}</span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Key Specs Matrix (2-Column Grid Matching WarehouseInquiryCard) */}
+                          <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border/70 text-[11px]">
+                            <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
+                              <span className="text-[10px] text-foreground-muted block">Department</span>
+                              <span className="font-semibold text-foreground truncate flex items-center gap-1 mt-0.5">
+                                <Building className="w-3 h-3 text-fairway-600" />
+                                <span className="truncate">{u.department || 'Industrial Leasing'}</span>
+                              </span>
+                            </div>
+                            <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
+                              <span className="text-[10px] text-foreground-muted block">Assigned Leads</span>
+                              <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
+                                <span>{u.assignedLeadsCount || 0} leads</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bottom Footer: Role & Action */}
+                        <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-foreground-muted">
+                          <span className="font-semibold capitalize bg-surface-muted border border-border px-2 py-0.5 rounded-md text-foreground text-[11px] inline-flex items-center gap-1">
+                            <Shield className="w-3 h-3 text-fairway-600" />
+                            <span>{roleItem?.name || u.role}</span>
+                          </span>
+
+                          {isAdmin && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenEditModal(u)}
+                              className="h-7 px-2.5 text-xs text-foreground hover:border-fairway-500 hover:text-fairway-600 shadow-2xs"
+                              leftIcon={<Edit2 className="w-3 h-3" />}
+                            >
+                              Edit
+                            </Button>
                           )}
                         </div>
                       </div>
+                    );
+                  })}
+                </div>
+              )}
 
-                      {/* Key Specs Matrix (2-Column Grid Matching WarehouseInquiryCard) */}
-                      <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border/70 text-[11px]">
-                        <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
-                          <span className="text-[10px] text-foreground-muted block">Department</span>
-                          <span className="font-semibold text-foreground truncate flex items-center gap-1 mt-0.5">
-                            <Building className="w-3 h-3 text-fairway-600" />
-                            <span className="truncate">{u.department || 'Industrial Leasing'}</span>
-                          </span>
-                        </div>
-                        <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
-                          <span className="text-[10px] text-foreground-muted block">Assigned Leads</span>
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono flex items-center gap-1 mt-0.5">
-                            <span>{u.assignedLeadsCount || 0} leads</span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bottom Footer: Role & Action */}
-                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-xs text-foreground-muted">
-                      <span className="font-semibold capitalize bg-surface-muted border border-border px-2 py-0.5 rounded-md text-foreground text-[11px] inline-flex items-center gap-1">
-                        <Shield className="w-3 h-3 text-fairway-600" />
-                        <span>{roleItem?.name || u.role}</span>
-                      </span>
-
-                      {isAdmin && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenEditModal(u)}
-                          className="h-7 px-2.5 text-xs text-foreground hover:border-fairway-500 hover:text-fairway-600 shadow-2xs"
-                          leftIcon={<Edit2 className="w-3 h-3" />}
-                        >
-                          Edit
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {/* Card View Pagination */}
+              {filteredUsers.length > 0 && !isRefreshing && (
+                <DataGridPagination sizes={[5, 10, 20, 50, 100]} />
+              )}
             </div>
-          )}
-
-          {/* Card View Pagination */}
-          {filteredUsers.length > 0 && !isRefreshing && (
-            <DataGridPagination sizes={[5, 10, 20, 50, 100]} />
-          )}
-        </div>
-      </DataGrid>
-    )}
+          </DataGrid>
+        )}
+      </div>
 
       {/* ================= ADD USER MODAL ================= */}
       {isAddUserOpen && (

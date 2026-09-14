@@ -4,7 +4,8 @@ import { Button } from '@/modules/core/components/ui/Button';
 import { Input, Textarea } from '@/modules/core/components/ui/Input';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
-import { StorageService } from '@/modules/core/services/storageService';
+import { PipelineStageService } from '@/modules/core/services/pipelineStageService';
+import { PIPELINE_STAGES } from '@/modules/core/data/seedData';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
@@ -82,7 +83,15 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
     nextFollowUpDate: '',
   });
 
-  const pipelineStages = StorageService.getPipelineStages();
+  const [pipelineStages, setPipelineStages] = useState(PIPELINE_STAGES);
+
+  useEffect(() => {
+    PipelineStageService.getPipelineStages().then((res) => {
+      if (res.success && res.data && res.data.length > 0) {
+        setPipelineStages(res.data);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (inquiry) {
@@ -185,9 +194,9 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
 
       // 1. Update backend database
       const res = await InquiryService.updateInquiry(inquiry.id, payload);
-
-      // 2. Update local storage cache for instant UI response and offline safety
-      StorageService.updateInquiry(inquiry.id, payload);
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to update inquiry on backend server');
+      }
 
       toastSuccess(
         'Inquiry Updated',
@@ -197,11 +206,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
       onClose();
     } catch (err: any) {
       console.error('Failed to update inquiry:', err);
-      // Fallback update in local storage if backend call had issues
-      StorageService.updateInquiry(inquiry.id, formData);
-      toastSuccess('Updated Locally', `Changes saved to local storage for ${inquiry.inquiryNumber}.`);
-      onSuccess();
-      onClose();
+      toastError('Update Failed', err.message || 'Failed to update inquiry');
     } finally {
       setIsSaving(false);
     }

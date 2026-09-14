@@ -7,7 +7,7 @@ import { DatePicker } from '@/modules/core/components/ui/DatePicker';
 
 import { Trophy, Sparkles } from 'lucide-react';
 import { Property } from '@/modules/core/types';
-import { StorageService } from '@/modules/core/services/storageService';
+import { PropertyService } from '@/modules/core/services/propertyService';
 import confetti from 'canvas-confetti';
 
 export interface WonCelebrationModalProps {
@@ -35,11 +35,22 @@ export const WonCelebrationModal: React.FC<WonCelebrationModalProps> = ({
   defaultMonthlyRent = 1500000,
   onConfirm,
 }) => {
-  const properties = StorageService.getProperties();
-  const [propertyId, setPropertyId] = useState(defaultPropertyId || properties[0]?.id || '');
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [propertyId, setPropertyId] = useState(defaultPropertyId || '');
   const [monthlyValue, setMonthlyValue] = useState(defaultMonthlyRent.toString());
   const [wonDate, setWonDate] = useState(new Date().toISOString().split('T')[0]);
   const [comments, setComments] = useState('');
+
+  useEffect(() => {
+    PropertyService.getProperties().then((res) => {
+      if (res.success && res.data) {
+        setProperties(res.data);
+        if (!propertyId && res.data.length > 0) {
+          setPropertyId(defaultPropertyId || res.data[0].id);
+        }
+      }
+    });
+  }, [defaultPropertyId]);
 
   useEffect(() => {
     if (isOpen) {

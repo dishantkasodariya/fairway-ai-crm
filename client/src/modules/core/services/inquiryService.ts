@@ -1,5 +1,5 @@
 import { Inquiry } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export interface CreateInquiryStepperPayload {
   inquiryData: {
@@ -99,7 +99,9 @@ export class InquiryService {
       if (params?.sortBy) queryParams.set('sortBy', params.sortBy);
       if (params?.ascending !== undefined) queryParams.set('ascending', String(params.ascending));
 
-      const res = await fetch(`${API_BASE_URL}/inquiries?${queryParams.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/inquiries?${queryParams.toString()}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -117,7 +119,9 @@ export class InquiryService {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE_URL}/inquiries/${id}`);
+      const res = await fetch(`${API_BASE_URL}/inquiries/${id}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -136,7 +140,7 @@ export class InquiryService {
     try {
       const res = await fetch(`${API_BASE_URL}/inquiries/stepper`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -158,7 +162,7 @@ export class InquiryService {
     try {
       const res = await fetch(`${API_BASE_URL}/inquiries/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -175,6 +179,7 @@ export class InquiryService {
     try {
       const res = await fetch(`${API_BASE_URL}/inquiries/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const json = await res.json();
       return json;

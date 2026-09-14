@@ -15,6 +15,7 @@ import {
   Users,
   FolderOpen,
   MessageSquare,
+  PhoneCall,
   Search,
   Plus,
   ChevronDown,
@@ -48,7 +49,7 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/modules/core/components/ui/tooltip';
-import { StorageService } from '@/modules/core/services/storageService';
+import { TaskService } from '@/modules/core/services/taskService';
 import { useToast } from '@/modules/core/providers/ToastContext';
 
 
@@ -72,6 +73,8 @@ export type ActiveNavView =
   | 'site_visits'
   | 'documents'
   | 'communications'
+  | 'calls'
+  | 'new_call'
   | 'map'
   | 'reports'
   | 'analytics'
@@ -103,7 +106,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onSignOut,
   children,
 }) => {
-  const { currentUser, logout, isSuperAdmin, isAdmin } = useAuth();
+  const { currentUser, logout, isSuperAdmin, isAdmin, canView, canImport, hasCapability } = useAuth();
   const { currentTheme, openDrawer, isDark, toggleColorMode, colorMode } = useTheme();
   const { success } = useToast();
 
@@ -144,20 +147,62 @@ export const AppShell: React.FC<AppShellProps> = ({
     });
   };
 
-  const pendingTasks = StorageService.getTasks().filter((t) => t.status === 'Pending').length;
-  const overdueTasks = StorageService.getTasks().filter(
-    (t) => t.status === 'Pending' && new Date(t.dueDate) < new Date(new Date().toDateString())
-  ).length;
+  const [taskCounts, setTaskCounts] = useState({ pending: 0, overdue: 0 });
 
-  const handleResetData = () => {
-    if (window.confirm('Reset Fairway CRM database to default demonstration seed records?')) {
-      StorageService.resetToDefaults();
-      success('Database reset', 'Restored all seed companies, warehouse inventory, inquiries, and tasks.');
-      window.location.reload();
+  useEffect(() => {
+    TaskService.getTasks({ status: 'Pending' }).then((res) => {
+      if (res.success && res.data) {
+        const todayStr = new Date().toDateString();
+        const pending = res.data.length;
+        const overdue = res.data.filter((t) => t.dueDate && new Date(t.dueDate) < new Date(todayStr)).length;
+        setTaskCounts({ pending, overdue });
+      }
+    });
+  }, []);
+
+  const isNavVisible = (id: ActiveNavView): boolean => {
+    if (isAdmin) return true;
+    switch (id) {
+      case 'dashboard':
+        return (
+          canView('inquiries') ||
+          canView('companies') ||
+          canView('properties') ||
+          canView('tasks') ||
+          canView('proposals') ||
+          canView('reports')
+        );
+      case 'inquiries':
+      case 'pipeline':
+        return canView('inquiries');
+      case 'companies':
+      case 'contacts':
+        return canView('companies');
+      case 'tasks':
+      case 'site_visits':
+        return canView('tasks');
+      case 'properties':
+        return canView('properties');
+      case 'proposals':
+        return canView('proposals');
+      case 'map':
+        return canView('properties') || canView('reports');
+      case 'import':
+        return canImport('inquiries') || canImport('companies') || canImport('properties');
+      case 'reports':
+      case 'analytics':
+        return canView('reports');
+      case 'settings':
+        return canView('settings') || hasCapability('perm_adm_roles') || hasCapability('perm_adm_users');
+      case 'documents':
+      case 'communications':
+        return canView('communications');
+      default:
+        return true;
     }
   };
 
-  const navItems = [
+  const allNavItems = [
     { id: 'dashboard' as ActiveNavView, label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'inquiries' as ActiveNavView, label: 'Inquiries / Leads', icon: <FileText className="w-4 h-4" /> },
     { id: 'companies' as ActiveNavView, label: 'Companies Master', icon: <Building2 className="w-4 h-4" /> },
@@ -168,9 +213,10 @@ export const AppShell: React.FC<AppShellProps> = ({
       id: 'tasks' as ActiveNavView,
       label: 'Tasks & Follow-ups',
       icon: <CheckSquare className="w-4 h-4" />,
-      badge: pendingTasks > 0 ? pendingTasks : undefined,
-      badgeAlert: overdueTasks > 0,
+      badge: taskCounts.pending > 0 ? taskCounts.pending : undefined,
+      badgeAlert: taskCounts.overdue > 0,
     },
+    { id: 'calls' as ActiveNavView, label: 'Calls', icon: <PhoneCall className="w-4 h-4" /> },
     { id: 'properties' as ActiveNavView, label: 'Warehouse Parks', icon: <Warehouse className="w-4 h-4" /> },
     { id: 'proposals' as ActiveNavView, label: 'Proposals', icon: <FileSpreadsheet className="w-4 h-4" /> },
     { id: 'site_visits' as ActiveNavView, label: 'Site Visits', icon: <Calendar className="w-4 h-4" /> },
@@ -183,6 +229,8 @@ export const AppShell: React.FC<AppShellProps> = ({
     { id: 'settings' as ActiveNavView, label: 'Settings & RBAC', icon: <Settings className="w-4 h-4" /> },
   ];
 
+  const navItems = allNavItems.filter((item) => isNavVisible(item.id));
+
   const handleCommandSelect = (type: string, id: string) => {
     if (type === 'inquiry') {
       onNavigate('inquiry_detail', id);
@@ -194,13 +242,15 @@ export const AppShell: React.FC<AppShellProps> = ({
   };
 
   const getRoleBadgeStyle = (role: string) => {
-    switch (role) {
+    switch (role?.toLowerCase()) {
       case 'super_admin':
         return 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-800/60';
       case 'admin':
         return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800/60';
       case 'sales':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60';
+      case 'management':
+        return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60';
       default:
         return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700';
     }
@@ -646,6 +696,7 @@ export const AppShell: React.FC<AppShellProps> = ({
                   currentView === item.id ||
                   (item.id === 'inquiries' && (currentView === 'inquiry_detail' || currentView === 'new_inquiry')) ||
                   (item.id === 'companies' && (currentView === 'company_detail' || (currentView as string) === 'new_company')) ||
+                  (item.id === 'calls' && (currentView === 'calls' || (currentView as string) === 'new_call')) ||
                   (item.id === 'properties' && (currentView === 'property_detail' || currentView === 'property_matching' || currentView === 'new_property')) ||
                   (item.id === 'proposals' && (currentView === 'proposals' || (currentView as string) === 'new_proposal'));
 

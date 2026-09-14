@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export interface CommunicationItem {
   id: string;
@@ -34,7 +34,9 @@ export class CommunicationService {
    */
   static async getStats(): Promise<{ success: boolean; data: CommunicationStats; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE_URL}/communications/stats`);
+      const res = await fetch(`${API_BASE_URL}/communications/stats`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -67,7 +69,9 @@ export class CommunicationService {
       if (params?.status && params.status !== 'all') q.append('status', params.status);
       if (params?.search) q.append('search', params.search);
 
-      const res = await fetch(`${API_BASE_URL}/communications?${q.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/communications?${q.toString()}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -98,7 +102,7 @@ export class CommunicationService {
     try {
       const res = await fetch(`${API_BASE_URL}/communications`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -127,7 +131,7 @@ export class CommunicationService {
     try {
       const res = await fetch(`${API_BASE_URL}/communications/send-followup-email`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();

@@ -211,7 +211,8 @@ export const deleteRole = async (req: Request, res: Response): Promise<void> => 
 
 export const getRolePermissionsForRole = async (req: Request, res: Response): Promise<void> => {
   try {
-    const roleKey = String(req.params.roleKey || '');
+    const roleKey = String(req.params.roleKey || '').trim();
+    const normalizedKey = roleKey.toLowerCase();
 
     const result = await query(
       `SELECT id, capability, category, super_admin, admin, sales, viewer, custom_permissions, description 
@@ -221,15 +222,25 @@ export const getRolePermissionsForRole = async (req: Request, res: Response): Pr
 
     const permissions = result.rows.map((row) => {
       let value = 'No';
-      if (roleKey === 'super_admin') value = row.super_admin;
-      else if (roleKey === 'admin') value = row.admin;
-      else if (roleKey === 'sales') value = row.sales;
-      else if (roleKey === 'viewer') value = row.viewer;
-      else {
+      if (normalizedKey === 'admin' || normalizedKey === 'super_admin') {
+        value = 'Yes';
+      } else {
         const custom = (row.custom_permissions || {}) as Record<string, string>;
-        value = custom[roleKey] || 'No';
+        if (custom[roleKey] !== undefined) {
+          value = custom[roleKey];
+        } else if (custom[normalizedKey] !== undefined) {
+          value = custom[normalizedKey];
+        } else if (custom[roleKey.toUpperCase()] !== undefined) {
+          value = custom[roleKey.toUpperCase()];
+        } else {
+          for (const [k, v] of Object.entries(custom)) {
+            if (k.toLowerCase() === normalizedKey) {
+              value = v;
+              break;
+            }
+          }
+        }
       }
-
 
       return {
         id: row.id,
@@ -256,7 +267,8 @@ export const getRolePermissionsForRole = async (req: Request, res: Response): Pr
 
 export const updatePermissionsForRole = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { roleKey } = req.params;
+    const roleKey = String(req.params.roleKey || '').trim();
+    const normalizedKey = roleKey.toLowerCase();
     const { permissions } = req.body; // Array of { id: string, value: string }
 
     if (!Array.isArray(permissions)) {
@@ -268,22 +280,19 @@ export const updatePermissionsForRole = async (req: Request, res: Response): Pro
     }
 
     for (const item of permissions) {
-      if (roleKey === 'super_admin') {
-        await query('UPDATE role_permissions SET super_admin = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [item.value, item.id]);
-      } else if (roleKey === 'admin') {
-        await query('UPDATE role_permissions SET admin = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [item.value, item.id]);
-      } else if (roleKey === 'sales') {
-        await query('UPDATE role_permissions SET sales = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [item.value, item.id]);
-      } else if (roleKey === 'viewer') {
-        await query('UPDATE role_permissions SET viewer = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [item.value, item.id]);
+      if (normalizedKey === 'admin' || normalizedKey === 'super_admin') {
+        await query('UPDATE role_permissions SET admin = $1, super_admin = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [item.value, item.id]);
       } else {
-        // Custom role update in custom_permissions JSON
+        // Any custom or user-created role updates custom_permissions
         await query(
           `UPDATE role_permissions 
-           SET custom_permissions = COALESCE(custom_permissions, '{}'::jsonb) || jsonb_build_object($1::text, $2::text),
+           SET custom_permissions = COALESCE(custom_permissions, '{}'::jsonb) 
+               || jsonb_build_object($1::text, $2::text) 
+               || jsonb_build_object($3::text, $2::text) 
+               || jsonb_build_object($4::text, $2::text),
                updated_at = CURRENT_TIMESTAMP 
-           WHERE id = $3`,
-          [roleKey, item.value, item.id]
+           WHERE id = $5`,
+          [roleKey, item.value, roleKey.toUpperCase(), normalizedKey, item.id]
         );
       }
     }

@@ -37,7 +37,6 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/modules/core/components/ui/tooltip';
-import { StorageService } from '@/modules/core/services/storageService';
 import { ProposalService } from '@/modules/core/services/proposalService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
@@ -48,6 +47,8 @@ import { Badge } from '@/modules/core/components/ui/Badge';
 import { DataTable7, ColumnConfig } from '@/modules/core/components/ui/data-table-7';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
 import { downloadProposalPDF } from '@/modules/core/utils/proposalPdfGenerator';
+import { ProposalsList } from '../components/ProposalsList';
+import { ProposalsCard } from '../components/ProposalsCard';
 import { cn } from '@/modules/core/lib/utils';
 
 export interface ProposalListViewProps {
@@ -99,13 +100,13 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
 
     try {
       const res = await ProposalService.getProposals();
-      if (res.success && res.data && res.data.length > 0) {
+      if (res.success && res.data) {
         setProposals(res.data);
       } else {
-        setProposals(StorageService.getProposals());
+        setProposals([]);
       }
     } catch {
-      setProposals(StorageService.getProposals());
+      setProposals([]);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -121,18 +122,12 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
       const res = await ProposalService.updateProposalStatus(id, newStatus);
       if (res.success && res.data) {
         setProposals((prev) => prev.map((p) => (p.id === id ? res.data! : p)));
-        try {
-          StorageService.updateProposalStatus(id, newStatus);
-        } catch {}
+        success('Proposal Updated', `Status changed to ${newStatus}`);
       } else {
-        StorageService.updateProposalStatus(id, newStatus);
-        loadProposals();
+        error('Update Failed', res.error || 'Failed to update proposal status');
       }
-      success('Proposal Updated', `Status changed to ${newStatus}`);
-    } catch {
-      StorageService.updateProposalStatus(id, newStatus);
-      loadProposals();
-      success('Proposal Updated', `Status changed to ${newStatus}`);
+    } catch (err: any) {
+      error('Update Failed', err.message || 'Failed to update proposal status');
     }
   };
 
@@ -380,16 +375,16 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
       </div>
 
       {/* Sleek Search & Control Toolbar matching reference */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+      <div className="flex items-center justify-between gap-2 sm:gap-3 pt-1 w-full">
         {/* Left: Search Bar */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5" />
+        <div className="relative flex-1 min-w-0 max-w-md">
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5 pointer-events-none" />
           <input
             type="text"
             placeholder="Search proposals by number, company, or property..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors h-9"
           />
           {searchQuery && (
             <button
@@ -405,7 +400,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
 
         {/* Right: Controls & View Switcher */}
         <TooltipProvider delayDuration={150}>
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Filter Drawer Trigger Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -430,41 +425,43 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Column Settings Dropdown */}
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+            {/* Column Settings Dropdown (Desktop Only) */}
+            <div className="hidden sm:block">
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Column
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
+                  <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
+                    Toggle Columns
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {allColumns.map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.key}
+                      checked={columnVisibility[col.key] !== false}
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={(val) => setColumnVisibility((prev) => ({ ...prev, [col.key]: !!val }))}
+                      className="text-xs cursor-pointer"
                     >
-                      <Settings className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Column
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
-                <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
-                  Toggle Columns
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {allColumns.map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.key}
-                    checked={columnVisibility[col.key] !== false}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumnVisibility((prev) => ({ ...prev, [col.key]: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    {col.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                      {col.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             {/* Refresh Button */}
             <Tooltip>
@@ -488,8 +485,8 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Segmented View Switcher */}
-            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+            {/* Segmented View Switcher (Desktop Only) */}
+            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -561,88 +558,42 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
             </Button>
           )}
         </div>
-      ) : viewMode === 'table' ? (
-        /* Pinned Columns Data Table */
-        <DataTable7<Proposal>
-          data={filteredProposals}
-          columns={visibleColumns}
-          keyExtractor={(p) => p.id}
-          onRowClick={(p) => onNavigateToInquiry(p.inquiryId)}
-        />
       ) : (
-        /* Card / Grid View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredProposals.map((prp) => {
-            const badge = getProposalStatusBadge(prp.status);
-            return (
-              <div
-                key={prp.id}
-                onClick={() => onNavigateToInquiry(prp.inquiryId)}
-                className="bg-surface rounded-card border border-border p-4 shadow-subtle hover:border-fairway-500/60 hover:shadow-md transition-all flex flex-col justify-between gap-3 text-left cursor-pointer"
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2.5">
-                  <span className="font-mono text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
-                    {prp.proposalNumber}
-                  </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${badge.bg}`}>
-                    {prp.status}
-                  </span>
-                </div>
+        <>
+          {/* Mobile view: ONLY Card View show, NOT list page show */}
+          <div className="block sm:hidden">
+            <ProposalsCard
+              proposals={filteredProposals}
+              onNavigateToCompany={onNavigateToCompany}
+              onNavigateToInquiry={onNavigateToInquiry}
+              onDownloadPdf={(prp) => {
+                downloadProposalPDF(prp);
+                success('Generating Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'}`);
+              }}
+            />
+          </div>
 
-                {/* Body */}
-                <div className="space-y-2 flex-1">
-                  <div>
-                    <h3
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onNavigateToCompany(prp.companyId);
-                      }}
-                      className="font-bold text-sm text-foreground hover:underline cursor-pointer line-clamp-1"
-                    >
-                      {prp.companyName}
-                    </h3>
-                    <p className="text-xs text-foreground-muted flex items-center gap-1 mt-0.5 line-clamp-1">
-                      <Warehouse className="w-3 h-3 text-fairway-600 shrink-0" />
-                      <span>{prp.propertyName}</span>
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/60 text-xs">
-                    <div>
-                      <span className="text-[10px] text-foreground-muted block">Proposed Space</span>
-                      <span className="font-semibold text-foreground">{formatSqFt(prp.proposedAreaSqFt)}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-foreground-muted block">Base Rate</span>
-                      <span className="font-semibold text-foreground">₹{prp.baseRentPerSqFtINR}/sq.ft</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2 text-xs">
-                  <div>
-                    <span className="text-[10px] text-foreground-muted block">Monthly Total</span>
-                    <span className="font-mono font-bold text-foreground text-sm">{formatINR(prp.totalMonthlyRentINR)}</span>
-                  </div>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    leftIcon={<Download className="w-3 h-3 text-primary" />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      downloadProposalPDF(prp);
-                      success('Generating Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'}`);
-                    }}
-                  >
-                    PDF
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          {/* Desktop view: Respects user viewMode (List vs Card) */}
+          <div className="hidden sm:block">
+            {viewMode === 'table' ? (
+              <ProposalsList
+                proposals={filteredProposals}
+                columns={visibleColumns}
+                onNavigateToInquiry={onNavigateToInquiry}
+              />
+            ) : (
+              <ProposalsCard
+                proposals={filteredProposals}
+                onNavigateToCompany={onNavigateToCompany}
+                onNavigateToInquiry={onNavigateToInquiry}
+                onDownloadPdf={(prp) => {
+                  downloadProposalPDF(prp);
+                  success('Generating Proposal PDF', `Opening ${prp.documentName || 'Proposal.pdf'}`);
+                }}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {/* Advanced Filters Drawer (Right Slide-out) */}

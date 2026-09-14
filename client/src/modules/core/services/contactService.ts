@@ -1,5 +1,5 @@
 import { Contact } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export class ContactService {
   /**
@@ -12,7 +12,9 @@ export class ContactService {
   }> {
     try {
       const q = companyId ? `?companyId=${companyId}` : '';
-      const res = await fetch(`${API_BASE_URL}/contacts${q}`);
+      const res = await fetch(`${API_BASE_URL}/contacts${q}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -39,7 +41,7 @@ export class ContactService {
     try {
       const res = await fetch(`${API_BASE_URL}/contacts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -71,7 +73,7 @@ export class ContactService {
     try {
       const res = await fetch(`${API_BASE_URL}/contacts/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -89,6 +91,7 @@ export class ContactService {
     try {
       const res = await fetch(`${API_BASE_URL}/contacts/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const json = await res.json();
       return json;

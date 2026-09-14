@@ -286,7 +286,7 @@ export const getCompanyById = async (req: Request, res: Response): Promise<void>
 export const checkDuplicateCompany = async (req: Request, res: Response): Promise<void> => {
   try {
     const { name } = req.body;
-    if (!name || name.trim().length < 2) {
+    if (!name || name.trim().length < 3) {
       res.status(200).json({ success: true, duplicates: [] });
       return;
     }

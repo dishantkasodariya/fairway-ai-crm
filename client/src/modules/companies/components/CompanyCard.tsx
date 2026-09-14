@@ -18,7 +18,7 @@ import { Company } from '@/modules/core/types';
 import { cn } from '@/modules/core/lib/utils';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { Skeleton } from '@/modules/core/components/ui/Skeleton';
-import { StorageService } from '@/modules/core/services/storageService';
+import { useAuth } from '@/modules/core/providers/AuthContext';
 import { getPriorityBadge, getCompanyStatusBadge } from '@/modules/core/utils/formatters';
 import {
   DropdownMenu,
@@ -39,10 +39,11 @@ export interface CompanyCardProps {
  * Modern Rich Grid Card for Companies Master
  */
 export const CompanyCard: React.FC<CompanyCardProps> = ({ company, onSelect, onEdit, onDelete }) => {
+  const { users } = useAuth();
   const statusBadge = getCompanyStatusBadge(company.status);
   const prioBadge = getPriorityBadge(company.priority);
-  const facilitiesCount = company.facilitiesCount ?? StorageService.getFacilities(company.id).length;
-  const inquiriesCount = company.inquiriesCount ?? StorageService.getInquiries(company.id).length;
+  const facilitiesCount = company.facilitiesCount ?? 0;
+  const inquiriesCount = company.inquiriesCount ?? 0;
 
   return (
     <div
@@ -166,7 +167,6 @@ export const CompanyCard: React.FC<CompanyCardProps> = ({ company, onSelect, onE
       <div className="mt-4 pt-3 border-t border-border flex items-center justify-between text-[11px] text-foreground-muted">
         <div className="flex items-center gap-1.5">
           {(() => {
-            const users = StorageService.getUsers();
             const ownerUser = users.find(
               (u) => u.id === company.assignedOwnerId || (company.assignedOwnerName && u.name.toLowerCase() === company.assignedOwnerName.toLowerCase())
             );

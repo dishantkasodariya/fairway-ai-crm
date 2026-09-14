@@ -1,5 +1,5 @@
 import { Note } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export class NoteService {
   /**
@@ -15,7 +15,9 @@ export class NoteService {
       if (params?.companyId) q.append('companyId', params.companyId);
       if (params?.inquiryId) q.append('inquiryId', params.inquiryId);
 
-      const res = await fetch(`${API_BASE_URL}/notes?${q.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/notes?${q.toString()}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -40,7 +42,7 @@ export class NoteService {
     try {
       const res = await fetch(`${API_BASE_URL}/notes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -58,6 +60,7 @@ export class NoteService {
     try {
       const res = await fetch(`${API_BASE_URL}/notes/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const json = await res.json();
       return json;

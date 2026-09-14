@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Input, Select, Textarea } from '@/modules/core/components/ui/Input';
-import { StorageService } from '@/modules/core/services/storageService';
 import { CompanyService } from '@/modules/core/services/companyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
@@ -94,25 +93,50 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     }
   }, [companyToEdit, isOpen, currentUser]);
 
-  const handleNameChange = async (name: string) => {
+  const duplicateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCheckedNameRef = useRef<string>('');
+
+  const handleNameChange = (name: string) => {
     setFormData((prev) => ({ ...prev, name, legalName: prev.legalName || `${name} Private Limited` }));
-    if (!isEditing && name.trim().length > 2) {
+
+    if (duplicateTimerRef.current) {
+      clearTimeout(duplicateTimerRef.current);
+      duplicateTimerRef.current = null;
+    }
+
+    const trimmed = name.trim();
+    if (isEditing || trimmed.length < 3) {
+      lastCheckedNameRef.current = '';
+      setDuplicates([]);
+      return;
+    }
+
+    if (trimmed.toLowerCase() === lastCheckedNameRef.current.toLowerCase()) {
+      return;
+    }
+
+    duplicateTimerRef.current = setTimeout(async () => {
       try {
-        const res = await CompanyService.checkDuplicates(name);
+        lastCheckedNameRef.current = trimmed;
+        const res = await CompanyService.checkDuplicates(trimmed);
         if (res.success && res.duplicates && res.duplicates.length > 0) {
           setDuplicates(res.duplicates);
         } else {
-          const localDupes = StorageService.checkCompanyDuplicates(name);
-          setDuplicates(localDupes);
+          setDuplicates([]);
         }
       } catch {
-        const localDupes = StorageService.checkCompanyDuplicates(name);
-        setDuplicates(localDupes);
+        setDuplicates([]);
       }
-    } else {
-      setDuplicates([]);
-    }
+    }, 750);
   };
+
+  useEffect(() => {
+    return () => {
+      if (duplicateTimerRef.current) {
+        clearTimeout(duplicateTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,15 +151,13 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
     try {
       if (isEditing && companyToEdit) {
         // Edit mode
-        await CompanyService.updateCompany(companyToEdit.id, {
+        const res = await CompanyService.updateCompany(companyToEdit.id, {
           ...formData,
           assignedOwnerName: owner.name,
         });
-
-        StorageService.updateCompany(companyToEdit.id, {
-          ...formData,
-          assignedOwnerName: owner.name,
-        });
+        if (!res.success) {
+          throw new Error(res.error || 'Failed to update company');
+        }
 
         success('Company Updated', `Saved changes for ${formData.name}.`);
         onClose();
@@ -149,26 +171,11 @@ export const NewCompanyModal: React.FC<NewCompanyModalProps> = ({
         });
 
         if (res.success && res.data) {
-          try {
-            StorageService.createCompany({
-              ...formData,
-              status: 'Active',
-              assignedOwnerName: owner.name,
-            });
-          } catch {}
-
           success('Company Created', `Registered ${res.data.name} in CRM.`);
           onClose();
           onSuccess(res.data.id);
         } else {
-          const localCompany = StorageService.createCompany({
-            ...formData,
-            status: 'Active',
-            assignedOwnerName: owner.name,
-          });
-          success('Company Created', `Registered ${localCompany.name} in CRM.`);
-          onClose();
-          onSuccess(localCompany.id);
+          throw new Error(res.error || 'Failed to create company');
         }
       }
     } catch (err: any) {

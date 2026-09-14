@@ -1,5 +1,5 @@
 import { Facility } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export class FacilityService {
   /**
@@ -12,7 +12,9 @@ export class FacilityService {
   }> {
     try {
       const q = companyId ? `?companyId=${companyId}` : '';
-      const res = await fetch(`${API_BASE_URL}/facilities${q}`);
+      const res = await fetch(`${API_BASE_URL}/facilities${q}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -41,7 +43,7 @@ export class FacilityService {
     try {
       const res = await fetch(`${API_BASE_URL}/facilities`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -59,6 +61,7 @@ export class FacilityService {
     try {
       const res = await fetch(`${API_BASE_URL}/facilities/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const json = await res.json();
       return json;

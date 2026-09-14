@@ -28,8 +28,9 @@ import {
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
-import { StorageService } from '@/modules/core/services/storageService';
 import { PropertyService } from '@/modules/core/services/propertyService';
+import { InquiryService } from '@/modules/core/services/inquiryService';
+import { matchPropertiesForInquiry } from '@/modules/core/utils/propertyMatcher';
 import { Property, Inquiry } from '@/modules/core/types';
 import { formatINR, formatSqFt, formatDate } from '@/modules/core/utils/formatters';
 import { Button } from '@/modules/core/components/ui/Button';
@@ -55,8 +56,10 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   onOpenNewInquiryForProperty,
 }) => {
   const { success, error: toastError } = useToast();
-  const { canDelete } = useAuth();
+  const { canDeleteModule } = useAuth();
+  const canDelete = canDeleteModule('properties');
   const [property, setProperty] = useState<Property | undefined>(undefined);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
@@ -64,7 +67,13 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   const [areaUnit, setAreaUnit] = useState<'sqft' | 'sqm'>('sqft');
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
-  const allInquiries = useMemo(() => StorageService.getInquiries(), []);
+  useEffect(() => {
+    InquiryService.getInquiries({ pageSize: 500 }).then((res) => {
+      if (res && res.data) {
+        setInquiries(res.data);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -143,10 +152,10 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   }
 
   // Find inquiries that match this property
-  const matchingInquiries = allInquiries
+  const matchingInquiries = inquiries
     .map((inq) => {
-      const matches = StorageService.matchPropertiesForInquiry(inq);
-      const matched = matches.find((m) => m.property.id === property.id || m.property.code === property.code);
+      const matches = property ? matchPropertiesForInquiry(inq, [property]) : [];
+      const matched = matches[0];
       return {
         inquiry: inq,
         score: matched ? matched.overallScore : 0,

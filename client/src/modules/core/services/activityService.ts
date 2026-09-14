@@ -1,5 +1,5 @@
 import { Activity } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export class ActivityService {
   /**
@@ -15,7 +15,9 @@ export class ActivityService {
       if (params?.companyId) q.append('companyId', params.companyId);
       if (params?.inquiryId) q.append('inquiryId', params.inquiryId);
 
-      const res = await fetch(`${API_BASE_URL}/activities?${q.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/activities?${q.toString()}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -43,7 +45,7 @@ export class ActivityService {
     try {
       const res = await fetch(`${API_BASE_URL}/activities`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();

@@ -17,8 +17,6 @@ import {
 } from "@/modules/core/components/ui/chart";
 import { useTheme } from "@/modules/core/providers/ThemeContext";
 import { cn } from "@/modules/core/lib/utils";
-import { StorageService } from "@/modules/core/services/storageService";
-
 export interface CorridorDemandItem {
   corridor: string;
   activeLeads: number;
@@ -26,11 +24,10 @@ export interface CorridorDemandItem {
   availableStockK: number;
 }
 
-// Generate real-time corridor stats from actual CRM inquiries & properties
-const generateRealtimeCorridorData = (): CorridorDemandItem[] => {
-  const inquiries = StorageService.getInquiries();
-  const properties = StorageService.getProperties();
-
+export const generateRealtimeCorridorData = (
+  inquiries: Array<{ targetCorridor?: string; location?: string; budgetMonthlyINR?: number }> = [],
+  properties: Array<{ corridor?: string; city?: string; availableAreaSqFt?: number }> = []
+): CorridorDemandItem[] => {
   const corridorsMap: Record<string, { leads: number; valueINR: number; stockSqFt: number }> = {
     "Dahej PCPIR": { leads: 0, valueINR: 0, stockSqFt: 0 },
     "Sanand - Viramgam": { leads: 0, valueINR: 0, stockSqFt: 0 },
@@ -46,10 +43,14 @@ const generateRealtimeCorridorData = (): CorridorDemandItem[] => {
     let matched = Object.keys(corridorsMap).find((c) =>
       loc.toLowerCase().includes(c.split(" ")[0].toLowerCase())
     );
-    if (!matched) matched = "Dahej PCPIR";
-
-    corridorsMap[matched].leads += 1;
-    corridorsMap[matched].valueINR += inq.budgetMonthlyINR || 0;
+    if (!matched && loc.trim()) {
+      corridorsMap[loc.trim()] = { leads: 0, valueINR: 0, stockSqFt: 0 };
+      matched = loc.trim();
+    }
+    if (matched) {
+      corridorsMap[matched].leads += 1;
+      corridorsMap[matched].valueINR += inq.budgetMonthlyINR || 0;
+    }
   });
 
   // Aggregate properties stock
@@ -58,21 +59,29 @@ const generateRealtimeCorridorData = (): CorridorDemandItem[] => {
     let matched = Object.keys(corridorsMap).find((c) =>
       cor.toLowerCase().includes(c.split(" ")[0].toLowerCase())
     );
-    if (!matched) matched = "Dahej PCPIR";
-
-    corridorsMap[matched].stockSqFt += prop.availableAreaSqFt || 0;
+    if (!matched && cor.trim()) {
+      corridorsMap[cor.trim()] = { leads: 0, valueINR: 0, stockSqFt: 0 };
+      matched = cor.trim();
+    }
+    if (matched) {
+      corridorsMap[matched].stockSqFt += prop.availableAreaSqFt || 0;
+    }
   });
 
-  return Object.entries(corridorsMap).map(([corridor, data]) => ({
-    corridor: corridor.replace(" Corridor", ""),
-    activeLeads: Math.max(data.leads, 1),
-    monthlyValueLakhs: Math.round((data.valueINR || 1500000) / 100000), // in Lakhs
-    availableStockK: Math.round((data.stockSqFt || 120000) / 1000), // in '000 sq.ft
-  }));
+  return Object.entries(corridorsMap)
+    .filter(([_, data]) => data.leads > 0 || data.stockSqFt > 0 || data.valueINR > 0)
+    .map(([corridor, data]) => ({
+      corridor: corridor.replace(" Corridor", ""),
+      activeLeads: data.leads,
+      monthlyValueLakhs: Math.round((data.valueINR || 0) / 100000),
+      availableStockK: Math.round((data.stockSqFt || 0) / 1000),
+    }));
 };
 
 export interface ChartBarStackedProps {
   data?: CorridorDemandItem[];
+  inquiries?: Array<{ targetCorridor?: string; location?: string; budgetMonthlyINR?: number }>;
+  properties?: Array<{ corridor?: string; city?: string; availableAreaSqFt?: number }>;
   title?: string;
   subtitle?: string;
   className?: string;
@@ -80,6 +89,8 @@ export interface ChartBarStackedProps {
 
 export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
   data,
+  inquiries,
+  properties,
   title = "Corridor Demand & Monthly Pipeline Value",
   subtitle = "Distribution of active tenant requirements & budget across Western India hubs",
   className,
@@ -88,8 +99,9 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
 
   const sourceData = useMemo(() => {
     if (data && data.length > 0) return data;
-    return generateRealtimeCorridorData();
-  }, [data]);
+    if (inquiries || properties) return generateRealtimeCorridorData(inquiries, properties);
+    return [];
+  }, [data, inquiries, properties]);
 
   const primaryColor = currentTheme.shades[700];
   const accentColor = currentTheme.accentShades[500];
@@ -109,6 +121,30 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
       color: secondaryColor,
     },
   } satisfies ChartConfig;
+
+  if (sourceData.length === 0) {
+    return (
+      <Card className={cn("bg-surface shadow-subtle border border-border flex flex-col justify-between", className)}>
+        <CardHeader className="pb-3 pt-5 px-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg border border-border bg-surface-muted text-foreground flex items-center justify-center shadow-xs">
+              <BarChart3 className="w-4 h-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold text-foreground tracking-tight">
+                {title}
+              </CardTitle>
+              <p className="text-xs text-foreground-muted mt-0.5">{subtitle}</p>
+            </div>
+          </div>
+        </CardHeader>
+        <div className="flex flex-col items-center justify-center py-16 text-center text-foreground-muted p-6">
+          <p className="text-sm font-medium">No corridor activity recorded yet</p>
+          <p className="text-xs mt-1">Add inquiries with target corridor or properties with corridor locations.</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className={cn("bg-surface shadow-subtle border border-border flex flex-col justify-between", className)}>

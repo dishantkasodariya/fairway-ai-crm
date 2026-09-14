@@ -174,16 +174,19 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
   isLoadingPermissions,
   onRefreshData,
 }) => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, refreshRolePermissions } = useAuth();
   const { success, error } = useToast();
 
   // Primary view modes: 'matrix' (List), 'cards' (Cards), 'modules' (Role & Module Toggle Matrix)
-  const [rbacViewMode, setRbacViewMode] = useState<'matrix' | 'cards' | 'modules'>('matrix');
+  const [rbacViewMode, setRbacViewMode] = useState<'matrix' | 'cards' | 'modules'>('modules');
   const [previousRolesView, setPreviousRolesView] = useState<'matrix' | 'cards'>('matrix');
   const [expandedModuleRows, setExpandedModuleRows] = useState<Record<string, boolean>>({});
-  const [selectedRoleKey, setSelectedRoleKey] = useState<string>('sales');
+  const [selectedRoleKey, setSelectedRoleKey] = useState<string>(() => roles[0]?.key || 'admin');
   const [roleSearchQuery, setRoleSearchQuery] = useState('');
+  const [moduleSearchQuery, setModuleSearchQuery] = useState('');
   const [roleTypeFilter, setRoleTypeFilter] = useState<'all' | 'system' | 'custom'>('all');
+  // Pending unsaved changes map: { [permId]: 'Yes' | 'No' }
+  const [pendingChanges, setPendingChanges] = useState<Record<string, 'Yes' | 'No'>>({});
   // Table state (matching Inquiries DataGrid)
   const [rolePagination, setRolePagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -266,12 +269,22 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
 
   // Helper to extract access level for a specific role
   const getRolePermissionValue = (perm: RolePermissionItem, roleKey: string): string => {
-    if (roleKey === 'super_admin') return perm.superAdmin || 'Yes';
-    if (roleKey === 'admin') return perm.admin || 'Yes';
-    if (roleKey === 'sales') return perm.sales || 'No';
-    if (roleKey === 'viewer') return perm.viewer || 'No';
+    const k = (roleKey || '').toLowerCase();
+    if (k === 'admin' || k === 'super_admin') return 'Yes';
     const custom = (perm.customPermissions || {}) as Record<string, string>;
-    return custom[roleKey] || 'No';
+    if (custom[roleKey] !== undefined) return custom[roleKey];
+    for (const [ck, cv] of Object.entries(custom)) {
+      if (ck.toLowerCase() === k) return cv;
+    }
+    return 'No';
+  };
+
+  // Effective permission value taking into account uncommitted pendingChanges for the active role
+  const getEffectiveRolePermissionValue = (perm: RolePermissionItem, roleKey: string): string => {
+    if (roleKey === selectedRoleKey && pendingChanges[perm.id] !== undefined) {
+      return pendingChanges[perm.id];
+    }
+    return getRolePermissionValue(perm, roleKey);
   };
 
   // Filtered roles list for Role List / Matrix view
@@ -322,7 +335,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     return Array.from(map.entries());
   }, [filteredPermissions]);
 
-  // Update permission value for a role
+  // Update permission value directly
   const handleUpdateRolePermissionValue = async (
     permId: string,
     roleKey: string,
@@ -335,18 +348,10 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
 
     try {
       setIsUpdatingPerm(true);
-      if (['super_admin', 'admin', 'sales', 'viewer'].includes(roleKey)) {
-        let fieldName: keyof RolePermissionItem = 'sales';
-        if (roleKey === 'super_admin') fieldName = 'superAdmin';
-        else if (roleKey === 'admin') fieldName = 'admin';
-        else if (roleKey === 'viewer') fieldName = 'viewer';
-
-        await PermissionsService.updateRolePermission(permId, { [fieldName]: newValue });
-      } else {
-        await RoleService.updateRolePermissionsForRole(roleKey, [{ id: permId, value: newValue }]);
-      }
-
+      await RoleService.updateRolePermissionsForRole(roleKey, [{ id: permId, value: newValue }]);
       await onRefreshData();
+      window.dispatchEvent(new CustomEvent('fw_role_permissions_updated', { detail: { roleKey } }));
+      await refreshRolePermissions();
       success('Permission Saved', `Access level updated to "${newValue}".`);
     } catch (err: any) {
       error('Update Failed', err.message || 'Failed to update capability.');
@@ -355,80 +360,11 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     }
   };
 
-  // Bulk Grant All for selected role
-  const handleGrantAllForRole = async (roleKey: string) => {
-    if (!isAdmin) return;
-    if (!window.confirm(`Grant full access (Yes) to all ${permissions.length} capabilities for role "${roleKey}"?`)) return;
-
-    try {
-      setIsUpdatingPerm(true);
-      const updates = permissions.map((p) => ({ id: p.id, value: 'Yes' }));
-      await RoleService.updateRolePermissionsForRole(roleKey, updates);
-      await onRefreshData();
-      success('Permissions Granted', `Granted all capabilities for ${roleKey}.`);
-    } catch (err: any) {
-      error('Bulk Update Failed', err.message);
-    } finally {
-      setIsUpdatingPerm(false);
-    }
-  };
-
-  // Bulk Revoke All for selected role
-  const handleRevokeAllForRole = async (roleKey: string) => {
-    if (!isAdmin) return;
-    if (!window.confirm(`Revoke all capabilities (No) for role "${roleKey}"?`)) return;
-
-    try {
-      setIsUpdatingPerm(true);
-      const updates = permissions.map((p) => ({ id: p.id, value: 'No' }));
-      await RoleService.updateRolePermissionsForRole(roleKey, updates);
-      await onRefreshData();
-      success('Permissions Revoked', `Revoked all capabilities for ${roleKey}.`);
-    } catch (err: any) {
-      error('Bulk Update Failed', err.message);
-    } finally {
-      setIsUpdatingPerm(false);
-    }
-  };
-
-  // Module Bulk Grant
-  const handleGrantModuleForRole = async (moduleCategory: string, roleKey: string) => {
-    if (!isAdmin) return;
-    try {
-      setIsUpdatingPerm(true);
-      const modulePerms = permissions.filter((p) => p.category === moduleCategory);
-      const updates = modulePerms.map((p) => ({ id: p.id, value: 'Yes' }));
-      await RoleService.updateRolePermissionsForRole(roleKey, updates);
-      await onRefreshData();
-      success('Module Updated', `Granted all "${moduleCategory}" permissions for ${roleKey}.`);
-    } catch (err: any) {
-      error('Update Failed', err.message);
-    } finally {
-      setIsUpdatingPerm(false);
-    }
-  };
-
-  // Module Bulk Revoke
-  const handleRevokeModuleForRole = async (moduleCategory: string, roleKey: string) => {
-    if (!isAdmin) return;
-    try {
-      setIsUpdatingPerm(true);
-      const modulePerms = permissions.filter((p) => p.category === moduleCategory);
-      const updates = modulePerms.map((p) => ({ id: p.id, value: 'No' }));
-      await RoleService.updateRolePermissionsForRole(roleKey, updates);
-      await onRefreshData();
-      success('Module Updated', `Revoked all "${moduleCategory}" permissions for ${roleKey}.`);
-    } catch (err: any) {
-      error('Update Failed', err.message);
-    } finally {
-      setIsUpdatingPerm(false);
-    }
-  };
-
-  // Action Definitions for the Action-Rows Table Matrix
+  // Action Definitions for the 9 CRM Permission Actions
   interface ActionDef {
-    key: 'view' | 'create' | 'edit' | 'delete' | 'export' | 'import' | 'special';
+    key: 'view' | 'create' | 'edit' | 'delete' | 'import' | 'export' | 'approve' | 'assign' | 'manage';
     title: string;
+    shortTitle: string;
     description: string;
     badge: string;
     icon: React.ReactNode;
@@ -438,13 +374,15 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     {
       key: 'view',
       title: 'View & Browse',
-      description: 'Read-only access to browse listings, dossiers, records & charts',
+      shortTitle: 'View',
+      description: 'Read-only access to browse records, listings, analytics & history',
       badge: 'Read',
       icon: <Eye className="w-3.5 h-3.5 text-sky-500" />,
     },
     {
       key: 'create',
       title: 'Create & Add',
+      shortTitle: 'Create',
       description: 'Register new inquiries, properties, accounts, proposals & tasks',
       badge: 'Write',
       icon: <PlusCircle className="w-3.5 h-3.5 text-emerald-500" />,
@@ -452,6 +390,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     {
       key: 'edit',
       title: 'Edit & Update',
+      shortTitle: 'Edit',
       description: 'Update specifications, pricing terms, deadlines & communications',
       badge: 'Modify',
       icon: <Edit3 className="w-3.5 h-3.5 text-amber-500" />,
@@ -459,34 +398,54 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     {
       key: 'delete',
       title: 'Delete & Archive',
+      shortTitle: 'Delete',
       description: 'Permanently remove or archive closed records and proposals',
       badge: 'Danger',
       icon: <Trash2 className="w-3.5 h-3.5 text-rose-500" />,
     },
     {
-      key: 'export',
-      title: 'Export (CSV / PDF)',
-      description: 'Download analytical spreadsheets, customer lists & proposal PDFs',
-      badge: 'Export',
-      icon: <Download className="w-3.5 h-3.5 text-indigo-500" />,
-    },
-    {
       key: 'import',
       title: 'Import & Upload',
+      shortTitle: 'Import',
       description: 'Bulk upload spreadsheets, architectural drawings & documentation',
       badge: 'Import',
       icon: <Upload className="w-3.5 h-3.5 text-purple-500" />,
     },
     {
-      key: 'special',
-      title: 'Governance & Special',
-      description: 'Change pipeline stages, reassign owners, manage roles & audit logs',
+      key: 'export',
+      title: 'Export (CSV / PDF)',
+      shortTitle: 'Export',
+      description: 'Download analytical spreadsheets, customer lists & proposal PDFs',
+      badge: 'Export',
+      icon: <Download className="w-3.5 h-3.5 text-indigo-500" />,
+    },
+    {
+      key: 'approve',
+      title: 'Approve & Stage',
+      shortTitle: 'Approve',
+      description: 'Approve pipeline stages, commercial proposals & governance steps',
+      badge: 'Approve',
+      icon: <CheckCircle2 className="w-3.5 h-3.5 text-teal-500" />,
+    },
+    {
+      key: 'assign',
+      title: 'Assign & Delegate',
+      shortTitle: 'Assign',
+      description: 'Reassign leads, team tasks and delegate account owners',
+      badge: 'Assign',
+      icon: <Users className="w-3.5 h-3.5 text-blue-500" />,
+    },
+    {
+      key: 'manage',
+      title: 'Manage & Admin',
+      shortTitle: 'Manage',
+      description: 'Configure security roles, user accounts, stages & revenue metrics',
       badge: 'Admin',
-      icon: <ShieldCheck className="w-3.5 h-3.5 text-teal-500" />,
+      icon: <ShieldCheck className="w-3.5 h-3.5 text-violet-500" />,
     },
   ];
 
-  // Standard modules list for the table columns
+  // Standard modules list for the table rows
   const standardModules = useMemo(() => {
     const defaultList = [
       { key: 'Inquiries & Leads', shortName: 'Inquiries', icon: <FileText className="w-3.5 h-3.5 text-fairway-600" /> },
@@ -511,13 +470,24 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     ];
   }, [categories]);
 
+  // Filtered modules by moduleSearchQuery
+  const filteredStandardModules = useMemo(() => {
+    if (!moduleSearchQuery.trim()) return standardModules;
+    const q = moduleSearchQuery.toLowerCase().trim();
+    return standardModules.filter(
+      (m) =>
+        m.key.toLowerCase().includes(q) ||
+        m.shortName.toLowerCase().includes(q)
+    );
+  }, [standardModules, moduleSearchQuery]);
+
   // Match a permission to an Action type
   const matchPermissionToAction = (
     perm: RolePermissionItem,
     actionKey: ActionDef['key']
   ): boolean => {
-    const cap = perm.capability.toLowerCase();
-    const id = perm.id.toLowerCase();
+    const cap = (perm.capability || '').toLowerCase();
+    const id = (perm.id || '').toLowerCase();
 
     if (actionKey === 'export') {
       return (
@@ -538,15 +508,12 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
         id.includes('docs')
       );
     }
-    if (actionKey === 'create') {
+    if (actionKey === 'delete') {
       return (
-        (id.includes('create') ||
-          cap.includes('create') ||
-          cap.includes('add') ||
-          cap.includes('register') ||
-          cap.includes('generate') ||
-          id.includes('call')) &&
-        !id.includes('quote_edit')
+        id.includes('delete') ||
+        cap.includes('delete') ||
+        cap.includes('archive') ||
+        cap.includes('remove')
       );
     }
     if (actionKey === 'edit') {
@@ -560,13 +527,41 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
         !id.includes('delete')
       );
     }
-    if (actionKey === 'delete') {
+    if (actionKey === 'approve') {
       return (
-        id.includes('delete') ||
-        cap.includes('delete') ||
-        cap.includes('archive') ||
-        cap.includes('remove') ||
-        cap.includes('complete')
+        id.includes('stage') ||
+        cap.includes('stage') ||
+        id.includes('approve') ||
+        cap.includes('approve')
+      );
+    }
+    if (actionKey === 'assign') {
+      return (
+        id.includes('assign') ||
+        cap.includes('assign') ||
+        cap.includes('reassign')
+      );
+    }
+    if (actionKey === 'manage') {
+      return (
+        id.includes('roles') ||
+        id.includes('users') ||
+        id.includes('financial') ||
+        cap.includes('manage') ||
+        cap.includes('configure') ||
+        cap.includes('admin')
+      );
+    }
+    if (actionKey === 'create') {
+      return (
+        (id.includes('create') ||
+          cap.includes('create') ||
+          cap.includes('add') ||
+          cap.includes('register') ||
+          cap.includes('generate') ||
+          id.includes('call')) &&
+        !id.includes('quote_edit') &&
+        !id.includes('assign')
       );
     }
     if (actionKey === 'view') {
@@ -579,27 +574,11 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
         id.includes('audit')
       );
     }
-    if (actionKey === 'special') {
-      return (
-        id.includes('stage') ||
-        id.includes('assign') ||
-        id.includes('users') ||
-        id.includes('roles') ||
-        id.includes('stages') ||
-        id.includes('financial') ||
-        (!matchPermissionToAction(perm, 'view') &&
-          !matchPermissionToAction(perm, 'create') &&
-          !matchPermissionToAction(perm, 'edit') &&
-          !matchPermissionToAction(perm, 'delete') &&
-          !matchPermissionToAction(perm, 'export') &&
-          !matchPermissionToAction(perm, 'import'))
-      );
-    }
     return false;
   };
 
-  // Toggle cell permissions for a specific module & action
-  const handleToggleCellAction = async (
+  // Toggle cell permissions for a specific module & action (recorded into pendingChanges)
+  const handleToggleCellAction = (
     perms: RolePermissionItem[],
     roleKey: string,
     targetValue: boolean
@@ -610,38 +589,34 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     }
     if (perms.length === 0) return;
 
-    try {
-      setIsUpdatingPerm(true);
-      const newValue = targetValue ? 'Yes' : 'No';
-
-      if (['super_admin', 'admin', 'sales', 'viewer'].includes(roleKey)) {
-        let fieldName: keyof RolePermissionItem = 'sales';
-        if (roleKey === 'super_admin') fieldName = 'superAdmin';
-        else if (roleKey === 'admin') fieldName = 'admin';
-        else if (roleKey === 'viewer') fieldName = 'viewer';
-
-        for (const p of perms) {
-          await PermissionsService.updateRolePermission(p.id, { [fieldName]: newValue });
-        }
-      } else {
-        const updates = perms.map((p) => ({ id: p.id, value: newValue }));
-        await RoleService.updateRolePermissionsForRole(roleKey, updates);
-      }
-
-      await onRefreshData();
-      success(
-        'Permission Updated',
-        `${targetValue ? 'Enabled' : 'Disabled'} ${perms.length > 1 ? `${perms.length} operations` : `"${perms[0].capability}"`} for ${roleKey}.`
-      );
-    } catch (err: any) {
-      error('Toggle Failed', err.message);
-    } finally {
-      setIsUpdatingPerm(false);
-    }
+    const newValue = targetValue ? 'Yes' : 'No';
+    setPendingChanges((prev) => {
+      const next = { ...prev };
+      perms.forEach((p) => {
+        next[p.id] = newValue;
+      });
+      return next;
+    });
   };
 
-  // Toggle an entire Action row across all modules
-  const handleToggleEntireActionRow = async (
+  // Toggle a single granular capability
+  const handleToggleGranularPermission = (
+    permId: string,
+    targetValue: boolean
+  ) => {
+    if (!isAdmin) {
+      error('Permission Denied', 'Only Admins can modify role capabilities.');
+      return;
+    }
+    const newValue = targetValue ? 'Yes' : 'No';
+    setPendingChanges((prev) => ({
+      ...prev,
+      [permId]: newValue,
+    }));
+  };
+
+  // Toggle an entire Action column across all modules
+  const handleToggleEntireActionRow = (
     actionKey: ActionDef['key'],
     roleKey: string,
     targetValue: boolean
@@ -650,38 +625,18 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     const permsToUpdate = permissions.filter((p) => matchPermissionToAction(p, actionKey));
     if (permsToUpdate.length === 0) return;
 
-    try {
-      setIsUpdatingPerm(true);
-      const newValue = targetValue ? 'Yes' : 'No';
-
-      if (['super_admin', 'admin', 'sales', 'viewer'].includes(roleKey)) {
-        let fieldName: keyof RolePermissionItem = 'sales';
-        if (roleKey === 'super_admin') fieldName = 'superAdmin';
-        else if (roleKey === 'admin') fieldName = 'admin';
-        else if (roleKey === 'viewer') fieldName = 'viewer';
-
-        for (const p of permsToUpdate) {
-          await PermissionsService.updateRolePermission(p.id, { [fieldName]: newValue });
-        }
-      } else {
-        const updates = permsToUpdate.map((p) => ({ id: p.id, value: newValue }));
-        await RoleService.updateRolePermissionsForRole(roleKey, updates);
-      }
-
-      await onRefreshData();
-      success(
-        'Action Row Updated',
-        `${targetValue ? 'Enabled' : 'Disabled'} all "${actionKey}" operations for ${roleKey}.`
-      );
-    } catch (err: any) {
-      error('Update Failed', err.message);
-    } finally {
-      setIsUpdatingPerm(false);
-    }
+    const newValue = targetValue ? 'Yes' : 'No';
+    setPendingChanges((prev) => {
+      const next = { ...prev };
+      permsToUpdate.forEach((p) => {
+        next[p.id] = newValue;
+      });
+      return next;
+    });
   };
 
   // Toggle an entire Module across all operations
-  const handleToggleEntireModule = async (
+  const handleToggleEntireModule = (
     moduleCategory: string,
     roleKey: string,
     targetValue: boolean
@@ -690,34 +645,86 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     const modulePerms = permissions.filter((p) => p.category === moduleCategory);
     if (modulePerms.length === 0) return;
 
+    const newValue = targetValue ? 'Yes' : 'No';
+    setPendingChanges((prev) => {
+      const next = { ...prev };
+      modulePerms.forEach((p) => {
+        next[p.id] = newValue;
+      });
+      return next;
+    });
+  };
+
+  // Bulk Grant All for selected role into pendingChanges
+  const handleGrantAllForRole = (roleKey: string) => {
+    if (!isAdmin) return;
+    setPendingChanges((prev) => {
+      const next = { ...prev };
+      permissions.forEach((p) => {
+        next[p.id] = 'Yes';
+      });
+      return next;
+    });
+  };
+
+  // Bulk Revoke All for selected role into pendingChanges
+  const handleRevokeAllForRole = (roleKey: string) => {
+    if (!isAdmin) return;
+    setPendingChanges((prev) => {
+      const next = { ...prev };
+      permissions.forEach((p) => {
+        next[p.id] = 'No';
+      });
+      return next;
+    });
+  };
+
+  // Save all pending changes to the database
+  const handleSaveAllChanges = async () => {
+    if (!isAdmin) {
+      error('Permission Denied', 'Only Admins can modify role capabilities.');
+      return;
+    }
+    const updates = Object.entries(pendingChanges).map(([id, value]) => ({ id, value }));
+    if (updates.length === 0) return;
+
     try {
       setIsUpdatingPerm(true);
-      const newValue = targetValue ? 'Yes' : 'No';
-
-      if (['super_admin', 'admin', 'sales', 'viewer'].includes(roleKey)) {
-        let fieldName: keyof RolePermissionItem = 'sales';
-        if (roleKey === 'super_admin') fieldName = 'superAdmin';
-        else if (roleKey === 'admin') fieldName = 'admin';
-        else if (roleKey === 'viewer') fieldName = 'viewer';
-
-        for (const p of modulePerms) {
-          await PermissionsService.updateRolePermission(p.id, { [fieldName]: newValue });
-        }
-      } else {
-        const updates = modulePerms.map((p) => ({ id: p.id, value: newValue }));
-        await RoleService.updateRolePermissionsForRole(roleKey, updates);
-      }
-
+      await RoleService.updateRolePermissionsForRole(selectedRoleKey, updates);
+      setPendingChanges({});
       await onRefreshData();
+      window.dispatchEvent(new CustomEvent('fw_role_permissions_updated', { detail: { roleKey: selectedRoleKey } }));
+      await refreshRolePermissions();
       success(
-        'Module Updated',
-        `${targetValue ? 'Enabled' : 'Disabled'} all permissions for "${moduleCategory}".`
+        'Permissions Saved',
+        `Successfully saved ${updates.length} permission update(s) for role "${selectedRole?.name}".`
       );
     } catch (err: any) {
-      error('Update Failed', err.message);
+      error('Save Failed', err.message || 'Failed to save changes.');
     } finally {
       setIsUpdatingPerm(false);
     }
+  };
+
+  // Discard all pending changes
+  const handleDiscardChanges = () => {
+    setPendingChanges({});
+  };
+
+  // Role switch handler with unsaved confirmation
+  const handleSelectRole = (newRoleKey: string) => {
+    if (newRoleKey === selectedRoleKey) return;
+    if (Object.keys(pendingChanges).length > 0) {
+      if (
+        !window.confirm(
+          `You have ${Object.keys(pendingChanges).length} unsaved changes for role "${selectedRole?.name}". Switching roles will discard these changes. Continue?`
+        )
+      ) {
+        return;
+      }
+      setPendingChanges({});
+    }
+    setSelectedRoleKey(newRoleKey);
   };
 
   // Toggle expand / collapse on module rows
@@ -1365,6 +1372,23 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
 
             {/* Segmented View Mode Switcher (Roles Matrix List, Capabilities Grid, Card View) */}
             <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setRbacViewMode('modules')}
+                    className={cn(
+                      'w-9 h-full flex items-center justify-center transition-all cursor-pointer',
+                      rbacViewMode === 'modules'
+                        ? 'bg-fairway-600 text-white font-bold'
+                        : 'text-foreground hover:text-foreground hover:bg-surface-muted/60'
+                    )}
+                  >
+                    <Layers className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Module Permissions Matrix</TooltipContent>
+              </Tooltip>
 
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1381,7 +1405,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                     <List className="w-4 h-4" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="top">List</TooltipContent>
+                <TooltipContent side="top">Roles List</TooltipContent>
               </Tooltip>
 
               <Tooltip>
@@ -1399,7 +1423,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                     <LayoutGrid className="w-4 h-4" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="top">Card</TooltipContent>
+                <TooltipContent side="top">Role Cards</TooltipContent>
               </Tooltip>
             </div>
 
@@ -1472,7 +1496,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                   <button
                     key={r.id}
                     type="button"
-                    onClick={() => setSelectedRoleKey(r.key)}
+                    onClick={() => handleSelectRole(r.key)}
                     className={cn(
                       'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer shrink-0 border text-left',
                       isSelected
@@ -1506,9 +1530,33 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
               })}
             </div>
 
-            {/* Role Quick Bulk Actions */}
+            {/* Role Quick Bulk Actions & Save/Discard */}
             {isAdmin && (
               <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto pr-1">
+                {Object.keys(pendingChanges).length > 0 && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleDiscardChanges}
+                      disabled={isUpdatingPerm}
+                      className="text-xs text-foreground-muted hover:text-foreground"
+                      leftIcon={<RotateCcw className="w-3 h-3" />}
+                    >
+                      Discard
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={handleSaveAllChanges}
+                      disabled={isUpdatingPerm}
+                      className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs"
+                      leftIcon={isUpdatingPerm ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                    >
+                      Save Changes ({Object.keys(pendingChanges).length})
+                    </Button>
+                  </>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -1542,6 +1590,35 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
             )}
           </div>
 
+          {/* Module Filter Toolbar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-surface border border-border p-2.5 px-3.5 rounded-2xl shadow-xs">
+            <div className="relative flex-1 max-w-md">
+              <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Filter CRM modules (e.g. Inquiries, Warehouses, Accounts, Proposals...)"
+                value={moduleSearchQuery}
+                onChange={(e) => setModuleSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-1.5 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors"
+              />
+              {moduleSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setModuleSearchQuery('')}
+                  className="absolute right-2.5 top-2 text-foreground-muted hover:text-foreground cursor-pointer"
+                >
+                  <XIcon className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-foreground-muted">
+              <span>
+                Showing <strong>{filteredStandardModules.length}</strong> of {standardModules.length} modules
+              </span>
+            </div>
+          </div>
+
           {/* ================= MODULES IN ROWS TABLE (PRIMARY MATRIX) ================= */}
           <div className="border border-border rounded-2xl bg-surface overflow-hidden shadow-xs">
             <div className="p-3 bg-surface-muted/40 border-b border-border flex items-center justify-between gap-3">
@@ -1554,13 +1631,20 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                     Module Rows Matrix: {selectedRole?.name}
                   </h4>
                   <p className="text-[11px] text-foreground-muted">
-                    Each row represents a CRM module. Core operations (View, Create, Edit, Delete, Export, Import) are toggleable on the right.
+                    Each row represents a CRM module with 9 independent action toggles. Toggle individual actions and click Save Changes.
                   </p>
                 </div>
               </div>
-              <span className="text-[11px] font-mono text-foreground-muted hidden md:inline">
-                {standardModules.length} Modules configured
-              </span>
+              <div className="flex items-center gap-2">
+                {Object.keys(pendingChanges).length > 0 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 animate-pulse">
+                    {Object.keys(pendingChanges).length} unsaved
+                  </span>
+                )}
+                <span className="text-[11px] font-mono text-foreground-muted hidden md:inline">
+                  {standardModules.length} Modules configured
+                </span>
+              </div>
             </div>
 
             <div className="overflow-x-auto no-scrollbar touch-pan-x">
@@ -1568,17 +1652,17 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                 <thead className="bg-surface-muted dark:bg-[#151c27] text-[11px] font-bold text-foreground-muted border-b border-border">
                   <tr>
                     {/* Sticky Module Header */}
-                    <th className="p-3.5 min-w-[240px] sticky left-0 bg-surface-muted dark:bg-[#151c27] z-20 border-r border-border shadow-xs">
+                    <th className="p-3.5 min-w-[220px] sticky left-0 bg-surface-muted dark:bg-[#151c27] z-20 border-r border-border shadow-xs">
                       CRM Module
                     </th>
 
-                    {/* Action Columns: View, Create, Edit, Delete, Export, Import */}
-                    {ACTION_DEFINITIONS.filter((a) => a.key !== 'special').map((action) => {
+                    {/* 9 Action Columns: View, Create, Edit, Delete, Import, Export, Approve, Assign, Manage */}
+                    {ACTION_DEFINITIONS.map((action) => {
                       const colPerms = permissions.filter((p) =>
                         matchPermissionToAction(p, action.key)
                       );
                       const activeCount = colPerms.filter(
-                        (p) => getRolePermissionValue(p, selectedRoleKey) !== 'No'
+                        (p) => getEffectiveRolePermissionValue(p, selectedRoleKey) !== 'No'
                       ).length;
                       const isColFullyActive =
                         colPerms.length > 0 && activeCount === colPerms.length;
@@ -1586,13 +1670,13 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                       return (
                         <th
                           key={action.key}
-                          className="p-3 text-center min-w-[110px] border-r border-border/50 group/col"
+                          className="p-3 text-center min-w-[96px] border-r border-border/50 group/col"
                         >
                           <div className="flex flex-col items-center justify-center gap-0.5">
                             <div className="flex items-center justify-center gap-1.5">
                               <span>{action.icon}</span>
                               <span className="font-bold text-foreground text-xs">
-                                {action.title.split(' ')[0]}
+                                {action.shortTitle}
                               </span>
                             </div>
                             <div className="flex items-center gap-1">
@@ -1611,7 +1695,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                                   }
                                   disabled={isUpdatingPerm}
                                   className="opacity-0 group-hover/col:opacity-100 transition-opacity text-[9px] font-bold px-1.5 py-0.2 rounded bg-fairway-50 dark:bg-fairway-950/40 text-fairway-600 hover:bg-fairway-100 border border-fairway-200 cursor-pointer"
-                                  title={`Toggle all ${action.title.split(' ')[0]} permissions`}
+                                  title={`Toggle all ${action.shortTitle} permissions`}
                                 >
                                   {isColFullyActive ? 'Off' : 'On'}
                                 </button>
@@ -1622,304 +1706,269 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                       );
                     })}
 
-                    {/* Special / Governance */}
-                    {(() => {
-                      const specialPerms = permissions.filter((p) =>
-                        matchPermissionToAction(p, 'special')
-                      );
-                      const activeCount = specialPerms.filter(
-                        (p) => getRolePermissionValue(p, selectedRoleKey) !== 'No'
-                      ).length;
-                      const isSpecialFullyActive =
-                        specialPerms.length > 0 && activeCount === specialPerms.length;
-
-                      return (
-                        <th className="p-3 text-center min-w-[120px] border-r border-border/50 group/col">
-                          <div className="flex flex-col items-center justify-center gap-0.5">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <ShieldCheck className="w-3.5 h-3.5 text-teal-500" />
-                              <span className="font-bold text-foreground text-xs">Governance</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] text-foreground-muted font-normal">
-                                {activeCount}/{specialPerms.length}
-                              </span>
-                              {isAdmin && specialPerms.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleToggleEntireActionRow(
-                                      'special',
-                                      selectedRoleKey,
-                                      !isSpecialFullyActive
-                                    )
-                                  }
-                                  disabled={isUpdatingPerm}
-                                  className="opacity-0 group-hover/col:opacity-100 transition-opacity text-[9px] font-bold px-1.5 py-0.2 rounded bg-fairway-50 dark:bg-fairway-950/40 text-fairway-600 hover:bg-fairway-100 border border-fairway-200 cursor-pointer"
-                                  title="Toggle all Governance permissions"
-                                >
-                                  {isSpecialFullyActive ? 'Off' : 'On'}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </th>
-                      );
-                    })()}
-
-                    {/* Quick Toggle Column */}
-                    <th className="p-3 text-center min-w-[110px] text-foreground-muted font-bold">
-                      Quick Toggle
+                    {/* Quick Module Toggle Column */}
+                    <th className="p-3 text-center min-w-[105px] text-foreground-muted font-bold">
+                      Module Actions
                     </th>
                   </tr>
                 </thead>
 
                 <tbody className="divide-y divide-border">
-                  {standardModules.map((mod) => {
-                    const modPerms = permissions.filter((p) => p.category === mod.key);
-                    const isExpanded = !!expandedModuleRows[mod.key];
-                    const activeCount = modPerms.filter(
-                      (p) => getRolePermissionValue(p, selectedRoleKey) !== 'No'
-                    ).length;
-                    const isModuleFullyGranted =
-                      modPerms.length > 0 && activeCount === modPerms.length;
+                  {filteredStandardModules.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="p-8 text-center text-foreground-muted text-xs">
+                        No CRM modules match your filter &ldquo;{moduleSearchQuery}&rdquo;
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStandardModules.map((mod) => {
+                      const modPerms = permissions.filter((p) => p.category === mod.key);
+                      const isExpanded = !!expandedModuleRows[mod.key];
+                      const activeCount = modPerms.filter(
+                        (p) => getEffectiveRolePermissionValue(p, selectedRoleKey) !== 'No'
+                      ).length;
+                      const isModuleFullyGranted =
+                        modPerms.length > 0 && activeCount === modPerms.length;
 
-                    return (
-                      <React.Fragment key={mod.key}>
-                        <tr className="hover:bg-surface-muted/25 dark:hover:bg-[#151c27]/60 transition-colors group">
-                          {/* Sticky Module Column with solid background in dark mode */}
-                          <td className="p-3.5 sticky left-0 bg-surface dark:bg-[#111722] group-hover:bg-surface-muted/60 dark:group-hover:bg-[#161e2b] z-10 border-r border-border shadow-xs">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-2.5">
-                                <div className="size-8 rounded-xl bg-surface-muted/70 dark:bg-[#18202d] border border-border flex items-center justify-center shrink-0">
-                                  {mod.icon}
+                      return (
+                        <React.Fragment key={mod.key}>
+                          <tr className="hover:bg-surface-muted/25 dark:hover:bg-[#151c27]/60 transition-colors group">
+                            {/* Sticky Module Column with solid background in dark mode */}
+                            <td className="p-3.5 sticky left-0 bg-surface dark:bg-[#111722] group-hover:bg-surface-muted/60 dark:group-hover:bg-[#161e2b] z-10 border-r border-border shadow-xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="size-8 rounded-xl bg-surface-muted/70 dark:bg-[#18202d] border border-border flex items-center justify-center shrink-0">
+                                    {mod.icon}
+                                  </div>
+                                  <div>
+                                    <span className="font-bold text-foreground text-xs block">
+                                      {mod.key}
+                                    </span>
+                                    <span className="text-[10px] text-foreground-muted">
+                                      {activeCount}/{modPerms.length} capabilities enabled
+                                    </span>
+                                  </div>
                                 </div>
-                                <div>
-                                  <span className="font-bold text-foreground text-xs block">
-                                    {mod.key}
-                                  </span>
-                                  <span className="text-[10px] text-foreground-muted">
-                                    {activeCount}/{modPerms.length} capabilities enabled
-                                  </span>
-                                </div>
+
+                                {modPerms.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleModuleRowExpand(mod.key)}
+                                    className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-muted/80 dark:hover:bg-[#1c2534] transition-colors cursor-pointer"
+                                    title="Expand all granular capabilities"
+                                  >
+                                    <ChevronDown
+                                      className={cn(
+                                        'w-3.5 h-3.5 transition-transform duration-200',
+                                        isExpanded && 'transform rotate-180 text-fairway-600'
+                                      )}
+                                    />
+                                  </button>
+                                )}
                               </div>
+                            </td>
 
-                              {modPerms.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleModuleRowExpand(mod.key)}
-                                  className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-muted/80 dark:hover:bg-[#1c2534] transition-colors cursor-pointer"
-                                  title="Expand all granular capabilities"
-                                >
-                                  <ChevronDown
-                                    className={cn(
-                                      'w-3.5 h-3.5 transition-transform duration-200',
-                                      isExpanded && 'transform rotate-180 text-fairway-600'
-                                    )}
-                                  />
-                                </button>
-                              )}
-                            </div>
-                          </td>
+                            {/* 9 Action Columns: View, Create, Edit, Delete, Import, Export, Approve, Assign, Manage */}
+                            {ACTION_DEFINITIONS.map((action) => {
+                              const cellPerms = modPerms.filter((p) =>
+                                matchPermissionToAction(p, action.key)
+                              );
 
-                          {/* Standard Action Columns: View, Create, Edit, Delete, Export, Import */}
-                          {ACTION_DEFINITIONS.filter((a) => a.key !== 'special').map((action) => {
-                            const cellPerms = modPerms.filter((p) =>
-                              matchPermissionToAction(p, action.key)
-                            );
+                              if (cellPerms.length === 0) {
+                                return (
+                                  <td
+                                    key={action.key}
+                                    className="p-3 text-center border-r border-border/40 text-foreground-muted/40"
+                                  >
+                                    <span className="text-xs font-mono select-none">—</span>
+                                  </td>
+                                );
+                              }
 
-                            if (cellPerms.length === 0) {
+                              const isCellActive = cellPerms.every(
+                                (p) => getEffectiveRolePermissionValue(p, selectedRoleKey) !== 'No'
+                              );
+
                               return (
                                 <td
                                   key={action.key}
-                                  className="p-3 text-center border-r border-border/40 text-foreground-muted/40"
+                                  className="p-3 text-center border-r border-border/40"
                                 >
-                                  <span className="text-xs font-mono select-none">—</span>
+                                  <div className="flex items-center justify-center">
+                                    <ToggleSwitch
+                                      checked={isCellActive}
+                                      disabled={!isAdmin || isUpdatingPerm}
+                                      onChange={(newVal) =>
+                                        handleToggleCellAction(cellPerms, selectedRoleKey, newVal)
+                                      }
+                                      label={isCellActive ? 'ON' : 'OFF'}
+                                      size="sm"
+                                      title={cellPerms.map((p) => `${p.capability} (${p.description || ''})`).join('\n')}
+                                    />
+                                  </div>
                                 </td>
                               );
-                            }
+                            })}
 
-                            const isCellActive = cellPerms.every(
-                              (p) => getRolePermissionValue(p, selectedRoleKey) !== 'No'
-                            );
-
-                            return (
-                              <td
-                                key={action.key}
-                                className="p-3 text-center border-r border-border/40"
-                              >
-                                <div className="flex items-center justify-center">
-                                  <ToggleSwitch
-                                    checked={isCellActive}
-                                    disabled={!isAdmin || isUpdatingPerm}
-                                    onChange={(newVal) =>
-                                      handleToggleCellAction(cellPerms, selectedRoleKey, newVal)
-                                    }
-                                    label={isCellActive ? 'ON' : 'OFF'}
-                                    size="sm"
-                                    title={cellPerms.map((p) => p.capability).join('\n')}
-                                  />
-                                </div>
-                              </td>
-                            );
-                          })}
-
-                          {/* Governance / Special Column */}
-                          {(() => {
-                            const specialPerms = modPerms.filter((p) =>
-                              matchPermissionToAction(p, 'special')
-                            );
-
-                            if (specialPerms.length === 0) {
-                              return (
-                                <td className="p-3 text-center border-r border-border/40 text-foreground-muted/40">
-                                  <span className="text-xs font-mono select-none">—</span>
-                                </td>
-                              );
-                            }
-
-                            const isSpecialActive = specialPerms.every(
-                              (p) => getRolePermissionValue(p, selectedRoleKey) !== 'No'
-                            );
-
-                            return (
-                              <td className="p-3 text-center border-r border-border/40">
-                                <div className="flex items-center justify-center">
-                                  <ToggleSwitch
-                                    checked={isSpecialActive}
-                                    disabled={!isAdmin || isUpdatingPerm}
-                                    onChange={(newVal) =>
-                                      handleToggleCellAction(specialPerms, selectedRoleKey, newVal)
-                                    }
-                                    label={isSpecialActive ? 'ON' : 'OFF'}
-                                    size="sm"
-                                    title={specialPerms.map((p) => p.capability).join('\n')}
-                                  />
-                                </div>
-                              </td>
-                            );
-                          })()}
-
-                          {/* Quick Module Toggle */}
-                          <td className="p-3 text-center">
-                            {isAdmin && modPerms.length > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleToggleEntireModule(
-                                    mod.key,
-                                    selectedRoleKey,
-                                    !isModuleFullyGranted
-                                  )
-                                }
-                                disabled={isUpdatingPerm}
-                                className={cn(
-                                  'text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer',
-                                  isModuleFullyGranted
-                                    ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50 hover:bg-rose-100'
-                                    : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50 hover:bg-emerald-100'
-                                )}
-                              >
-                                {isModuleFullyGranted ? 'Revoke All' : 'Grant All'}
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-foreground-muted">—</span>
-                            )}
-                          </td>
-                        </tr>
-
-                        {/* Accordion Sub-Drawer for Granular Capabilities */}
-                        {isExpanded && (
-                          <tr className="bg-surface-muted/20 dark:bg-[#121824]/60">
-                            <td colSpan={9} className="p-4 border-b border-border">
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between gap-2 mb-2">
-                                  <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
-                                    Granular Capabilities in {mod.key}
-                                  </span>
-                                  <span className="text-[10px] text-foreground-muted">
-                                    {modPerms.length} capabilities
-                                  </span>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                  {modPerms.map((perm) => {
-                                    const isPermActive =
-                                      getRolePermissionValue(perm, selectedRoleKey) !== 'No';
-                                    const isCustomPerm =
-                                      perm.id.startsWith('perm_') &&
-                                      !perm.id.startsWith('perm_inq') &&
-                                      !perm.id.startsWith('perm_comp') &&
-                                      !perm.id.startsWith('perm_prop') &&
-                                      !perm.id.startsWith('perm_task') &&
-                                      !perm.id.startsWith('perm_comm') &&
-                                      !perm.id.startsWith('perm_rep') &&
-                                      !perm.id.startsWith('perm_adm');
-
-                                    return (
-                                      <div
-                                        key={perm.id}
-                                        className="p-2.5 rounded-xl bg-surface dark:bg-[#151c27] border border-border flex items-center justify-between gap-3 shadow-2xs"
-                                      >
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-1.5">
-                                            <span className="font-bold text-xs text-foreground">
-                                              {perm.capability}
-                                            </span>
-                                            {isCustomPerm && (
-                                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
-                                                Custom
-                                              </span>
-                                            )}
-                                          </div>
-                                          {perm.description && (
-                                            <p className="text-[10px] text-foreground-muted truncate">
-                                              {perm.description}
-                                            </p>
-                                          )}
-                                        </div>
-
-                                        <div className="flex items-center gap-2 shrink-0">
-                                          <ToggleSwitch
-                                            checked={isPermActive}
-                                            disabled={!isAdmin || isUpdatingPerm}
-                                            onChange={(newVal) =>
-                                              handleToggleCellAction([perm], selectedRoleKey, newVal)
-                                            }
-                                            label={isPermActive ? 'ON' : 'OFF'}
-                                            size="sm"
-                                          />
-                                          {isCustomPerm && isAdmin && (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                handleDeleteCustomPermission(
-                                                  perm.id,
-                                                  perm.capability
-                                                )
-                                              }
-                                              className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors"
-                                              title="Delete custom capability"
-                                            >
-                                              <Trash2 className="w-3 h-3" />
-                                            </button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
+                            {/* Quick Module Toggle */}
+                            <td className="p-3 text-center">
+                              {isAdmin && modPerms.length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleToggleEntireModule(
+                                      mod.key,
+                                      selectedRoleKey,
+                                      !isModuleFullyGranted
+                                    )
+                                  }
+                                  disabled={isUpdatingPerm}
+                                  className={cn(
+                                    'text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer',
+                                    isModuleFullyGranted
+                                      ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50 hover:bg-rose-100'
+                                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50 hover:bg-emerald-100'
+                                  )}
+                                >
+                                  {isModuleFullyGranted ? 'Revoke All' : 'Grant All'}
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-foreground-muted">—</span>
+                              )}
                             </td>
                           </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
+
+                          {/* Accordion Sub-Drawer for Granular Capabilities */}
+                          {isExpanded && (
+                            <tr className="bg-surface-muted/20 dark:bg-[#121824]/60">
+                              <td colSpan={11} className="p-4 border-b border-border">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between gap-2 mb-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
+                                      Granular Capabilities in {mod.key}
+                                    </span>
+                                    <span className="text-[10px] text-foreground-muted">
+                                      {modPerms.length} capabilities
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {modPerms.map((perm) => {
+                                      const isPermActive =
+                                        getEffectiveRolePermissionValue(perm, selectedRoleKey) !== 'No';
+                                      const isCustomPerm =
+                                        perm.id.startsWith('perm_') &&
+                                        !perm.id.startsWith('perm_inq') &&
+                                        !perm.id.startsWith('perm_comp') &&
+                                        !perm.id.startsWith('perm_prop') &&
+                                        !perm.id.startsWith('perm_task') &&
+                                        !perm.id.startsWith('perm_comm') &&
+                                        !perm.id.startsWith('perm_rep') &&
+                                        !perm.id.startsWith('perm_adm');
+
+                                      return (
+                                        <div
+                                          key={perm.id}
+                                          className="p-2.5 rounded-xl bg-surface dark:bg-[#151c27] border border-border flex items-center justify-between gap-3 shadow-2xs"
+                                        >
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="font-bold text-xs text-foreground">
+                                                {perm.capability}
+                                              </span>
+                                              {isCustomPerm && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                                                  Custom
+                                                </span>
+                                              )}
+                                            </div>
+                                            {perm.description && (
+                                              <p className="text-[10px] text-foreground-muted truncate">
+                                                {perm.description}
+                                              </p>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            <ToggleSwitch
+                                              checked={isPermActive}
+                                              disabled={!isAdmin || isUpdatingPerm}
+                                              onChange={(newVal) =>
+                                                handleToggleGranularPermission(perm.id, newVal)
+                                              }
+                                              label={isPermActive ? 'ON' : 'OFF'}
+                                              size="sm"
+                                            />
+                                            {isCustomPerm && isAdmin && (
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  handleDeleteCustomPermission(
+                                                    perm.id,
+                                                    perm.capability
+                                                  )
+                                                }
+                                                className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded transition-colors"
+                                                title="Delete custom capability"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
+
+          {/* Sticky Floating Save Changes Banner */}
+          {Object.keys(pendingChanges).length > 0 && (
+            <div className="sticky bottom-4 z-40 bg-white/95 dark:bg-[#151c27]/95 backdrop-blur border-2 border-emerald-500/60 shadow-2xl rounded-2xl p-3.5 sm:px-6 sm:py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200">
+              <div className="flex items-center gap-3">
+                <div className="size-3 rounded-full bg-emerald-500 animate-pulse shrink-0 ring-4 ring-emerald-500/20" />
+                <div className="text-xs">
+                  <p className="font-extrabold text-foreground">
+                    Unsaved Permission Changes ({Object.keys(pendingChanges).length})
+                  </p>
+                  <p className="text-[11px] text-foreground-muted">
+                    You have modified permissions for role <span className="font-bold text-fairway-600">{selectedRole?.name}</span>. Click Save Changes to apply them across the CRM.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDiscardChanges}
+                  disabled={isUpdatingPerm}
+                  leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
+                >
+                  Discard
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={handleSaveAllChanges}
+                  disabled={isUpdatingPerm}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-600/20"
+                  leftIcon={isUpdatingPerm ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                >
+                  {isUpdatingPerm ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

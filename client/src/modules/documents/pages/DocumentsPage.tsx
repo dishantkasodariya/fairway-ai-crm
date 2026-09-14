@@ -48,6 +48,8 @@ import { Modal } from '@/modules/core/components/ui/Modal';
 import { Input } from '@/modules/core/components/ui/Input';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
 import { cn } from '@/modules/core/lib/utils';
+import { DocumentsList } from '../components/DocumentsList';
+import { DocumentsCard } from '../components/DocumentsCard';
 
 interface DocumentsPageProps {
   onSelectCompany?: (companyId: string) => void;
@@ -284,8 +286,8 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
             Commercial lease proposals, architectural site plans, NFPA fire compliance, and client NDA documentation.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => setIsUploadOpen(true)} size="sm" className="gap-1.5 shadow-sm font-semibold">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button onClick={() => setIsUploadOpen(true)} size="sm" className="gap-1.5 shadow-sm font-semibold w-full sm:w-auto justify-center">
             <UploadCloud className="w-4 h-4" />
             <span>Upload Document</span>
           </Button>
@@ -398,86 +400,88 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
               </TooltipContent>
             </Tooltip>
 
-            {/* Column Settings Dropdown */}
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
-                    >
-                      <Settings className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Column
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
-                <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
-                  Toggle Columns
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem
-                  checked={columns.name}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, name: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Document Name
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.category}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, category: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Category
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.company}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, company: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Associated Account
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.inquiry}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, inquiry: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Inquiry Reference
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.size}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, size: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  File Size
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.date}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, date: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Upload Date
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.actions}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, actions: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Actions
-                </DropdownMenuCheckboxItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Column Settings Dropdown (Desktop Only) */}
+            <div className="hidden sm:block">
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Column
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
+                  <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
+                    Toggle Columns
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={columns.name}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, name: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Document Name
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.category}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, category: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Category
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.company}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, company: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Associated Account
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.inquiry}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, inquiry: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Inquiry Reference
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.size}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, size: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    File Size
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.date}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, date: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Upload Date
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.actions}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, actions: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Actions
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             {/* Refresh Button */}
             <Tooltip>
@@ -501,8 +505,8 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
               </TooltipContent>
             </Tooltip>
 
-            {/* Segmented View Switcher */}
-            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+            {/* Segmented View Switcher (Desktop Only) */}
+            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -570,160 +574,35 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
             </Button>
           )}
         </div>
-      ) : viewMode === 'table' ? (
-        /* View 1: Table List */
-        <Card className="bg-surface border border-border shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-surface-muted/60 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {columns.name && <th className="py-3 px-4">Document Name</th>}
-                  {columns.category && <th className="py-3 px-4">Category</th>}
-                  {columns.company && <th className="py-3 px-4">Associated Account</th>}
-                  {columns.inquiry && <th className="py-3 px-4">Inquiry Ref</th>}
-                  {columns.size && <th className="py-3 px-4">Size</th>}
-                  {columns.date && <th className="py-3 px-4">Upload Date</th>}
-                  {columns.actions && <th className="py-3 px-4 text-right">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredDocs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-surface-muted/50 transition-colors group">
-                    {columns.name && (
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-surface-muted border border-border flex items-center justify-center shrink-0">
-                            {getFileIcon(doc.fileType)}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-foreground hover:text-primary transition-colors cursor-pointer">
-                              {doc.name}
-                            </div>
-                            <div className="text-[11px] text-muted-foreground font-mono uppercase">{doc.fileType} Format</div>
-                          </div>
-                        </div>
-                      </td>
-                    )}
-
-                    {columns.category && (
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-foreground border border-border">
-                          {doc.category}
-                        </span>
-                      </td>
-                    )}
-
-                    {columns.company && (
-                      <td className="py-3.5 px-4">
-                        {doc.companyId ? (
-                          <button
-                            onClick={() => onSelectCompany && onSelectCompany(doc.companyId!)}
-                            className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5 text-left cursor-pointer"
-                          >
-                            <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            <span className="truncate max-w-[180px]">{doc.companyName || 'Enterprise'}</span>
-                          </button>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">General</span>
-                        )}
-                      </td>
-                    )}
-
-                    {columns.inquiry && (
-                      <td className="py-3.5 px-4">
-                        {doc.inquiryNumber ? (
-                          <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                            {doc.inquiryNumber}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </td>
-                    )}
-
-                    {columns.size && (
-                      <td className="py-3.5 px-4 font-mono text-xs text-muted-foreground">
-                        {doc.fileSize || '1.2 MB'}
-                      </td>
-                    )}
-
-                    {columns.date && (
-                      <td className="py-3.5 px-4 text-xs text-muted-foreground">
-                        {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : 'N/A'}
-                      </td>
-                    )}
-
-                    {columns.actions && (
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button size="xs" variant="ghost" title="Download Document" className="h-7 w-7 p-0">
-                            <Download className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-                          </Button>
-                          <Button size="xs" variant="ghost" onClick={() => handleDelete(doc.id, doc.name)} title="Delete Document" className="h-7 w-7 p-0 hover:text-destructive">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
       ) : (
-        /* View 2: Cards Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDocs.map((doc) => (
-            <div
-              key={doc.id}
-              className="bg-surface rounded-card border border-border p-4 shadow-subtle hover:border-fairway-500/60 hover:shadow-md transition-all flex flex-col justify-between gap-3 text-left"
-            >
-              <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-lg bg-surface-muted border border-border flex items-center justify-center shrink-0">
-                    {getFileIcon(doc.fileType)}
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-foreground text-sm truncate">{doc.name}</h3>
-                    <span className="text-[11px] text-muted-foreground font-mono uppercase">{doc.fileType} • {doc.fileSize || '1.2 MB'}</span>
-                  </div>
-                </div>
+        <>
+          {/* Mobile view: ONLY Card View show, NOT list page show */}
+          <div className="block sm:hidden">
+            <DocumentsCard
+              documents={filteredDocs}
+              onSelectCompany={onSelectCompany}
+              onDelete={handleDelete}
+            />
+          </div>
 
-                <Button size="xs" variant="ghost" onClick={() => handleDelete(doc.id, doc.name)} className="h-7 w-7 p-0 hover:text-destructive shrink-0">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-
-              <div className="space-y-1.5 text-xs flex-1">
-                <div>
-                  <span className="bg-surface-muted px-2 py-0.5 rounded border border-border text-[11px] text-muted-foreground">
-                    {doc.category}
-                  </span>
-                </div>
-
-                {doc.companyName && (
-                  <div
-                    onClick={() => doc.companyId && onSelectCompany && onSelectCompany(doc.companyId)}
-                    className="font-medium text-foreground hover:underline cursor-pointer flex items-center gap-1.5 pt-1"
-                  >
-                    <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <span className="break-words sm:truncate">{doc.companyName}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2 text-xs">
-                <span className="text-[11px] text-muted-foreground">
-                  {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : 'N/A'}
-                </span>
-                <Button size="xs" variant="outline" leftIcon={<Download className="w-3.5 h-3.5" />}>
-                  Download
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+          {/* Desktop view: Respects user viewMode (List vs Card) */}
+          <div className="hidden sm:block">
+            {viewMode === 'table' ? (
+              <DocumentsList
+                documents={filteredDocs}
+                columns={columns}
+                onSelectCompany={onSelectCompany}
+                onDelete={handleDelete}
+              />
+            ) : (
+              <DocumentsCard
+                documents={filteredDocs}
+                onSelectCompany={onSelectCompany}
+                onDelete={handleDelete}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {/* Advanced Filters Drawer (Right Slide-out) */}

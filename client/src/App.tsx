@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { ShieldAlert } from 'lucide-react';
+import { Button } from '@/modules/core/components/ui/Button';
 import { AuthProvider, useAuth } from '@/modules/core/providers/AuthContext';
 import { NotificationProvider } from '@/modules/core/providers/NotificationContext';
 import { ToastProvider } from '@/modules/core/providers/ToastContext';
@@ -15,6 +17,8 @@ import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
 import { InquiriesPage } from '@/modules/inquiries/pages/InquiriesPage';
 import { InquiryDetailPage } from '@/modules/inquiries/pages/InquiryDetailPage';
 import { NewInquiryPage } from '@/modules/inquiries/pages/NewInquiryPage';
+import { CallsPage } from '@/modules/calls/pages/CallsPage';
+import { NewCallPage } from '@/modules/calls/pages/NewCallPage';
 import { CompaniesPage } from '@/modules/companies/pages/CompaniesPage';
 import { CompanyDetailPage } from '@/modules/companies/pages/CompanyDetailPage';
 import { NewCompanyPage } from '@/modules/companies/pages/NewCompanyPage';
@@ -35,14 +39,38 @@ import { SettingsPage } from '@/modules/settings/pages/SettingsPage';
 import { ProfilePage } from '@/modules/profile/pages/ProfilePage';
 import { NotFoundPage } from '@/modules/core/pages/NotFoundPage';
 
-import { StorageService } from '@/modules/core/services/storageService';
+const AccessRestrictedView: React.FC<{
+  moduleName: string;
+  onGoBack: () => void;
+}> = ({ moduleName, onGoBack }) => {
+  const { currentUser } = useAuth();
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+      <div className="w-16 h-16 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 flex items-center justify-center text-rose-600 dark:text-rose-400 mb-4 shadow-sm">
+        <ShieldAlert className="w-8 h-8" />
+      </div>
+      <h2 className="text-xl font-bold text-foreground tracking-tight">
+        Access Restricted
+      </h2>
+      <p className="text-sm text-foreground-muted max-w-md mt-2">
+        Your assigned role (<span className="font-semibold text-foreground capitalize">{(currentUser.role || '').replace('_', ' ')}</span>) does not have permission to view the <span className="font-semibold text-foreground">{moduleName}</span> module.
+      </p>
+      <div className="mt-6 flex items-center gap-3">
+        <Button size="sm" variant="primary" onClick={onGoBack}>
+          Return to Permitted Workspace
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 const AppRouter: React.FC = () => {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, isSuperAdmin, canView, canImport, hasCapability } = useAuth();
   const { activeView, selectedEntityId, navigate, pathname } = useRouter();
 
   // Global Quick Action State
   const [defaultInquiryCompanyId, setDefaultInquiryCompanyId] = useState<string | undefined>(undefined);
+  const [newCallType, setNewCallType] = useState<'schedule' | 'log'>('schedule');
 
   const handleNavigate = (view: ActiveNavView, entityId?: string) => {
     navigate({ view, id: entityId });
@@ -84,17 +112,52 @@ const AppRouter: React.FC = () => {
   }
 
 
+  const getFirstAllowedView = (): ActiveNavView => {
+    if (canView('inquiries')) return 'inquiries';
+    if (canView('companies')) return 'companies';
+    if (canView('properties')) return 'properties';
+    if (canView('tasks')) return 'tasks';
+    if (canView('proposals')) return 'proposals';
+    if (canView('reports')) return 'reports';
+    return 'dashboard';
+  };
+
   const renderActiveView = () => {
     switch (activeView) {
-      case 'dashboard':
+      case 'dashboard': {
+        const canAccessDashboard =
+          isSuperAdmin ||
+          canView('inquiries') ||
+          canView('companies') ||
+          canView('properties') ||
+          canView('tasks') ||
+          canView('proposals') ||
+          canView('reports');
+        if (!canAccessDashboard) {
+          return (
+            <AccessRestrictedView
+              moduleName="Dashboard"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <DashboardPage
             onNavigate={handleNavigate}
             onOpenNewInquiry={() => handleNavigate('new_inquiry')}
           />
         );
+      }
 
       case 'inquiries':
+        if (!canView('inquiries')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Inquiries & Leads"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <InquiriesPage
             onSelectInquiry={(id) => handleNavigate('inquiry_detail', id)}
@@ -104,19 +167,35 @@ const AppRouter: React.FC = () => {
         );
 
       case 'new_inquiry':
+        if (!canView('inquiries')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Inquiries & Leads"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <NewInquiryPage
             defaultCompanyId={defaultInquiryCompanyId}
             onBack={() => handleNavigate('inquiries')}
-            onSuccess={(newInquiryId) => {
+            onSuccess={() => {
               setDefaultInquiryCompanyId(undefined);
-              handleNavigate('inquiry_detail', newInquiryId);
+              handleNavigate('inquiries');
             }}
           />
         );
 
       case 'inquiry_detail': {
-        const targetId = selectedEntityId || StorageService.getInquiries()[0]?.id || '';
+        if (!canView('inquiries')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Inquiries & Leads"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
+        const targetId = selectedEntityId || '';
         return (
           <InquiryDetailPage
             key={targetId}
@@ -130,6 +209,14 @@ const AppRouter: React.FC = () => {
       }
 
       case 'companies':
+        if (!canView('companies')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Companies & Accounts"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <CompaniesPage
             onSelectCompany={(id) => handleNavigate('company_detail', id)}
@@ -140,6 +227,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'new_company':
+        if (!canView('companies')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Companies & Accounts"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <NewCompanyPage
             onBack={() => handleNavigate('companies')}
@@ -148,18 +243,34 @@ const AppRouter: React.FC = () => {
         );
 
       case 'edit_company':
+        if (!canView('companies')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Companies & Accounts"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <NewCompanyPage
-            companyToEdit={StorageService.getCompanyById(selectedEntityId || '')}
+            companyId={selectedEntityId}
             onBack={() => handleNavigate('companies')}
             onSuccess={(updatedId) => handleNavigate('company_detail', updatedId)}
           />
         );
 
       case 'company_detail':
+        if (!canView('companies')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Companies & Accounts"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <CompanyDetailPage
-            companyId={selectedEntityId || 'comp_1'}
+            companyId={selectedEntityId || ''}
             onBack={() => handleNavigate('companies')}
             onNavigateToInquiry={(inqId) => handleNavigate('inquiry_detail', inqId)}
             onNavigateToMap={() => handleNavigate('map')}
@@ -168,6 +279,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'pipeline':
+        if (!canView('inquiries')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Pipeline Kanban"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <PipelinePage
             onSelectInquiry={(id) => handleNavigate('inquiry_detail', id)}
@@ -176,6 +295,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'tasks':
+        if (!canView('tasks')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Tasks & Follow-ups"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <TasksPage
             onNavigateToCompany={(compKid) => handleNavigate('company_detail', compKid)}
@@ -184,6 +311,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'properties':
+        if (!canView('properties')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Properties & Warehouses"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <PropertiesPage
             onSelectProperty={(id) => handleNavigate('property_detail', id)}
@@ -193,6 +328,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'new_property':
+        if (!canView('properties')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Properties & Warehouses"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <NewPropertyPage
             onBack={() => handleNavigate('properties')}
@@ -203,6 +346,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'property_detail':
+        if (!canView('properties')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Properties & Warehouses"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <PropertyDetailPage
             propertyId={selectedEntityId || 'prop_1'}
@@ -213,6 +364,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'proposals':
+        if (!canView('proposals')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Proposals & Financials"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <ProposalsPage
             onNavigateToCompany={(compKid) => handleNavigate('company_detail', compKid)}
@@ -221,6 +380,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'site_visits':
+        if (!canView('tasks')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Site Visits"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <SiteVisitsPage
             onNavigateToCompany={(compKid) => handleNavigate('company_detail', compKid)}
@@ -229,6 +396,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'map':
+        if (!canView('properties') && !canView('reports')) {
+          return (
+            <AccessRestrictedView
+              moduleName="India Corridors Map"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <MapPage
             onNavigateToCompany={(compKid) => handleNavigate('company_detail', compKid)}
@@ -237,6 +412,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'import':
+        if (!canImport('inquiries') && !canImport('companies') && !canImport('properties')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Excel/CSV Import"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <ImportWizardPage
             onNavigateToInquiries={() => handleNavigate('inquiries')}
@@ -245,6 +428,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'contacts':
+        if (!canView('companies')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Contacts"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <ContactsPage
             onSelectCompany={(id) => handleNavigate('company_detail', id)}
@@ -253,6 +444,14 @@ const AppRouter: React.FC = () => {
         );
 
       case 'documents':
+        if (!canView('communications')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Documents"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return (
           <DocumentsPage
             onSelectCompany={(id) => handleNavigate('company_detail', id)}
@@ -261,13 +460,56 @@ const AppRouter: React.FC = () => {
         );
 
       case 'communications':
+        if (!canView('communications')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Communications"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return <CommunicationsPage />;
+
+      case 'calls':
+        return (
+          <CallsPage
+            onOpenNewCall={(type) => {
+              setNewCallType(type || 'schedule');
+              handleNavigate('new_call');
+            }}
+          />
+        );
+
+      case 'new_call':
+        return (
+          <NewCallPage
+            initialCallType={newCallType}
+            onBack={() => handleNavigate('calls')}
+            onSuccess={() => handleNavigate('calls')}
+          />
+        );
 
       case 'reports':
       case 'analytics':
+        if (!canView('reports')) {
+          return (
+            <AccessRestrictedView
+              moduleName="Reports & Analytics"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return <ReportsPage />;
 
       case 'settings':
+        if (!canView('settings') && !hasCapability('perm_adm_roles') && !hasCapability('perm_adm_users') && !isSuperAdmin) {
+          return (
+            <AccessRestrictedView
+              moduleName="Settings & RBAC"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
         return <SettingsPage />;
 
       case 'profile':
@@ -275,7 +517,6 @@ const AppRouter: React.FC = () => {
 
       default:
         return <NotFoundPage onGoHome={() => handleNavigate('dashboard')} />;
-
     }
   };
 

@@ -1,5 +1,5 @@
 import { Task } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export class TaskService {
   /**
@@ -35,7 +35,9 @@ export class TaskService {
       }
 
       const queryString = params.toString() ? `?${params.toString()}` : '';
-      const res = await fetch(`${API_BASE_URL}/tasks${queryString}`);
+      const res = await fetch(`${API_BASE_URL}/tasks${queryString}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -49,7 +51,9 @@ export class TaskService {
    */
   static async getTaskById(id: string): Promise<{ success: boolean; data?: Task; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE_URL}/tasks/${id}`);
+      const res = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -65,7 +69,7 @@ export class TaskService {
     try {
       const res = await fetch(`${API_BASE_URL}/tasks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(taskData),
       });
       const json = await res.json();
@@ -83,7 +87,7 @@ export class TaskService {
     try {
       const res = await fetch(`${API_BASE_URL}/tasks/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(taskData),
       });
       const json = await res.json();
@@ -101,7 +105,7 @@ export class TaskService {
     try {
       const res = await fetch(`${API_BASE_URL}/tasks/${id}/toggle`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: taskData ? JSON.stringify(taskData) : undefined,
       });
       const json = await res.json();
@@ -119,6 +123,7 @@ export class TaskService {
     try {
       const res = await fetch(`${API_BASE_URL}/tasks/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const json = await res.json();
       return json;

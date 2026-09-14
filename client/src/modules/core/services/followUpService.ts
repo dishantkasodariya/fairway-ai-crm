@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export interface FollowUpItem {
   id: string;
@@ -38,7 +38,9 @@ export class FollowUpService {
       if (params?.status && params.status !== 'all') q.append('status', params.status);
       if (params?.assignedUserId && params.assignedUserId !== 'all') q.append('assignedUserId', params.assignedUserId);
 
-      const res = await fetch(`${API_BASE_URL}/follow-ups?${q.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/follow-ups?${q.toString()}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -69,7 +71,7 @@ export class FollowUpService {
     try {
       const res = await fetch(`${API_BASE_URL}/follow-ups`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -96,7 +98,7 @@ export class FollowUpService {
     try {
       const res = await fetch(`${API_BASE_URL}/follow-ups/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();

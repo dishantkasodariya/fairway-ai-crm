@@ -26,16 +26,18 @@ import {
   ChevronDown,
   Loader2,
 } from 'lucide-react';
-import { StorageService } from '@/modules/core/services/storageService';
 import CompanyService from '@/modules/core/services/companyService';
 import ContactService from '@/modules/core/services/contactService';
 import FacilityService from '@/modules/core/services/facilityService';
 import NoteService from '@/modules/core/services/noteService';
 import ActivityService from '@/modules/core/services/activityService';
 import { TaskService } from '@/modules/core/services/taskService';
+import { ProposalService } from '@/modules/core/services/proposalService';
+import { PropertyService } from '@/modules/core/services/propertyService';
+import { matchPropertiesForInquiry } from '@/modules/core/utils/propertyMatcher';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
-import { Company, Contact, Facility, Inquiry, Task, Note, Activity, Proposal, SiteVisit } from '@/modules/core/types';
+import { Company, Contact, Facility, Inquiry, Task, Note, Activity, Proposal, Property, SiteVisit } from '@/modules/core/types';
 import { formatINR, formatSqFt, formatDate, formatRelativeDate, getPriorityBadge, getCompanyStatusBadge, getFacilityStatusBadge } from '@/modules/core/utils/formatters';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
@@ -44,10 +46,12 @@ import { Breadcrumbs } from '@/modules/core/components/ui/Breadcrumbs';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { Input, Select, Textarea } from '@/modules/core/components/ui/Input';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
+import { TimePicker } from '@/modules/core/components/ui/TimePicker';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuLabel } from '@/modules/core/components/ui/DropdownMenu';
 
 import { LostReasonModal } from '@/modules/core/components/LostReasonModal';
 import { WonCelebrationModal } from '@/modules/core/components/WonCelebrationModal';
+import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
 
 export interface CompanyDetailViewProps {
   companyId: string;
@@ -64,18 +68,31 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
   onNavigateToMap,
   onOpenNewInquiryForCompany,
 }) => {
-  const { canEdit, canDelete, currentUser, users } = useAuth();
+  const { canEditModule, canDeleteModule, currentUser, users } = useAuth();
+  const canEdit = canEditModule('companies');
+  const canDelete = canDeleteModule('companies');
   const { success, error } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [company, setCompany] = useState<Company | undefined>(StorageService.getCompanyById(companyId));
-  const [contacts, setContacts] = useState<Contact[]>(StorageService.getContacts(companyId));
-  const [facilities, setFacilities] = useState<Facility[]>(StorageService.getFacilities(companyId));
-  const [inquiries, setInquiries] = useState<Inquiry[]>(StorageService.getInquiries(companyId));
-  const [tasks, setTasks] = useState<Task[]>(StorageService.getTasks(companyId));
-  const [notes, setNotes] = useState<Note[]>(StorageService.getNotes(companyId));
-  const [activities, setActivities] = useState<Activity[]>(StorageService.getActivities(companyId));
-  const [proposals, setProposals] = useState<Proposal[]>(StorageService.getProposals(companyId));
+  const [company, setCompany] = useState<Company | undefined>(undefined);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+
+  const userComboboxOptions = React.useMemo<ComboboxOption[]>(() => {
+    return users.map((u) => ({
+      value: u.id,
+      label: u.name,
+      description: u.role,
+      avatar: u.avatar,
+      initials: u.name?.slice(0, 2).toUpperCase(),
+    }));
+  }, [users]);
 
   // Modals state
   const [isAddContactOpen, setIsAddContactOpen] = useState(false);
@@ -123,108 +140,63 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
     assignedUserId: currentUser.id,
   });
 
-  // Fetch live company data from backend on mount or ID change
+  // Fetch live company data and all associated entities from backend
+  const refreshData = async () => {
+    try {
+      const [compRes, taskRes, noteRes, actRes, propRes, catalogRes] = await Promise.allSettled([
+        CompanyService.getCompanyById(companyId),
+        TaskService.getTasks({ companyId }),
+        NoteService.getNotes({ companyId }),
+        ActivityService.getActivities({ companyId }),
+        ProposalService.getProposals({ companyId }),
+        PropertyService.getProperties(),
+      ]);
+
+      if (compRes.status === 'fulfilled' && compRes.value.success && compRes.value.data) {
+        const comp = compRes.value.data;
+        setCompany(comp);
+        setContacts(comp.contacts || []);
+        setFacilities(comp.facilities || []);
+        setInquiries(comp.inquiries || []);
+      }
+
+      if (taskRes.status === 'fulfilled' && taskRes.value.success && taskRes.value.data) {
+        setTasks(taskRes.value.data);
+      }
+
+      if (noteRes.status === 'fulfilled' && noteRes.value.success && noteRes.value.data) {
+        setNotes(noteRes.value.data);
+      }
+
+      if (actRes.status === 'fulfilled' && actRes.value.success && actRes.value.data) {
+        setActivities(actRes.value.data);
+      }
+
+      if (propRes.status === 'fulfilled' && propRes.value.success && propRes.value.data) {
+        setProposals(propRes.value.data);
+      }
+
+      if (catalogRes.status === 'fulfilled' && catalogRes.value.success && catalogRes.value.data) {
+        setProperties(catalogRes.value.data);
+      }
+    } catch (err) {
+      console.error('Failed to load company dossier from backend:', err);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
-    const fetchCompany = async () => {
+    const fetchInitial = async () => {
       setLoading(true);
-      try {
-        const res = await CompanyService.getCompanyById(companyId);
-        if (isMounted && res.success && res.data) {
-          setCompany(res.data);
-          if (res.data.contacts && res.data.contacts.length > 0) {
-            setContacts(res.data.contacts);
-          } else {
-            setContacts(StorageService.getContacts(companyId));
-          }
-          if (res.data.facilities && res.data.facilities.length > 0) {
-            setFacilities(res.data.facilities);
-          } else {
-            setFacilities(StorageService.getFacilities(companyId));
-          }
-          if (res.data.inquiries && res.data.inquiries.length > 0) {
-            setInquiries(res.data.inquiries);
-          } else {
-            setInquiries(StorageService.getInquiries(companyId));
-          }
-        } else if (isMounted) {
-          const localComp = StorageService.getCompanyById(companyId);
-          setCompany(localComp);
-        }
-      } catch {
-        if (isMounted) {
-          setCompany(StorageService.getCompanyById(companyId));
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
+      await refreshData();
+      if (isMounted) setLoading(false);
     };
 
-    fetchCompany();
+    fetchInitial();
     return () => {
       isMounted = false;
     };
   }, [companyId]);
-
-  // Reload handler
-  const refreshData = async () => {
-    try {
-      const res = await CompanyService.getCompanyById(companyId);
-      if (res.success && res.data) {
-        setCompany(res.data);
-        if (res.data.contacts) setContacts(res.data.contacts);
-        if (res.data.facilities) setFacilities(res.data.facilities);
-        if (res.data.inquiries) setInquiries(res.data.inquiries);
-      } else {
-        const freshCompany = StorageService.getCompanyById(companyId);
-        setCompany(freshCompany);
-        setContacts(StorageService.getContacts(companyId));
-        setFacilities(StorageService.getFacilities(companyId));
-        setInquiries(StorageService.getInquiries(companyId));
-      }
-    } catch {
-      const freshCompany = StorageService.getCompanyById(companyId);
-      setCompany(freshCompany);
-    }
-
-    // Fetch real tasks from backend
-    try {
-      const taskRes = await TaskService.getTasks({ companyId });
-      if (taskRes.success && taskRes.data && taskRes.data.length > 0) {
-        setTasks(taskRes.data);
-      } else {
-        setTasks(StorageService.getTasks(companyId));
-      }
-    } catch {
-      setTasks(StorageService.getTasks(companyId));
-    }
-
-    // Fetch real notes from backend
-    try {
-      const noteRes = await NoteService.getNotes({ companyId });
-      if (noteRes.success && noteRes.data && noteRes.data.length > 0) {
-        setNotes(noteRes.data);
-      } else {
-        setNotes(StorageService.getNotes(companyId));
-      }
-    } catch {
-      setNotes(StorageService.getNotes(companyId));
-    }
-
-    // Fetch real activities from backend
-    try {
-      const actRes = await ActivityService.getActivities({ companyId });
-      if (actRes.success && actRes.data && actRes.data.length > 0) {
-        setActivities(actRes.data);
-      } else {
-        setActivities(StorageService.getActivities(companyId));
-      }
-    } catch {
-      setActivities(StorageService.getActivities(companyId));
-    }
-
-    setProposals(StorageService.getProposals(companyId));
-  };
 
   if (loading) {
     return (
@@ -257,12 +229,9 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
         companyName: company.name,
         ...contactForm,
       });
-    } catch {
-      StorageService.createContact({
-        companyId: company.id,
-        companyName: company.name,
-        ...contactForm,
-      });
+    } catch (err: any) {
+      error('Failed to Add Contact', err.message || 'Error communicating with backend');
+      return;
     }
 
     setIsAddContactOpen(false);
@@ -291,12 +260,9 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
         companyName: company.name,
         ...facilityForm,
       });
-    } catch {
-      StorageService.createFacility({
-        companyId: company.id,
-        companyName: company.name,
-        ...facilityForm,
-      });
+    } catch (err: any) {
+      error('Failed to Add Facility', err.message || 'Error communicating with backend');
+      return;
     }
 
     setIsAddFacilityOpen(false);
@@ -333,19 +299,9 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
         title: `Scheduled ${taskForm.taskType}`,
         description: taskForm.description,
       });
-    } catch {
-      StorageService.createTask({
-        companyId: company.id,
-        companyName: company.name,
-        assignedUserId: assignedUser.id,
-        assignedUserName: assignedUser.name,
-        taskType: taskForm.taskType,
-        description: taskForm.description,
-        dueDate: taskForm.dueDate,
-        dueTime: taskForm.dueTime,
-        priority: taskForm.priority,
-        status: 'Pending',
-      });
+    } catch (err: any) {
+      error('Failed to Create Task', err.message || 'Error communicating with backend');
+      return;
     }
 
     setIsAddTaskOpen(false);
@@ -384,8 +340,9 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
         title: 'Added Internal Note',
         description: content.slice(0, 100),
       });
-    } catch {
-      StorageService.createNote(company.id, content);
+    } catch (err: any) {
+      error('Failed to Add Note', err.message || 'Error communicating with backend');
+      return;
     }
 
     setNewNoteText('');
@@ -395,23 +352,31 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
   };
 
   // Toggle Task Completion
-  const handleToggleTask = (taskId: string) => {
-    StorageService.toggleTaskCompletion(taskId);
-    refreshData();
-    success('Task Updated', 'Follow-up status updated in history timeline.');
+  const handleToggleTask = async (taskId: string) => {
+    try {
+      await TaskService.toggleTask(taskId);
+      await refreshData();
+      success('Task Updated', 'Follow-up status updated in history timeline.');
+    } catch (err: any) {
+      error('Update Failed', err.message || 'Could not update task');
+    }
   };
 
   // Owner Reassignment
-  const handleReassignOwner = (newOwnerId: string) => {
+  const handleReassignOwner = async (newOwnerId: string) => {
     const targetUser = users.find((u) => u.id === newOwnerId);
     if (!targetUser) return;
 
-    StorageService.updateCompany(company.id, {
-      assignedOwnerId: targetUser.id,
-      assignedOwnerName: targetUser.name,
-    });
-    refreshData();
-    success('Owner Updated', `Assigned company ownership to ${targetUser.name}`);
+    try {
+      await CompanyService.updateCompany(company.id, {
+        assignedOwnerId: targetUser.id,
+        assignedOwnerName: targetUser.name,
+      });
+      await refreshData();
+      success('Owner Updated', `Assigned company ownership to ${targetUser.name}`);
+    } catch (err: any) {
+      error('Update Failed', err.message || 'Could not reassign company owner');
+    }
   };
 
   const prioBadge = getPriorityBadge(company.priority);
@@ -516,34 +481,16 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
               Assigned Owner
             </span>
             {canEdit ? (
-              <DropdownMenu
-                align="left"
-                className="w-56"
-                trigger={
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-between w-full gap-1.5 font-semibold text-foreground bg-surface px-2.5 py-1 rounded-lg border border-border hover:bg-surface-muted transition-colors shadow-2xs text-xs cursor-pointer min-w-0"
-                  >
-                    <span className="truncate">{company.assignedOwnerName || 'Assign Owner'}</span>
-                    <ChevronDown className="w-3 h-3 text-foreground-muted shrink-0" />
-                  </button>
-                }
-              >
-                <DropdownMenuLabel>Reassign Owner</DropdownMenuLabel>
-                {users.map((u) => (
-                  <DropdownMenuItem
-                    key={u.id}
-                    onClick={() => handleReassignOwner(u.id)}
-                    className={company.assignedOwnerId === u.id ? 'bg-surface-muted font-semibold text-fairway-700 dark:text-fairway-400' : ''}
-                    icon={company.assignedOwnerId === u.id ? <Check className="w-3.5 h-3.5 text-fairway-600 dark:text-fairway-400" /> : <User className="w-3.5 h-3.5 text-foreground-muted" />}
-                  >
-                    <div className="flex items-center justify-between gap-2 w-full">
-                      <span className="truncate">{u.name}</span>
-                      <span className="text-[10px] text-foreground-muted capitalize">({u.role})</span>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenu>
+              <div className="w-full mt-1">
+                <Combobox
+                  options={userComboboxOptions}
+                  value={company.assignedOwnerId || ''}
+                  onChange={(val) => handleReassignOwner(val)}
+                  placeholder="Assign Owner..."
+                  searchPlaceholder="Search salesperson..."
+                  triggerClassName="h-8 text-xs py-1 px-2.5 rounded-lg"
+                />
+              </div>
             ) : (
               <span className="font-bold text-foreground truncate mt-0.5 block">{company.assignedOwnerName}</span>
             )}
@@ -652,7 +599,7 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
             ) : (
               <div className="p-4 sm:p-5 space-y-4">
                 {inquiries.map((inq) => {
-                  const propertyMatches = StorageService.matchPropertiesForInquiry(inq);
+                  const propertyMatches = matchPropertiesForInquiry(inq, properties);
                   const topMatch = propertyMatches[0];
 
                   return (
@@ -1177,24 +1124,31 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
         description={`Update primary contact and business details for ${company.name}`}
       >
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             const target = e.target as any;
-            const updated = StorageService.updateCompany(company.id, {
-              phone: target.phone?.value || company.phone,
-              email: target.email?.value || company.email,
-              website: target.website?.value || company.website,
-              address: target.address?.value || company.address,
-              city: target.city?.value || company.city,
-              state: target.state?.value || company.state,
-              pincode: target.pincode?.value || company.pincode,
-              annualTurnover: target.annualTurnover?.value || company.annualTurnover,
-              employeeCount: target.employeeCount?.value || company.employeeCount,
-            });
-            if (updated) {
-              setCompany(updated);
-              success('Company Updated', `Saved profile details for ${updated.name}`);
-              setIsEditCompanyOpen(false);
+            try {
+              const res = await CompanyService.updateCompany(company.id, {
+                phone: target.phone?.value || company.phone,
+                email: target.email?.value || company.email,
+                website: target.website?.value || company.website,
+                address: target.address?.value || company.address,
+                city: target.city?.value || company.city,
+                state: target.state?.value || company.state,
+                pincode: target.pincode?.value || company.pincode,
+                annualTurnover: target.annualTurnover?.value || company.annualTurnover,
+                employeeCount: target.employeeCount?.value || company.employeeCount,
+              });
+              if (res.success && res.data) {
+                setCompany(res.data);
+                success('Company Updated', `Saved profile details for ${res.data.name}`);
+                setIsEditCompanyOpen(false);
+                await refreshData();
+              } else {
+                error('Update Failed', res.error || 'Could not update company details.');
+              }
+            } catch (err: any) {
+              error('Update Failed', err.message || 'Error updating company');
             }
           }}
           className="space-y-4 text-xs"
@@ -1424,25 +1378,27 @@ export const CompanyDetailView: React.FC<CompanyDetailViewProps> = ({
               onChange={(dateStr) => setTaskForm({ ...taskForm, dueDate: dateStr })}
               placeholder="Select due date"
             />
-            <Input
+            <TimePicker
               label="Due Time"
               value={taskForm.dueTime}
-              onChange={(e) => setTaskForm({ ...taskForm, dueTime: e.target.value })}
+              onChange={(timeStr) => setTaskForm({ ...taskForm, dueTime: timeStr })}
+              placeholder="Select due time"
             />
           </div>
 
 
-          <Select
-            label="Assigned Salesperson"
-            value={taskForm.assignedUserId}
-            onChange={(e) => setTaskForm({ ...taskForm, assignedUserId: e.target.value })}
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} ({u.role})
-              </option>
-            ))}
-          </Select>
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground block">
+              Assigned Salesperson
+            </label>
+            <Combobox
+              options={userComboboxOptions}
+              value={taskForm.assignedUserId}
+              onChange={(val) => setTaskForm({ ...taskForm, assignedUserId: val })}
+              placeholder="Select salesperson..."
+              searchPlaceholder="Search salesperson..."
+            />
+          </div>
 
           <Textarea
             label="Task Description"

@@ -1,45 +1,62 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Notification } from '@/modules/core/types';
-import { StorageService } from '@/modules/core/services/storageService';
+import { NotificationService } from '@/modules/core/services/notificationService';
 
 interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
-  markAsRead: (id: string) => void;
-  markAllAsRead: () => void;
-  addNotification: (notif: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => void;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  addNotification: (notif: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => Promise<void>;
+  refreshNotifications: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [notifications, setNotifications] = useState<Notification[]>(StorageService.getNotifications());
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  const refresh = () => {
-    setNotifications(StorageService.getNotifications());
+  const refreshNotifications = async () => {
+    try {
+      const res = await NotificationService.getNotifications();
+      if (res.success && res.data) {
+        setNotifications(res.data);
+        setUnreadCount(res.unreadCount ?? res.data.filter((n) => !n.isRead).length);
+      }
+    } catch (err) {
+      console.warn('Failed to refresh notifications from API:', err);
+    }
   };
 
   useEffect(() => {
-    window.addEventListener('fw_storage_change', refresh);
-    return () => window.removeEventListener('fw_storage_change', refresh);
+    refreshNotifications();
+    const interval = setInterval(refreshNotifications, 60000); // 1-minute background sync
+    return () => clearInterval(interval);
   }, []);
 
-  const markAsRead = (id: string) => {
-    StorageService.markNotificationRead(id);
-    refresh();
+  const markAsRead = async (id: string) => {
+    // Optimistic update
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+    await NotificationService.markAsRead(id);
   };
 
-  const markAllAsRead = () => {
-    StorageService.markAllNotificationsRead();
-    refresh();
+  const markAllAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+    await NotificationService.markAllAsRead();
   };
 
-  const addNotification = (notif: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => {
-    StorageService.createNotification(notif);
-    refresh();
+  const addNotification = async (notif: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => {
+    const res = await NotificationService.createNotification(notif);
+    if (res.success && res.data) {
+      setNotifications((prev) => [res.data!, ...prev]);
+      setUnreadCount((prev) => prev + 1);
+    }
   };
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <NotificationContext.Provider
@@ -49,6 +66,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         markAsRead,
         markAllAsRead,
         addNotification,
+        refreshNotifications,
       }}
     >
       {children}

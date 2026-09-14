@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import {
   UploadCloud,
@@ -17,9 +17,11 @@ import {
   ArrowLeft,
   Layers,
 } from 'lucide-react';
-import { StorageService, normalizeCompanyName } from '@/modules/core/services/storageService';
+import { normalizeCompanyName } from '@/modules/core/utils/formatters';
 import { ImportService } from '@/modules/core/services/importService';
-import { ImportResult } from '@/modules/core/types';
+import { InquiryService } from '@/modules/core/services/inquiryService';
+import { CompanyService } from '@/modules/core/services/companyService';
+import { ImportResult, Inquiry, Company } from '@/modules/core/types';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
@@ -103,6 +105,17 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
   });
 
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [existingInquiries, setExistingInquiries] = useState<Inquiry[]>([]);
+  const [existingCompanies, setExistingCompanies] = useState<Company[]>([]);
+
+  useEffect(() => {
+    InquiryService.getInquiries({ pageSize: 1000 }).then((res) => {
+      if (res.success && res.data) setExistingInquiries(res.data);
+    });
+    CompanyService.getCompanies({ pageSize: 1000 }).then((res) => {
+      if (res.success && res.data) setExistingCompanies(res.data);
+    });
+  }, []);
 
   // Auto-map column helper
   const autoMapColumns = (head: string[]) => {
@@ -244,9 +257,6 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
       };
     }
 
-    const existingInquiries = StorageService.getInquiries();
-    const existingCompanies = StorageService.getCompanies();
-
     const seenInBatch = new Set<string>();
     let validCount = 0;
     let duplicateCount = 0;
@@ -330,7 +340,7 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
     });
 
     return { rowStatuses, validCount, duplicateCount, missingCount };
-  }, [parsedRows, columnMapping]);
+  }, [parsedRows, columnMapping, existingInquiries, existingCompanies]);
 
   const handleValidateAndProceed = () => {
     setStep(3);
@@ -355,18 +365,11 @@ export const ImportWizardView: React.FC<ImportWizardViewProps> = ({
           importedInquiries: res.data.importedInquiries.map((i) => i.inquiryNumber),
         };
 
-        try {
-          StorageService.importFromParsedData(parsedRows, columnMapping);
-        } catch {}
-
         setImportResult(mappedResult);
         setStep(4);
         success('Migration Completed', `Successfully imported ${res.data.importedCount} records into Fairway CRM.`);
       } else {
-        const result = StorageService.importFromParsedData(parsedRows, columnMapping);
-        setImportResult(result);
-        setStep(4);
-        success('Migration Completed', `Imported ${result.importedCount} records into Fairway CRM.`);
+        error('Import Failed', res.error || 'Failed to execute migration.');
       }
     } catch (err: any) {
       error('Import Error', err?.message || 'Failed to execute migration.');

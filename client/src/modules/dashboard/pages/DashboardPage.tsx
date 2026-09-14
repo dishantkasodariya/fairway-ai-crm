@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Building2,
   FileText,
@@ -27,7 +27,6 @@ import {
   Briefcase,
   Flame,
 } from 'lucide-react';
-import { StorageService } from '@/modules/core/services/storageService';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { CompanyService } from '@/modules/core/services/companyService';
 import { PropertyService } from '@/modules/core/services/propertyService';
@@ -47,63 +46,45 @@ export interface DashboardViewProps {
 }
 
 export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpenNewInquiry }) => {
-  const { currentUser, isSales, canEdit } = useAuth();
+  const { currentUser, isSales, canEdit, users, canView, canCreate } = useAuth();
   const { success } = useToast();
   const [ownerFilter, setOwnerFilter] = useState<string>(isSales ? currentUser.id : 'all');
-  const [tasksList, setTasksList] = useState<Task[]>(() => StorageService.getTasks());
-  const [companies, setCompanies] = useState<Company[]>(() => StorageService.getCompanies());
-  const [allInquiries, setAllInquiries] = useState<Inquiry[]>(() => StorageService.getInquiries());
-  const [properties, setProperties] = useState<Property[]>(() => StorageService.getProperties());
-  const [activities, setActivities] = useState<ActivityType[]>(() => StorageService.getActivities());
-  const users = StorageService.getUsers();
+  const [tasksList, setTasksList] = useState<Task[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [allInquiries, setAllInquiries] = useState<Inquiry[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [activities, setActivities] = useState<ActivityType[]>([]);
 
   // Async load live PostgreSQL data from backend APIs
-  useEffect(() => {
-    let isMounted = true;
-    const loadBackendData = async () => {
-      try {
-        const [inqRes, compRes, propRes, taskRes] = await Promise.allSettled([
-          InquiryService.getInquiries({ pageSize: 500 }),
-          CompanyService.getCompanies({ pageSize: 500 }),
-          PropertyService.getProperties(),
-          TaskService.getTasks(),
-        ]);
+  const loadBackendData = useCallback(async () => {
+    try {
+      const [inqRes, compRes, propRes, taskRes] = await Promise.allSettled([
+        InquiryService.getInquiries({ pageSize: 500 }),
+        CompanyService.getCompanies({ pageSize: 500 }),
+        PropertyService.getProperties(),
+        TaskService.getTasks(),
+      ]);
 
-        if (isMounted) {
-          if (inqRes.status === 'fulfilled' && inqRes.value.success && inqRes.value.data) {
-            setAllInquiries(inqRes.value.data);
-            try { StorageService.saveInquiries(inqRes.value.data); } catch {}
-          }
-          if (compRes.status === 'fulfilled' && compRes.value.success && compRes.value.data) {
-            setCompanies(compRes.value.data);
-          }
-          if (propRes.status === 'fulfilled' && propRes.value.success && propRes.value.data) {
-            setProperties(propRes.value.data);
-          }
-          if (taskRes.status === 'fulfilled' && taskRes.value.success && taskRes.value.data) {
-            setTasksList(taskRes.value.data);
-          }
-        }
-      } catch (e) {
-        console.warn('Backend live data fetch fallback to local cache:', e);
+      if (inqRes.status === 'fulfilled' && inqRes.value.success && inqRes.value.data) {
+        setAllInquiries(inqRes.value.data);
       }
-    };
-
-    loadBackendData();
-    return () => { isMounted = false; };
+      if (compRes.status === 'fulfilled' && compRes.value.success && compRes.value.data) {
+        setCompanies(compRes.value.data);
+      }
+      if (propRes.status === 'fulfilled' && propRes.value.success && propRes.value.data) {
+        setProperties(propRes.value.data);
+      }
+      if (taskRes.status === 'fulfilled' && taskRes.value.success && taskRes.value.data) {
+        setTasksList(taskRes.value.data);
+      }
+    } catch (e) {
+      console.warn('Backend live data fetch error:', e);
+    }
   }, []);
 
-  // Reactive listener for storage changes
   useEffect(() => {
-    const handleStorageChange = () => {
-      setTasksList(StorageService.getTasks());
-      setAllInquiries(StorageService.getInquiries());
-      setCompanies(StorageService.getCompanies());
-      setProperties(StorageService.getProperties());
-    };
-    window.addEventListener('fw_storage_change', handleStorageChange);
-    return () => window.removeEventListener('fw_storage_change', handleStorageChange);
-  }, []);
+    loadBackendData();
+  }, [loadBackendData]);
 
   const inquiries = ownerFilter === 'all' ? allInquiries : allInquiries.filter((i) => i.salespersonId === ownerFilter);
   const tasks = ownerFilter === 'all' ? tasksList : tasksList.filter((t) => t.assignedUserId === ownerFilter);
@@ -125,10 +106,27 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   const todaysTasks = tasks.filter((t) => t.status === 'Pending' && t.dueDate === todayStr);
   const overdueTasks = tasks.filter((t) => t.status === 'Pending' && t.dueDate < todayStr);
 
-  const handleCompleteTask = (taskId: string) => {
-    StorageService.toggleTaskCompletion(taskId, 'Completed from Dashboard');
-    setTasksList(StorageService.getTasks());
-    success('Task Completed', 'Follow-up marked done and logged to timeline.');
+  const handleCompleteTask = async (taskId: string) => {
+    try {
+      const res = await TaskService.toggleTask(taskId, { completedNotes: 'Completed from Dashboard' });
+      if (res.success && res.data) {
+        setTasksList((prev) => prev.map((t) => (t.id === taskId ? res.data! : t)));
+      } else {
+        setTasksList((prev) =>
+          prev.map((t) =>
+            t.id === taskId ? { ...t, status: 'Completed', completedAt: new Date().toISOString() } : t
+          )
+        );
+      }
+      success('Task Completed', 'Follow-up marked done and logged to timeline.');
+    } catch {
+      setTasksList((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, status: 'Completed', completedAt: new Date().toISOString() } : t
+        )
+      );
+      success('Task Completed', 'Follow-up marked done.');
+    }
   };
 
   // Time-of-day greeting
@@ -173,7 +171,7 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   return (
     <div className="space-y-6 max-w-8xl mx-auto text-left">
       {/* 1. Executive Minimal Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 pb-4 border-b border-border">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">
@@ -193,15 +191,15 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
         </div>
 
         {/* Action Tools & Owner Switcher */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto min-w-0 max-w-full">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full sm:w-auto min-w-0">
           <DropdownMenu
             align="right"
             className="w-64 max-w-[calc(100vw-24px)] max-h-80 overflow-y-auto"
-            containerClassName="min-w-0 max-w-full"
+            containerClassName="flex-1 sm:flex-initial min-w-0"
             trigger={
               <button
                 type="button"
-                className="flex items-center gap-1.5 xs:gap-2 text-xs bg-surface border border-border hover:border-foreground/40 rounded-xl px-2.5 xs:px-3 py-2 shadow-xs transition-colors focus:outline-none cursor-pointer min-w-0 max-w-[140px] xs:max-w-[170px] sm:max-w-[200px]"
+                className="flex items-center gap-2 text-xs bg-surface border border-border hover:border-fairway-400 rounded-xl px-3 py-2 h-9 shadow-2xs transition-all focus:outline-none cursor-pointer w-full sm:w-auto min-w-0 max-w-full sm:max-w-[260px]"
               >
                 <User className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
                 <span className="text-foreground-muted font-medium shrink-0 hidden md:inline">Desk:</span>
@@ -236,13 +234,13 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             ))}
           </DropdownMenu>
 
-          {canEdit && (
+          {canCreate('inquiries') && (
             <Button
               size="sm"
               variant="primary"
               onClick={onOpenNewInquiry}
               leftIcon={<Plus className="w-4 h-4" />}
-              className="shadow-sm rounded-xl px-3 sm:px-4 py-2 font-bold text-xs shrink-0 whitespace-nowrap"
+              className="h-9 shadow-2xs rounded-xl px-3.5 sm:px-4 font-bold text-xs shrink-0 whitespace-nowrap"
             >
               New Inquiry
             </Button>
@@ -356,24 +354,28 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => onNavigate('pipeline')}
-              leftIcon={<ArrowUpRight className="w-3.5 h-3.5 text-foreground" />}
-              className="rounded-lg font-semibold text-xs"
-            >
-              Open Pipeline Board
-            </Button>
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => onNavigate('reports')}
-              leftIcon={<BarChart3 className="w-3.5 h-3.5 text-foreground" />}
-              className="rounded-lg font-semibold text-xs"
-            >
-              Reports & Graphs
-            </Button>
+            {canView('inquiries') && (
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => onNavigate('pipeline')}
+                leftIcon={<ArrowUpRight className="w-3.5 h-3.5 text-foreground" />}
+                className="rounded-lg font-semibold text-xs"
+              >
+                Open Pipeline Board
+              </Button>
+            )}
+            {canView('reports') && (
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => onNavigate('reports')}
+                leftIcon={<BarChart3 className="w-3.5 h-3.5 text-foreground" />}
+                className="rounded-lg font-semibold text-xs"
+              >
+                Reports & Graphs
+              </Button>
+            )}
           </div>
         </div>
 
@@ -589,7 +591,6 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
                 <div
                   key={inq.id}
                   onClick={() => {
-                    StorageService.upsertInquiry(inq);
                     onNavigate('inquiry_detail', inq.id);
                   }}
                   className="py-3 px-5 flex items-center justify-between hover:bg-surface-muted/50 cursor-pointer transition-colors group select-none"

@@ -13,6 +13,7 @@ export * from './UserAvatar';
 export * from './popover';
 export * from './calendar';
 export * from './DatePicker';
+export * from './TimePicker';
 export * from './chart';
 export * from './chart-area-interactive';
 export * from './chart-pie-donut-active';

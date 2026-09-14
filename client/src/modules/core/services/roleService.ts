@@ -161,6 +161,10 @@ export const RoleService = {
         return { success: false, error: data.error?.message || 'Failed to update role permissions' };
       }
 
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('fw_role_permissions_updated', { detail: { roleKey } }));
+      }
+
       return { success: true, message: data.message };
     } catch (err: any) {
       return { success: false, error: err.message };

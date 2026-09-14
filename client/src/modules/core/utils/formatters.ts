@@ -204,3 +204,14 @@ export function getPipelineStageBadge(stageKey: string) {
     label: config.label,
   };
 }
+
+export function normalizeCompanyName(name?: string): string {
+  if (!name || typeof name !== 'string') return '';
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\b(private\s+limited|pvt\.?\s*ltd\.?|limited|ltd\.?|llp|inc\.?|corp\.?|corporation|co\.?)\b/gi, '')
+    .replace(/[^a-z0-9]/gi, '')
+    .trim();
+}
+

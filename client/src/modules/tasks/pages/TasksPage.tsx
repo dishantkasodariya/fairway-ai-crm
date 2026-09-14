@@ -38,7 +38,6 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/modules/core/components/ui/tooltip';
-import { StorageService } from '@/modules/core/services/storageService';
 import { TaskService } from '@/modules/core/services/taskService';
 import { CompanyService } from '@/modules/core/services/companyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
@@ -51,9 +50,18 @@ import { Tabs } from '@/modules/core/components/ui/Tabs';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { Input, Select, Textarea } from '@/modules/core/components/ui/Input';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
+import { TimePicker } from '@/modules/core/components/ui/TimePicker';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
 import { UserCombobox } from '@/modules/core/components/ui/UserCombobox';
 import { Skeleton } from '@/modules/core/components/ui/Skeleton';
+import {
+  TasksList,
+  ColumnVisibility,
+  getTaskTypeIcon,
+  normalizeStatus,
+  getValidDueDate,
+} from '../components/TasksList';
+import { TasksCard } from '../components/TasksCard';
 import { cn } from '@/modules/core/lib/utils';
 
 export interface TaskListViewProps {
@@ -61,22 +69,11 @@ export interface TaskListViewProps {
   onNavigateToInquiry: (inquiryId: string) => void;
 }
 
-interface ColumnVisibility {
-  status: boolean;
-  description: boolean;
-  priority: boolean;
-  company: boolean;
-  inquiry: boolean;
-  dueDate: boolean;
-  assignee: boolean;
-  actions: boolean;
-}
-
 export const TaskListView: React.FC<TaskListViewProps> = ({
   onNavigateToCompany,
   onNavigateToInquiry,
 }) => {
-  const { canEdit, currentUser, users, isSales } = useAuth();
+  const { canEdit, canEditModule, currentUser, users, isSales, canCreate, canDeleteModule } = useAuth();
   const { success, error } = useToast();
 
   // Tab & View States
@@ -145,8 +142,23 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   const [newTaskForm, setNewTaskForm] = useState(getEmptyTaskForm);
   const [taskErrors, setTaskErrors] = useState<Record<string, string>>({});
 
+  // Edit Task States
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editTaskForm, setEditTaskForm] = useState(getEmptyTaskForm);
+  const [editTaskErrors, setEditTaskErrors] = useState<Record<string, string>>({});
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const clearTaskError = (field: string) => {
     setTaskErrors((prev) => {
+      if (!prev[field]) return prev;
+      const updated = { ...prev };
+      delete updated[field];
+      return updated;
+    });
+  };
+
+  const clearEditTaskError = (field: string) => {
+    setEditTaskErrors((prev) => {
       if (!prev[field]) return prev;
       const updated = { ...prev };
       delete updated[field];
@@ -159,13 +171,13 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     const fetchCompanies = async () => {
       try {
         const res = await CompanyService.getCompanies({ pageSize: 1000 });
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res.success && Array.isArray(res.data)) {
           setCompanies(res.data);
         } else {
-          setCompanies(StorageService.getCompanies());
+          setCompanies([]);
         }
       } catch {
-        setCompanies(StorageService.getCompanies());
+        setCompanies([]);
       }
     };
     fetchCompanies();
@@ -184,10 +196,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
           dueDate: getValidDueDate(t),
         }));
         setTasks(normalizedBackend);
-        StorageService.setTasks(normalizedBackend);
       } else {
         setTasks([]);
-        StorageService.setTasks([]);
       }
     } catch (err) {
       console.error('Failed to load tasks from backend:', err);
@@ -303,31 +313,24 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
           dueDate: getValidDueDate(res.data),
         };
         setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
-        StorageService.updateTask(id, updated);
+        success('Task Updated', 'Follow-up status synchronized.');
       } else {
-        const updatedLocal = StorageService.toggleTaskCompletion(id);
-        if (updatedLocal) {
-          setTasks((prev) => prev.map((t) => (t.id === id ? updatedLocal : t)));
-        }
+        error('Update Failed', res.error || 'Failed to update task');
       }
-    } catch {
-      const updatedLocal = StorageService.toggleTaskCompletion(id);
-      if (updatedLocal) {
-        setTasks((prev) => prev.map((t) => (t.id === id ? updatedLocal : t)));
-      }
+    } catch (err: any) {
+      error('Update Failed', err.message || 'Failed to update task');
     }
-    success('Task Updated', 'Follow-up status synchronized.');
   };
 
   const handleDeleteTask = async (id: string) => {
     try {
       await TaskService.deleteTask(id);
-    } catch (e) {
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+      success('Task Deleted', 'Follow-up task removed.');
+    } catch (e: any) {
       console.error('Backend deleteTask error:', e);
+      error('Delete Failed', e.message || 'Failed to delete task');
     }
-    StorageService.deleteTask(id);
-    setTasks((prev) => prev.filter((t) => t.id !== id));
-    success('Task Deleted', 'Follow-up task removed.');
   };
 
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -359,7 +362,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       return;
     }
 
-    const comp = companies.find((c) => c.id === newTaskForm.companyId) || StorageService.getCompanyById(newTaskForm.companyId);
+    const comp = companies.find((c) => c.id === newTaskForm.companyId);
     const assigned = users.find((u) => u.id === newTaskForm.assignedUserId) || currentUser;
 
     setIsSubmitting(true);
@@ -385,20 +388,89 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
           dueDate: getValidDueDate(res.data),
         };
         setTasks((prev) => [created, ...prev]);
-        StorageService.createTask(created);
+        setIsNewTaskOpen(false);
+        setNewTaskForm(getEmptyTaskForm());
+        setTaskErrors({});
+        success('Task Created', 'Follow-up task scheduled.');
       } else {
-        const localT = StorageService.createTask(taskData as any);
-        setTasks((prev) => [localT, ...prev]);
+        error('Create Failed', res.error || 'Failed to create task on backend');
       }
-
-      setIsNewTaskOpen(false);
-      setNewTaskForm(getEmptyTaskForm());
-      setTaskErrors({});
-      success('Task Created', 'Follow-up task scheduled.');
     } catch (err: any) {
       error('Error', err.message || 'Failed to create task.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenEditTask = (task: Task) => {
+    setEditingTask(task);
+    setEditTaskForm({
+      companyId: task.companyId || '',
+      taskType: (task.taskType || 'Follow-up') as Task['taskType'],
+      description: task.description || '',
+      dueDate: getValidDueDate(task),
+      dueTime: task.dueTime || '',
+      priority: (task.priority || 'Medium') as Task['priority'],
+      assignedUserId: task.assignedUserId || currentUser.id,
+    });
+    setEditTaskErrors({});
+  };
+
+  const handleUpdateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTask) return;
+
+    const errors: Record<string, string> = {};
+    if (!editTaskForm.companyId) errors.companyId = 'Please select a company';
+    if (!editTaskForm.taskType) errors.taskType = 'Task type is required';
+    if (!editTaskForm.priority) errors.priority = 'Priority is required';
+    if (!editTaskForm.dueDate) errors.dueDate = 'Due date is required';
+    if (!editTaskForm.assignedUserId) errors.assignedUserId = 'Assignee is required';
+    if (!editTaskForm.description || !editTaskForm.description.trim()) {
+      errors.description = 'Task description is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setEditTaskErrors(errors);
+      return;
+    }
+
+    const comp = companies.find((c) => c.id === editTaskForm.companyId);
+    const assigned = users.find((u) => u.id === editTaskForm.assignedUserId) || currentUser;
+
+    setIsUpdating(true);
+    try {
+      const taskData: Partial<Task> = {
+        companyId: comp?.id,
+        companyName: comp?.name,
+        assignedUserId: assigned.id,
+        assignedUserName: assigned.name,
+        taskType: editTaskForm.taskType as Task['taskType'],
+        description: editTaskForm.description.trim(),
+        dueDate: editTaskForm.dueDate,
+        dueTime: editTaskForm.dueTime || undefined,
+        priority: editTaskForm.priority as Task['priority'],
+      };
+
+      const res = await TaskService.updateTask(editingTask.id, taskData);
+      if (res.success && res.data) {
+        const updated = {
+          ...res.data,
+          status: normalizeStatus(res.data.status),
+          dueDate: getValidDueDate(res.data),
+        };
+        setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updated : t)));
+        setEditingTask(null);
+        setEditTaskForm(getEmptyTaskForm());
+        setEditTaskErrors({});
+        success('Task Updated', 'Follow-up task details updated.');
+      } else {
+        error('Update Failed', res.error || 'Failed to update task on backend');
+      }
+    } catch (err: any) {
+      error('Error', err.message || 'Failed to update task.');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -516,7 +588,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          {canEdit && (
+          {canCreate('tasks') && (
             <Button
               size="sm"
               variant="primary"
@@ -534,8 +606,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         </div>
       </div>
 
-      {/* Tabs Row with Horizontal Scroll for Mobile */}
-      <div className="w-full overflow-x-auto pb-0.5 -mx-1 px-1">
+      {/* Tabs Row with Mobile Previous / Next Arrows */}
+      <div className="w-full pb-0.5">
         <Tabs
           activeTab={activeTab}
           onChange={(id) => {
@@ -557,16 +629,16 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       </div>
 
       {/* Sleek Search & Control Toolbar matching reference */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+      <div className="flex items-center justify-between gap-2 sm:gap-3 pt-1 w-full">
         {/* Left: Search Bar */}
-        <div className="relative flex-1 w-full max-w-full sm:max-w-md">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5" />
+        <div className="relative flex-1 min-w-0 max-w-md">
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5 pointer-events-none" />
           <input
             type="text"
             placeholder="Search tasks, descriptions, companies, salesperson..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors h-9"
           />
           {searchQuery && (
             <button
@@ -582,7 +654,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
         {/* Right: Controls & View Switcher */}
         <TooltipProvider delayDuration={150}>
-          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Left on Mobile: Filter Drawer Trigger Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -609,23 +681,24 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
             {/* Right Group on Mobile: Column Settings, Refresh, and View Switcher (List / Card) */}
             <div className="flex items-center gap-2">
-              {/* Column Settings Dropdown */}
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Column
-                  </TooltipContent>
-                </Tooltip>
+              {/* Column Settings Dropdown (Desktop Only) */}
+              <div className="hidden sm:block">
+                <DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Column
+                    </TooltipContent>
+                  </Tooltip>
                 <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
                   <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
                     Toggle Columns
@@ -697,6 +770,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                   </DropdownMenuCheckboxItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
 
               {/* Refresh Button */}
               <Tooltip>
@@ -720,8 +794,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 </TooltipContent>
               </Tooltip>
 
-              {/* Segmented View Switcher (List / Card) */}
-              <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+              {/* Segmented View Switcher (List / Card) - Desktop Only */}
+              <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
@@ -769,31 +843,10 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
       {/* Main Content Area */}
       {isLoading || isRefreshing ? (
-        viewMode === 'list' ? (
-          <div className="bg-surface rounded-card border border-border shadow-subtle overflow-hidden divide-y divide-border animate-fade-in">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="p-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                  <Skeleton className="w-5 h-5 rounded-full shrink-0" />
-                  <Skeleton className="w-16 h-5 rounded-md shrink-0" />
-                  <div className="space-y-1.5 flex-1 max-w-md">
-                    <Skeleton className="h-4 w-full rounded" />
-                    <Skeleton className="h-3 w-3/4 rounded" />
-                  </div>
-                  <Skeleton className="w-24 h-4 rounded hidden md:block" />
-                  <Skeleton className="w-16 h-5 rounded-full hidden sm:block" />
-                  <Skeleton className="w-20 h-4 rounded hidden lg:block" />
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Skeleton className="w-6 h-6 rounded-full" />
-                  <Skeleton className="w-16 h-7 rounded-lg" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 animate-fade-in">
-            {Array.from({ length: 6 }).map((_, i) => (
+        <>
+          {/* Mobile view: Always render Card Skeletons */}
+          <div className="grid grid-cols-1 gap-3 sm:hidden animate-fade-in">
+            {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
                 className="bg-surface rounded-card border border-border p-4 shadow-subtle flex flex-col justify-between gap-3 text-left"
@@ -826,7 +879,69 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
               </div>
             ))}
           </div>
-        )
+
+          {/* Desktop view: Render based on viewMode */}
+          <div className="hidden sm:block">
+            {viewMode === 'list' ? (
+              <div className="bg-surface rounded-card border border-border shadow-subtle overflow-hidden divide-y divide-border animate-fade-in">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                      <Skeleton className="w-5 h-5 rounded-full shrink-0" />
+                      <Skeleton className="w-16 h-5 rounded-md shrink-0" />
+                      <div className="space-y-1.5 flex-1 max-w-md">
+                        <Skeleton className="h-4 w-full rounded" />
+                        <Skeleton className="h-3 w-3/4 rounded" />
+                      </div>
+                      <Skeleton className="w-24 h-4 rounded hidden md:block" />
+                      <Skeleton className="w-16 h-5 rounded-full hidden sm:block" />
+                      <Skeleton className="w-20 h-4 rounded hidden lg:block" />
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Skeleton className="w-6 h-6 rounded-full" />
+                      <Skeleton className="w-16 h-7 rounded-lg" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 animate-fade-in">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-surface rounded-card border border-border p-4 shadow-subtle flex flex-col justify-between gap-3 text-left"
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="w-16 h-5 rounded" />
+                        <Skeleton className="w-14 h-5 rounded-full" />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Skeleton className="w-5 h-5 rounded-full" />
+                        <Skeleton className="w-5 h-5 rounded-full" />
+                      </div>
+                    </div>
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-full rounded" />
+                      <Skeleton className="h-4 w-4/5 rounded" />
+                      <div className="space-y-1 pt-1">
+                        <Skeleton className="h-3.5 w-32 rounded" />
+                        <Skeleton className="h-3.5 w-24 rounded" />
+                      </div>
+                    </div>
+                    <div className="pt-2.5 border-t border-border/60 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="w-6 h-6 rounded-full" />
+                        <Skeleton className="w-20 h-3.5 rounded" />
+                      </div>
+                      <Skeleton className="w-20 h-7 rounded-lg" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       ) : filteredTasks.length === 0 ? (
         <div className="py-16 text-center text-xs text-foreground-muted bg-surface rounded-card border border-border shadow-subtle p-6">
           <CheckCircle2 className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
@@ -848,252 +963,47 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
             </Button>
           )}
         </div>
-      ) : viewMode === 'list' ? (
-        /* ================= VIEW MODE 1: LIST VIEW ================= */
-        <div className="bg-surface rounded-card border border-border shadow-subtle overflow-hidden divide-y divide-border">
-          {filteredTasks.map((t) => {
-            const isDone = normalizeStatus(t.status) === 'Completed';
-            const dueDateStr = getValidDueDate(t);
-            const isOverdue = !isDone && dueDateStr < todayStr;
-
-            return (
-              <div
-                key={t.id}
-                className={cn(
-                  "p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 hover:bg-surface-muted/50 transition-colors",
-                  isOverdue && "bg-rose-500/5 border-l-2 border-rose-500"
-                )}
-              >
-                <div className="flex items-start gap-3 sm:gap-3.5 min-w-0 flex-1">
-                  {columns.status && (
-                    <button
-                      onClick={() => handleToggleTask(t.id)}
-                      className="mt-0.5 text-foreground-muted hover:text-emerald-600 transition-colors shrink-0 cursor-pointer"
-                      title={isDone ? 'Mark as Pending' : 'Mark as Completed'}
-                    >
-                      <CheckCircle2
-                        className={cn(
-                          "w-5 h-5",
-                          isDone ? "text-emerald-600 fill-emerald-100 dark:fill-emerald-950/50" : "text-slate-400 hover:text-emerald-600"
-                        )}
-                      />
-                    </button>
-                  )}
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {t.taskType && (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-surface-muted px-2 py-0.5 rounded text-foreground border border-border/80">
-                          {getTaskTypeIcon(t.taskType)}
-                          <span>{t.taskType}</span>
-                        </span>
-                      )}
-
-                      {columns.description && (
-                        <span className={cn("text-xs font-semibold", isDone ? "line-through text-foreground-muted" : "text-foreground")}>
-                          {t.description}
-                        </span>
-                      )}
-
-                      {columns.priority && t.priority && (
-                        <Badge
-                          variant={t.priority === 'High' ? 'danger' : t.priority === 'Medium' ? 'warning' : 'default'}
-                          size="sm"
-                          dot
-                        >
-                          {t.priority}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 text-[11px] text-foreground-muted mt-1.5 flex-wrap">
-                      {columns.company && t.companyName && (
-                        <span
-                          onClick={() => t.companyId && onNavigateToCompany(t.companyId)}
-                          className="font-bold text-foreground hover:underline cursor-pointer flex items-center gap-1"
-                        >
-                          <Building2 className="w-3 h-3 text-foreground-muted" />
-                          <span>{t.companyName}</span>
-                        </span>
-                      )}
-
-                      {columns.inquiry && t.inquiryNumber && (
-                        <span
-                          onClick={() => t.inquiryId && onNavigateToInquiry(t.inquiryId)}
-                          className="font-mono bg-surface-muted px-1.5 py-0.2 rounded border border-border text-foreground hover:border-foreground/40 cursor-pointer"
-                        >
-                          {t.inquiryNumber}
-                        </span>
-                      )}
-
-                      {columns.dueDate && (
-                        <span className="flex items-center gap-1">
-                          <Clock className={cn("w-3 h-3", isOverdue ? "text-rose-600" : "text-foreground-muted")} />
-                          <span className={isOverdue ? "font-bold text-rose-600 dark:text-rose-400" : "text-foreground-muted"}>
-                            Due: {formatDate(dueDateStr)} {t.dueTime && `· ${t.dueTime}`} ({formatRelativeDate(dueDateStr)})
-                          </span>
-                        </span>
-                      )}
-
-                      {columns.assignee && t.assignedUserName && (
-                        <span className="flex items-center gap-1 text-foreground-muted">
-                          <User className="w-3 h-3 text-foreground-muted" />
-                          <span>{t.assignedUserName}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {columns.actions && (
-                  <div className="flex items-center justify-end sm:justify-start gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40 w-full sm:w-auto">
-                    <Button
-                      size="xs"
-                      variant={isDone ? 'outline' : 'primary'}
-                      onClick={() => handleToggleTask(t.id)}
-                      className="px-3"
-                    >
-                      {isDone ? 'Reopen' : 'Complete'}
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => handleDeleteTask(t.id)}
-                      title="Delete task"
-                      className="text-foreground-muted hover:text-rose-600 px-2"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       ) : (
-        /* ================= VIEW MODE 2: CARD / GRID VIEW ================= */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          {filteredTasks.map((t) => {
-            const isDone = normalizeStatus(t.status) === 'Completed';
-            const dueDateStr = getValidDueDate(t);
-            const isOverdue = !isDone && dueDateStr < todayStr;
+        <>
+          {/* Mobile view: ONLY Card View show, NOT list page show */}
+          <div className="block sm:hidden">
+            <TasksCard
+              tasks={filteredTasks}
+              todayStr={todayStr}
+              onToggleTask={handleToggleTask}
+              onEditTask={canEditModule('tasks') ? handleOpenEditTask : undefined}
+              onDeleteTask={canDeleteModule('tasks') ? handleDeleteTask : undefined}
+              onNavigateToCompany={onNavigateToCompany}
+              onNavigateToInquiry={onNavigateToInquiry}
+            />
+          </div>
 
-            return (
-              <div
-                key={t.id}
-                className={cn(
-                  "bg-surface rounded-card border border-border p-4 shadow-subtle hover:border-fairway-500/60 hover:shadow-md transition-all flex flex-col justify-between gap-3 text-left relative",
-                  isOverdue && "border-l-4 border-l-rose-500 bg-rose-500/[0.02]"
-                )}
-              >
-                {/* Card Top: Badges & Actions */}
-                <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2.5">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-surface-muted px-2 py-0.5 rounded text-foreground border border-border">
-                      {getTaskTypeIcon(t.taskType)}
-                      <span>{t.taskType || 'Task'}</span>
-                    </span>
-
-                    {t.priority && (
-                      <Badge
-                        variant={t.priority === 'High' ? 'danger' : t.priority === 'Medium' ? 'warning' : 'default'}
-                        size="sm"
-                        dot
-                      >
-                        {t.priority}
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleToggleTask(t.id)}
-                      className="p-1 text-foreground-muted hover:text-emerald-600 transition-colors rounded hover:bg-surface-muted cursor-pointer"
-                      title={isDone ? 'Mark Pending' : 'Mark Complete'}
-                    >
-                      <CheckCircle2
-                        className={cn(
-                          "w-4 h-4",
-                          isDone ? "text-emerald-600 fill-emerald-100 dark:fill-emerald-950/50" : "text-slate-400"
-                        )}
-                      />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTask(t.id)}
-                      className="p-1 text-foreground-muted hover:text-rose-600 transition-colors rounded hover:bg-surface-muted cursor-pointer"
-                      title="Delete task"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Card Body: Description & Details */}
-                <div className="space-y-2 flex-1">
-                  <p
-                    className={cn(
-                      "text-xs font-semibold line-clamp-2",
-                      isDone ? "line-through text-foreground-muted" : "text-foreground"
-                    )}
-                  >
-                    {t.description}
-                  </p>
-
-                  <div className="space-y-1 text-[11px]">
-                    {t.companyName && (
-                      <div
-                        onClick={() => t.companyId && onNavigateToCompany(t.companyId)}
-                        className="font-bold text-foreground hover:underline cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Building2 className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
-                        <span className="truncate">{t.companyName}</span>
-                      </div>
-                    )}
-
-                    {t.inquiryNumber && (
-                      <div className="flex items-center gap-1.5 pt-0.5">
-                        <span className="text-foreground-muted text-[10px]">Inquiry:</span>
-                        <span
-                          onClick={() => t.inquiryId && onNavigateToInquiry(t.inquiryId)}
-                          className="font-mono text-[10px] bg-surface-muted px-1.5 py-0.2 rounded border border-border text-foreground hover:border-foreground/40 cursor-pointer"
-                        >
-                          {t.inquiryNumber}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Card Footer: Due Date, Assignee & Action */}
-                <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2 text-[11px]">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1">
-                      <Clock className={cn("w-3 h-3 shrink-0", isOverdue ? "text-rose-600" : "text-foreground-muted")} />
-                      <span className={cn("truncate", isOverdue ? "font-bold text-rose-600 dark:text-rose-400" : "text-foreground-muted")}>
-                        {formatDate(dueDateStr)}
-                      </span>
-                    </div>
-                    {t.assignedUserName && (
-                      <div className="flex items-center gap-1 text-[10px] text-foreground-muted mt-0.5">
-                        <User className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{t.assignedUserName}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    size="xs"
-                    variant={isDone ? 'outline' : 'primary'}
-                    onClick={() => handleToggleTask(t.id)}
-                    className="shrink-0"
-                  >
-                    {isDone ? 'Reopen' : 'Complete'}
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          {/* Desktop view: Respects user viewMode (List vs Card) */}
+          <div className="hidden sm:block">
+            {viewMode === 'list' ? (
+              <TasksList
+                tasks={filteredTasks}
+                columns={columns}
+                todayStr={todayStr}
+                onToggleTask={handleToggleTask}
+                onEditTask={canEditModule('tasks') ? handleOpenEditTask : undefined}
+                onDeleteTask={canDeleteModule('tasks') ? handleDeleteTask : undefined}
+                onNavigateToCompany={onNavigateToCompany}
+                onNavigateToInquiry={onNavigateToInquiry}
+              />
+            ) : (
+              <TasksCard
+                tasks={filteredTasks}
+                todayStr={todayStr}
+                onToggleTask={handleToggleTask}
+                onEditTask={canEditModule('tasks') ? handleOpenEditTask : undefined}
+                onDeleteTask={canDeleteModule('tasks') ? handleDeleteTask : undefined}
+                onNavigateToCompany={onNavigateToCompany}
+                onNavigateToInquiry={onNavigateToInquiry}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {/* Advanced Filters Drawer (Right Slide-out matching reference) */}
@@ -1221,8 +1131,22 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         }}
         title="Create Follow-up Task"
         description="Schedule a sales call, proposal follow-up, or client meeting"
+        footer={
+          <div className="flex items-center justify-end gap-2.5 sm:gap-3 w-full">
+            <Button
+              type="submit"
+              form="new-task-form"
+              variant="primary"
+              size="sm"
+              disabled={isSubmitting}
+              className="w-full xs:w-auto"
+            >
+              {isSubmitting ? 'Scheduling...' : 'Schedule Task'}
+            </Button>
+          </div>
+        }
       >
-        <form onSubmit={handleCreateTask} noValidate className="space-y-4 text-xs text-left">
+        <form id="new-task-form" onSubmit={handleCreateTask} noValidate className="space-y-4 text-xs text-left">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground block">
               Linked Company <span className="text-rose-500 font-bold">*</span>
@@ -1315,11 +1239,11 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 error={taskErrors.dueDate}
               />
             </div>
-            <Input
+            <TimePicker
               label="Due Time"
               placeholder="e.g. 11:00 AM"
               value={newTaskForm.dueTime}
-              onChange={(e) => setNewTaskForm({ ...newTaskForm, dueTime: e.target.value })}
+              onChange={(timeStr) => setNewTaskForm({ ...newTaskForm, dueTime: timeStr })}
             />
           </div>
 
@@ -1359,23 +1283,181 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
               rows={3}
             />
           </div>
+        </form>
+      </Modal>
 
-          <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
+      {/* Edit Task Modal */}
+      <Modal
+        isOpen={!!editingTask}
+        onClose={() => {
+          setEditingTask(null);
+          setEditTaskErrors({});
+        }}
+        title="Edit Follow-up Task"
+        description="Update task details, schedule, priority, and salesperson."
+        footer={
+          <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 w-full">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => {
-                setIsNewTaskOpen(false);
-                setTaskErrors({});
+                setEditingTask(null);
+                setEditTaskErrors({});
               }}
               className="w-full xs:w-auto"
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" size="sm" disabled={isSubmitting} className="w-full xs:w-auto">
-              Schedule Task
+            <Button
+              type="submit"
+              form="edit-task-form"
+              variant="primary"
+              size="sm"
+              disabled={isUpdating}
+              className="w-full xs:w-auto"
+            >
+              {isUpdating ? 'Saving...' : 'Save Changes'}
             </Button>
+          </div>
+        }
+      >
+        <form id="edit-task-form" onSubmit={handleUpdateTask} className="space-y-4 pt-1 text-xs text-left">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground block">
+              Related Company <span className="text-rose-500 font-bold">*</span>
+            </label>
+            <Combobox
+              options={companies.map((c) => ({
+                value: c.id,
+                label: c.name,
+                description: `${c.city || 'Gujarat'} · ${c.industry || 'Industrial'}`,
+              }))}
+              value={editTaskForm.companyId}
+              onChange={(val) => {
+                setEditTaskForm({ ...editTaskForm, companyId: val });
+                clearEditTaskError('companyId');
+              }}
+              placeholder="Select company..."
+              searchPlaceholder="Search company..."
+              triggerClassName={editTaskErrors.companyId ? 'border-rose-500 ring-1 ring-rose-500' : ''}
+            />
+            {editTaskErrors.companyId && (
+              <p className="text-[11px] text-rose-500 font-medium">{editTaskErrors.companyId}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground block">
+                Task Type <span className="text-rose-500 font-bold">*</span>
+              </label>
+              <Combobox
+                options={[
+                  { value: 'Call', label: 'Call' },
+                  { value: 'Meeting', label: 'Meeting' },
+                  { value: 'Email', label: 'Email' },
+                  { value: 'Follow-up', label: 'Follow-up' },
+                  { value: 'Site Visit', label: 'Site Visit' },
+                  { value: 'Other', label: 'Other' },
+                ]}
+                value={editTaskForm.taskType}
+                onChange={(val) => {
+                  setEditTaskForm({ ...editTaskForm, taskType: val as any });
+                  clearEditTaskError('taskType');
+                }}
+                placeholder="Select task type..."
+                searchPlaceholder="Search task type..."
+                triggerClassName={editTaskErrors.taskType ? 'border-rose-500 ring-1 ring-rose-500' : ''}
+              />
+              {editTaskErrors.taskType && (
+                <p className="text-[11px] text-rose-500 font-medium">{editTaskErrors.taskType}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground block">
+                Priority <span className="text-rose-500 font-bold">*</span>
+              </label>
+              <Combobox
+                options={[
+                  { value: 'High', label: 'High' },
+                  { value: 'Medium', label: 'Medium' },
+                  { value: 'Low', label: 'Low' },
+                ]}
+                value={editTaskForm.priority}
+                onChange={(val) => {
+                  setEditTaskForm({ ...editTaskForm, priority: val as any });
+                  clearEditTaskError('priority');
+                }}
+                placeholder="Select priority..."
+                searchPlaceholder="Search priority..."
+                triggerClassName={editTaskErrors.priority ? 'border-rose-500 ring-1 ring-rose-500' : ''}
+              />
+              {editTaskErrors.priority && (
+                <p className="text-[11px] text-rose-500 font-medium">{editTaskErrors.priority}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground block">
+                Due Date <span className="text-rose-500 font-bold">*</span>
+              </label>
+              <DatePicker
+                value={editTaskForm.dueDate}
+                onChange={(dateStr) => {
+                  setEditTaskForm({ ...editTaskForm, dueDate: dateStr });
+                  clearEditTaskError('dueDate');
+                }}
+                placeholder="Select due date"
+                error={editTaskErrors.dueDate}
+              />
+            </div>
+            <TimePicker
+              label="Due Time"
+              placeholder="e.g. 11:00 AM"
+              value={editTaskForm.dueTime}
+              onChange={(timeStr) => setEditTaskForm({ ...editTaskForm, dueTime: timeStr })}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground block">
+              Assigned Salesperson <span className="text-rose-500 font-bold">*</span>
+            </label>
+            <UserCombobox
+              users={users}
+              value={editTaskForm.assignedUserId}
+              onChange={(val) => {
+                setEditTaskForm({ ...editTaskForm, assignedUserId: val });
+                clearEditTaskError('assignedUserId');
+              }}
+              placeholder="Select salesperson..."
+              searchPlaceholder="Search salespeople..."
+              triggerClassName={editTaskErrors.assignedUserId ? 'border-rose-500 ring-1 ring-rose-500' : ''}
+            />
+            {editTaskErrors.assignedUserId && (
+              <p className="text-[11px] text-rose-500 font-medium">{editTaskErrors.assignedUserId}</p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground block">
+              Task Description <span className="text-rose-500 font-bold">*</span>
+            </label>
+            <Textarea
+              placeholder="e.g. Call Rahul Shah regarding chemical containment and fire sprinkler approval..."
+              value={editTaskForm.description}
+              onChange={(e) => {
+                setEditTaskForm({ ...editTaskForm, description: e.target.value });
+                clearEditTaskError('description');
+              }}
+              className={editTaskErrors.description ? 'border-rose-500 ring-1 ring-rose-500' : ''}
+              error={editTaskErrors.description}
+              rows={3}
+            />
           </div>
         </form>
       </Modal>

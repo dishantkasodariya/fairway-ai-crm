@@ -22,7 +22,6 @@ import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
 import { Property, PropertyStatus } from '@/modules/core/types';
 import { PropertyService } from '@/modules/core/services/propertyService';
-import { StorageService } from '@/modules/core/services/storageService';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { formatINR, formatSqFt } from '@/modules/core/utils/formatters';
 
@@ -340,14 +339,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={onBack}
-              leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
-              className="border-border text-foreground hover:bg-surface-muted justify-center"
+              leftIcon={<ArrowLeft className="w-3.5 h-3.5 shrink-0" />}
+              className="w-full sm:w-auto border-border text-foreground hover:bg-surface-muted justify-center h-9"
             >
               Back
             </Button>

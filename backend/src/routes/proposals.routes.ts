@@ -7,14 +7,15 @@ import {
   updateProposal,
   deleteProposal,
 } from '../controllers/proposals.controller.js';
+import { requirePermission } from '../middleware/permission.middleware.js';
 
 const router = Router();
 
-router.get('/', getProposals);
-router.get('/:id', getProposalById);
-router.post('/', createProposal);
-router.patch('/:id/status', updateProposalStatus);
-router.put('/:id', updateProposal);
-router.delete('/:id', deleteProposal);
+router.get('/', requirePermission('proposals', 'view'), getProposals);
+router.get('/:id', requirePermission('proposals', 'view'), getProposalById);
+router.post('/', requirePermission('proposals', 'create'), createProposal);
+router.patch('/:id/status', requirePermission('proposals', 'edit'), updateProposalStatus);
+router.put('/:id', requirePermission('proposals', 'edit'), updateProposal);
+router.delete('/:id', requirePermission('proposals', 'delete'), deleteProposal);
 
 export default router;

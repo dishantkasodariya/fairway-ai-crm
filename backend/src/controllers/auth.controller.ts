@@ -34,7 +34,7 @@ const memoryUsers: Map<string, MemoryUser> = new Map([
       name: 'Amit Patel',
       email: 'amit@fairway.co.in',
       password: '',
-      role: 'super_admin',
+      role: 'admin',
       department: 'Executive Leadership',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       status: 'Active',
@@ -50,7 +50,7 @@ const memoryUsers: Map<string, MemoryUser> = new Map([
       name: 'Aryan Verma',
       email: 'aryan@fairway.co.in',
       password: '',
-      role: 'super_admin',
+      role: 'admin',
       department: 'Executive Leadership',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
       status: 'Active',
@@ -66,7 +66,7 @@ const memoryUsers: Map<string, MemoryUser> = new Map([
       name: 'Bhavya Sharma',
       email: 'bhavya@gmail.com',
       password: '', // will match on compare or fallback
-      role: 'super_admin',
+      role: 'management',
       department: 'Executive Leadership',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       status: 'Active',
@@ -82,7 +82,7 @@ const memoryUsers: Map<string, MemoryUser> = new Map([
       name: 'Bhavya Sharma',
       email: 'bhavya.sharma@fairwaylogistics.in',
       password: '',
-      role: 'super_admin',
+      role: 'management',
       department: 'Executive Leadership',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       status: 'Active',
@@ -114,7 +114,7 @@ const memoryUsers: Map<string, MemoryUser> = new Map([
       name: 'Dishant Patel (Super Admin)',
       email: 'admin@fairway.com',
       password: '',
-      role: 'super_admin',
+      role: 'admin',
       department: 'Executive Leadership',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       status: 'Active',
@@ -162,7 +162,7 @@ const memoryUsers: Map<string, MemoryUser> = new Map([
       name: 'Dishant Patel',
       email: 'dishant@fairway.co.in',
       password: '',
-      role: 'super_admin',
+      role: 'admin',
       department: 'Executive Leadership',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       status: 'Active',
@@ -178,7 +178,7 @@ const memoryUsers: Map<string, MemoryUser> = new Map([
       name: 'Pooja Hegde',
       email: 'sales@fairway.co.in',
       password: '',
-      role: 'sales',
+      role: 'admin',
       department: 'Gujarat Leasing Desk',
       avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
       status: 'Active',
@@ -192,13 +192,12 @@ const memoryUsers: Map<string, MemoryUser> = new Map([
 // Helper to sanitize user object for client response (camelCase & no password)
 const formatUserResponse = (row: any) => {
   if (!row) return null;
-  const email = (row.email || '').trim().toLowerCase();
-  const isSuperAdmin = email === 'amit@fairway.co.in' || email === 'aryan@fairway.co.in';
+  const rawRole = (row.role || 'admin').toString().trim().toLowerCase();
   return {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: isSuperAdmin ? 'super_admin' : (row.role || 'admin'),
+    role: rawRole,
     avatar: row.avatar || undefined,
     phone: row.phone || '+91 988496151',
     timezone: row.timezone || 'Asia/Kolkata',
@@ -206,7 +205,7 @@ const formatUserResponse = (row: any) => {
     workingHoursEnd: row.working_hours_end || '7:30 PM',
     twoFactorEnabled: row.two_factor_enabled === true || row.two_factor_enabled === 'true',
     birthDate: row.birth_date || undefined,
-    department: isSuperAdmin ? 'Executive Leadership' : (row.department || 'Industrial Leasing'),
+    department: row.department || 'Executive Leadership',
     status: row.status || 'Active',
     assignedLeadsCount: row.assigned_leads_count || 0,
     lastActive: row.last_active || new Date().toISOString(),

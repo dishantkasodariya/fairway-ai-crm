@@ -1198,7 +1198,7 @@ export class StorageService {
       id: `aud_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       userId: currentUser.id,
       userName: currentUser.name,
-      userRole: currentUser.role === 'super_admin' ? 'Super Admin' : currentUser.role === 'admin' ? 'Admin' : 'Sales',
+      userRole: currentUser.role ? currentUser.role.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'User',
       timestamp: new Date().toISOString(),
     };
     setStorageItem(STORAGE_KEYS.AUDIT_LOGS, [newLog, ...logs]);

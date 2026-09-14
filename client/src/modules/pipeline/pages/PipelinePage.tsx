@@ -22,7 +22,8 @@ import {
   Warehouse,
   X,
 } from 'lucide-react';
-import { StorageService } from '@/modules/core/services/storageService';
+import { PipelineStageService } from '@/modules/core/services/pipelineStageService';
+import { PIPELINE_STAGES } from '@/modules/core/data/seedData';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { Inquiry, PipelineStageKey, PipelineStageConfig, PriorityLevel } from '@/modules/core/types';
@@ -47,8 +48,8 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
   const { canEdit, currentUser, users, isSales } = useAuth();
   const { success, error } = useToast();
 
-  const [inquiries, setInquiries] = useState<Inquiry[]>(() => StorageService.getInquiries());
-  const stages = StorageService.getPipelineStages();
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [stages, setStages] = useState<PipelineStageConfig[]>(PIPELINE_STAGES);
 
   const [ownerFilter, setOwnerFilter] = useState<string>(isSales ? currentUser.id : 'all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -72,20 +73,51 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
 
   // Board Horizontal Scroll Ref
   const boardContainerRef = useRef<HTMLDivElement>(null);
+  const [activeVisibleStage, setActiveVisibleStage] = useState<string>('');
+
+  // Track active visible column on scroll for mobile pills indicator
+  useEffect(() => {
+    const container = boardContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const scrollLeft = container.scrollLeft;
+      const cols = container.querySelectorAll<HTMLElement>('[data-stage-key]');
+      let closestStage = '';
+      let minDistance = Infinity;
+
+      cols.forEach((col) => {
+        const offsetLeft = col.offsetLeft;
+        const distance = Math.abs(offsetLeft - scrollLeft);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestStage = col.getAttribute('data-stage-key') || '';
+        }
+      });
+
+      if (closestStage) {
+        setActiveVisibleStage(closestStage);
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [stages]);
 
   const refreshData = async () => {
-    const local = StorageService.getInquiries();
-    if (local && local.length > 0) {
-      setInquiries(local);
-    }
     try {
-      const res = await InquiryService.getInquiries({ pageSize: 500 });
-      if (res && res.data && res.data.length > 0) {
-        setInquiries(res.data);
-        StorageService.saveInquiries(res.data);
+      const [inqRes, stageRes] = await Promise.all([
+        InquiryService.getInquiries({ pageSize: 500 }),
+        PipelineStageService.getPipelineStages(),
+      ]);
+      if (inqRes && inqRes.data) {
+        setInquiries(inqRes.data);
       }
-    } catch {
-      // StorageService fallback active
+      if (stageRes && stageRes.success && stageRes.data && stageRes.data.length > 0) {
+        setStages(stageRes.data);
+      }
+    } catch (err) {
+      console.warn('Pipeline fetch error:', err);
     }
   };
 
@@ -172,7 +204,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
     const inqId = e.dataTransfer.getData('text/plain') || draggedInquiryId;
     if (!inqId) return;
 
-    const targetInq = inquiries.find((i) => i.id === inqId) || StorageService.getInquiryById(inqId);
+    const targetInq = inquiries.find((i) => i.id === inqId);
     if (!targetInq || targetInq.stage === targetStage) {
       setDraggedInquiryId(null);
       return;
@@ -196,10 +228,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
     );
     setDraggedInquiryId(null);
 
-    // 2. Persist locally to StorageService
-    StorageService.changeInquiryStage(inqId, targetStage);
-
-    // 3. Persist to Backend database via API
+    // 2. Persist to Backend database via API
     try {
       await InquiryService.updateInquiry(inqId, { stage: targetStage });
     } catch (err) {
@@ -229,10 +258,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
       prev.map((i) => (i.id === inq.id ? { ...i, stage: targetStage } : i))
     );
 
-    // 2. Local StorageService
-    StorageService.changeInquiryStage(inq.id, targetStage);
-
-    // 3. Backend API
+    // 2. Backend API
     try {
       await InquiryService.updateInquiry(inq.id, { stage: targetStage });
     } catch (err) {
@@ -254,7 +280,6 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
     setIsDeleting(true);
     try {
       await InquiryService.deleteInquiry(inquiryToDelete.id);
-      StorageService.deleteInquiry(inquiryToDelete.id);
       success('Inquiry Deleted', `Removed ${inquiryToDelete.inquiryNumber} (${inquiryToDelete.companyName}) from CRM pipeline.`);
       setIsDeleteModalOpen(false);
       setInquiryToDelete(null);
@@ -269,11 +294,21 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
   // Horizontal scroll controls
   const scrollBoard = (direction: 'left' | 'right') => {
     if (boardContainerRef.current) {
-      const scrollAmount = 340;
-      boardContainerRef.current.scrollBy({
+      const container = boardContainerRef.current;
+      const scrollAmount = Math.max(280, container.clientWidth * 0.75);
+      container.scrollBy({
         left: direction === 'left' ? -scrollAmount : scrollAmount,
         behavior: 'smooth',
       });
+    }
+  };
+
+  const scrollToStage = (stageKey: string) => {
+    if (!boardContainerRef.current) return;
+    const col = boardContainerRef.current.querySelector(`[data-stage-key="${stageKey}"]`) as HTMLElement;
+    if (col) {
+      col.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+      setActiveVisibleStage(stageKey);
     }
   };
 
@@ -282,28 +317,30 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden text-left space-y-3">
       {/* 1. Header Bar (Shrink-0) */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-border">
         <div>
-          <span className="text-[11px] font-bold text-fairway-700 dark:text-fairway-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Kanban className="w-3.5 h-3.5" />
+          <span className="text-[10px] sm:text-[11px] font-bold text-fairway-700 dark:text-fairway-400 uppercase tracking-wider flex items-center gap-1.5">
+            <Kanban className="w-3.5 h-3.5 shrink-0" />
             CRM / Visual Pipeline
           </span>
-          <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight flex items-center gap-2 mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight flex flex-wrap items-center gap-2 mt-0.5">
             <span>Sales Pipeline Kanban</span>
             {isSales && (
-              <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
                 My Leads
               </span>
             )}
           </h1>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full sm:w-auto">
+          <div className="text-left sm:text-right min-w-0 flex-1 sm:flex-none">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block whitespace-nowrap">
               Filtered Value ({filteredInquiries.length} leads)
             </span>
-            <span className="text-sm font-black text-foreground">{formatINR(totalBoardValue, true)} / mo</span>
+            <span className="text-xs sm:text-sm font-black text-foreground font-mono block truncate">
+              {formatINR(totalBoardValue, true)} / mo
+            </span>
           </div>
 
           {canEdit && (
@@ -311,8 +348,8 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
               size="sm"
               variant="primary"
               onClick={onOpenNewInquiry}
-              leftIcon={<Plus className="w-4 h-4" />}
-              className="rounded-xl px-3.5 py-1.5 font-bold shadow-xs shrink-0"
+              leftIcon={<Plus className="w-4 h-4 shrink-0" />}
+              className="rounded-xl px-3.5 py-1.5 font-bold shadow-xs justify-center shrink-0 h-9 sm:h-8 whitespace-nowrap"
             >
               New Inquiry
             </Button>
@@ -321,10 +358,10 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
       </div>
 
       {/* 2. Compact Filters & Horizontal Scroll Bar (Shrink-0) */}
-      <div className="shrink-0 bg-surface p-2.5 rounded-xl border border-border shadow-2xs flex flex-col md:flex-row items-center justify-between gap-2.5 text-xs">
-        {/* Left: Quick Search */}
-        <div className="flex items-center gap-2 w-full md:w-auto flex-1 max-w-sm">
-          <div className="relative w-full flex items-center">
+      <div className="shrink-0 bg-surface p-2 sm:p-2.5 rounded-xl border border-border shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 text-xs">
+        {/* Row 1 on Mobile/Tablet: Search Box + Scroll Buttons */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="relative flex-1 min-w-0 flex items-center">
             <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-2.5 pointer-events-none" />
             <input
               type="text"
@@ -343,11 +380,31 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
               </button>
             )}
           </div>
+
+          {/* On Mobile/Tablet: Board Navigation Buttons sit cleanly on Row 1 alongside Search */}
+          <div className="flex lg:hidden items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => scrollBoard('left')}
+              className="size-8 flex items-center justify-center rounded-lg border border-border bg-surface hover:bg-surface-muted text-foreground transition-colors cursor-pointer shadow-2xs active:scale-95"
+              title="Scroll Left"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollBoard('right')}
+              className="size-8 flex items-center justify-center rounded-lg border border-border bg-surface hover:bg-surface-muted text-foreground transition-colors cursor-pointer shadow-2xs active:scale-95"
+              title="Scroll Right"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Center: Dropdown Filters */}
-        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
-          <div className="w-44">
+        {/* Row 2 on Mobile: Dropdown Filters & Reset */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex-1 min-w-[125px] sm:w-44 sm:flex-initial">
             <Combobox
               options={[
                 { value: 'all', label: 'All Owners' },
@@ -359,7 +416,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
             />
           </div>
 
-          <div className="w-40">
+          <div className="flex-1 min-w-[125px] sm:w-40 sm:flex-initial">
             <Combobox
               options={[
                 { value: 'all', label: 'All Priorities' },
@@ -380,40 +437,69 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
                 setOwnerFilter(isSales ? currentUser.id : 'all');
                 setPriorityFilter('all');
               }}
-              className="text-fairway-700 dark:text-fairway-400 font-bold text-xs whitespace-nowrap px-2 hover:underline"
+              className="text-fairway-700 dark:text-fairway-400 font-bold text-xs whitespace-nowrap px-2 py-1 rounded hover:underline shrink-0"
             >
               Reset
             </button>
           )}
-        </div>
 
-        {/* Right: Board Horizontal Navigation Scroll Buttons */}
-        <div className="flex items-center gap-1.5 shrink-0 ml-auto md:ml-0">
-          <span className="text-[11px] text-foreground-muted mr-1 hidden lg:inline">Scroll Board:</span>
-          <button
-            type="button"
-            onClick={() => scrollBoard('left')}
-            className="p-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-foreground transition-colors cursor-pointer shadow-2xs"
-            title="Scroll Left"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollBoard('right')}
-            className="p-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-foreground transition-colors cursor-pointer shadow-2xs"
-            title="Scroll Right"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          {/* On Desktop (lg+): Board Horizontal Navigation Scroll Buttons */}
+          <div className="hidden lg:flex items-center gap-1.5 shrink-0 ml-2 pl-2 border-l border-border/80">
+            <span className="text-[11px] text-foreground-muted mr-0.5">Scroll:</span>
+            <button
+              type="button"
+              onClick={() => scrollBoard('left')}
+              className="size-7.5 flex items-center justify-center rounded-lg border border-border bg-surface hover:bg-surface-muted text-foreground transition-colors cursor-pointer shadow-2xs"
+              title="Scroll Left"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollBoard('right')}
+              className="size-7.5 flex items-center justify-center rounded-lg border border-border bg-surface hover:bg-surface-muted text-foreground transition-colors cursor-pointer shadow-2xs"
+              title="Scroll Right"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+      </div>
+
+      {/* Mobile/Tablet Stage Quick Switcher (Snap Carousel) */}
+      <div className="shrink-0 flex lg:hidden items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+        {stages.map((stage) => {
+          const colInquiries = filteredInquiries.filter((i) => i.stage === stage.key);
+          const isCurrent = (activeVisibleStage || stages[0]?.key) === stage.key;
+          return (
+            <button
+              key={stage.id}
+              type="button"
+              onClick={() => scrollToStage(stage.key)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all border cursor-pointer select-none active:scale-95 ${
+                isCurrent
+                  ? 'bg-surface text-foreground border-fairway-500 shadow-xs ring-1 ring-fairway-500/30'
+                  : 'bg-surface-muted/70 text-foreground-muted border-border hover:text-foreground'
+              }`}
+            >
+              <span
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{ backgroundColor: stage.color }}
+              />
+              <span>{stage.label}</span>
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-surface border border-border">
+                {colInquiries.length}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* 3. Screen-Height-Fit Kanban Board (Fills remaining height, horizontally scrolls) */}
       <div
         ref={boardContainerRef}
         onDragOver={handleBoardDragOver}
-        className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden pb-2.5 pt-0.5 select-none scroll-smooth"
+        className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden pb-2.5 pt-0.5 select-none scroll-smooth snap-x snap-mandatory sm:snap-none"
       >
         {stages.map((stage) => {
           const columnInquiries = filteredInquiries.filter((i) => i.stage === stage.key);
@@ -423,10 +509,11 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
           return (
             <div
               key={stage.id}
+              data-stage-key={stage.key}
               onDragOver={(e) => handleDragOver(e, stage.key)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, stage.key)}
-              className={`w-72 sm:w-80 shrink-0 h-full flex flex-col rounded-2xl border transition-all duration-150 ${
+              className={`w-[84vw] xs:w-[78vw] sm:w-80 shrink-0 h-full flex flex-col rounded-2xl border transition-all duration-150 snap-start sm:snap-align-none ${
                 isDropTarget
                   ? 'border-fairway-600 bg-fairway-500/5 ring-2 ring-fairway-500/30 scale-[1.01]'
                   : 'border-border bg-surface-muted/40'
@@ -479,7 +566,6 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
                         draggable={canEdit !== false}
                         onDragStart={(e) => handleDragStart(e, inq.id)}
                         onClick={() => {
-                          StorageService.upsertInquiry(inq);
                           onSelectInquiry(inq.id);
                         }}
                         className={`group relative bg-surface p-3.5 rounded-xl border border-border shadow-2xs hover:border-fairway-500/60 hover:shadow-md cursor-pointer transition-all duration-150 select-none ${
@@ -529,7 +615,6 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
                                   type="button"
                                   onClick={() => {
                                     setActiveCardMenuId(null);
-                                    StorageService.upsertInquiry(inq);
                                     onSelectInquiry(inq.id);
                                   }}
                                   className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-foreground hover:bg-surface-muted transition-colors"
@@ -666,11 +751,22 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
           onClose={() => setLostTargetInquiry(null)}
           inquiryNumber={lostTargetInquiry.inquiryNumber}
           companyName={lostTargetInquiry.companyName}
-          onConfirm={(data) => {
-            StorageService.markInquiryLost(lostTargetInquiry.id, data);
-            refreshData();
-            setLostTargetInquiry(null);
-            success('Marked Lost', `Reason recorded for ${lostTargetInquiry.inquiryNumber}`);
+          onConfirm={async (data) => {
+            try {
+              await InquiryService.updateInquiry(lostTargetInquiry.id, {
+                stage: 'lost',
+                status: 'Lost',
+                lostReason: data.lostReason,
+                lostComments: data.lostComments,
+                lostDate: data.lostDate,
+                closedByUserId: data.closedByUserId,
+              } as any);
+              await refreshData();
+              setLostTargetInquiry(null);
+              success('Marked Lost', `Reason recorded for ${lostTargetInquiry.inquiryNumber}`);
+            } catch (err: any) {
+              error('Update Failed', err.message || 'Failed to mark inquiry as lost');
+            }
           }}
         />
       )}
@@ -683,11 +779,23 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
           inquiryNumber={wonTargetInquiry.inquiryNumber}
           companyName={wonTargetInquiry.companyName}
           defaultMonthlyRent={wonTargetInquiry.budgetMonthlyINR}
-          onConfirm={(data) => {
-            StorageService.markInquiryWon(wonTargetInquiry.id, data);
-            refreshData();
-            setWonTargetInquiry(null);
-            success('Deal Won!', `Congratulations on converting ${wonTargetInquiry.companyName}!`);
+          onConfirm={async (data) => {
+            try {
+              await InquiryService.updateInquiry(wonTargetInquiry.id, {
+                stage: 'won',
+                status: 'Won',
+                wonPropertyId: data.wonPropertyId,
+                wonPropertyName: data.wonPropertyName,
+                wonFinalValueMonthlyINR: data.wonFinalValueMonthlyINR,
+                wonComments: data.wonComments,
+                wonDate: data.wonDate,
+              } as any);
+              await refreshData();
+              setWonTargetInquiry(null);
+              success('Deal Won!', `Congratulations on converting ${wonTargetInquiry.companyName}!`);
+            } catch (err: any) {
+              error('Update Failed', err.message || 'Failed to mark inquiry as won');
+            }
           }}
         />
       )}

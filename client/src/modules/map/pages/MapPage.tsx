@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Layers,
 } from 'lucide-react';
-import { StorageService } from '@/modules/core/services/storageService';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { FacilityService } from '@/modules/core/services/facilityService';
 import { Facility, Property } from '@/modules/core/types';
@@ -63,7 +62,7 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
   onNavigateToCompany,
   onNavigateToProperty,
 }) => {
-  const [facilities, setFacilities] = useState<Facility[]>(() => StorageService.getFacilities());
+  const [facilities, setFacilities] = useState<Facility[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
 
   useEffect(() => {

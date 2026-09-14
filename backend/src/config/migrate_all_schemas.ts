@@ -212,6 +212,180 @@ export async function runAllSchemaFixes() {
     `ALTER TABLE proposals ALTER COLUMN "depositMonths" DROP NOT NULL;`,
     `ALTER TABLE proposals ALTER COLUMN "leaseTenureYears" DROP NOT NULL;`,
     `ALTER TABLE proposals ALTER COLUMN "lockInPeriodMonths" DROP NOT NULL;`,
+
+    // 10. pipeline_stages table
+    `ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS key VARCHAR(100);`,
+    `ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS label VARCHAR(255);`,
+    `ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS bg_color VARCHAR(50) DEFAULT 'bg-slate-50';`,
+    `ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS text_color VARCHAR(50) DEFAULT 'text-slate-700';`,
+    `ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS border_color VARCHAR(50) DEFAULT 'border-slate-300';`,
+    `ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS stage_order INTEGER DEFAULT 1;`,
+    `ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS is_system BOOLEAN DEFAULT TRUE;`,
+    `ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
+    `ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
+    `ALTER TABLE pipeline_stages ALTER COLUMN code DROP NOT NULL;`,
+    `ALTER TABLE pipeline_stages ALTER COLUMN name DROP NOT NULL;`,
+    `ALTER TABLE pipeline_stages ALTER COLUMN "orderIndex" DROP NOT NULL;`,
+    `ALTER TABLE pipeline_stages ALTER COLUMN "createdAt" DROP NOT NULL;`,
+    `ALTER TABLE pipeline_stages ALTER COLUMN "updatedAt" DROP NOT NULL;`,
+    `ALTER TABLE pipeline_stages ALTER COLUMN "isWon" DROP NOT NULL;`,
+    `ALTER TABLE pipeline_stages ALTER COLUMN "isLost" DROP NOT NULL;`,
+    `ALTER TABLE pipeline_stages ALTER COLUMN "isActive" DROP NOT NULL;`,
+
+    // Backfill standard stages for pipeline_stages
+    `UPDATE pipeline_stages SET
+       key = 'new',
+       label = 'New Lead',
+       color = '#64748B',
+       bg_color = 'bg-slate-50',
+       text_color = 'text-slate-700',
+       border_color = 'border-slate-300',
+       description = 'Inquiry received, awaiting initial sales touchpoint.',
+       stage_order = 1,
+       is_system = true,
+       created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP),
+       updated_at = COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP)
+     WHERE code = 'NEW_INQUIRY' OR key = 'new';`,
+
+    `UPDATE pipeline_stages SET
+       key = 'contacted',
+       label = 'Contacted',
+       color = '#0284C7',
+       bg_color = 'bg-sky-50',
+       text_color = 'text-sky-700',
+       border_color = 'border-sky-300',
+       description = 'Initial interaction conducted via call, WhatsApp, or email.',
+       stage_order = 2,
+       is_system = true,
+       created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP),
+       updated_at = COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP)
+     WHERE code = 'CONTACT_ESTABLISHED' OR key = 'contacted';`,
+
+    `UPDATE pipeline_stages SET
+       key = 'requirement_confirmed',
+       label = 'Req. Confirmed',
+       color = '#4F46E5',
+       bg_color = 'bg-indigo-50',
+       text_color = 'text-indigo-700',
+       border_color = 'border-indigo-300',
+       description = 'Area, timeline, budget, and technical specs validated.',
+       stage_order = 3,
+       is_system = true,
+       created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP),
+       updated_at = COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP)
+     WHERE code = 'QUALIFIED' OR key = 'requirement_confirmed';`,
+
+    `UPDATE pipeline_stages SET
+       key = 'proposal',
+       label = 'Proposal Sent',
+       color = '#7C3AED',
+       bg_color = 'bg-purple-50',
+       text_color = 'text-purple-700',
+       border_color = 'border-purple-300',
+       description = 'Formal commercial proposal document drafted & delivered.',
+       stage_order = 6,
+       is_system = true,
+       created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP),
+       updated_at = COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP)
+     WHERE code = 'PROPOSAL' OR key = 'proposal';`,
+
+    `UPDATE pipeline_stages SET
+       key = 'site_visit',
+       label = 'Site Visit',
+       color = '#EA580C',
+       bg_color = 'bg-orange-50',
+       text_color = 'text-orange-700',
+       border_color = 'border-orange-300',
+       description = 'Site inspection scheduled or in progress at warehouse park.',
+       stage_order = 7,
+       is_system = true,
+       created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP),
+       updated_at = COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP)
+     WHERE code = 'SITE_VISIT' OR key = 'site_visit';`,
+
+    `UPDATE pipeline_stages SET
+       key = 'negotiation',
+       label = 'Negotiation',
+       color = '#D97706',
+       bg_color = 'bg-amber-50',
+       text_color = 'text-amber-700',
+       border_color = 'border-amber-300',
+       description = 'Commercial terms, lock-in, and lease duration under active review.',
+       stage_order = 8,
+       is_system = true,
+       created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP),
+       updated_at = COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP)
+     WHERE code = 'NEGOTIATION' OR key = 'negotiation';`,
+
+    `UPDATE pipeline_stages SET
+       key = 'won',
+       label = 'Won (Closed)',
+       color = '#059669',
+       bg_color = 'bg-green-100',
+       text_color = 'text-green-800',
+       border_color = 'border-green-400',
+       description = 'Lease agreement finalized and LOI signed.',
+       stage_order = 9,
+       is_system = true,
+       created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP),
+       updated_at = COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP)
+     WHERE code = 'WON' OR key = 'won';`,
+
+    `UPDATE pipeline_stages SET
+       key = 'lost',
+       label = 'Lost',
+       color = '#DC2626',
+       bg_color = 'bg-rose-50',
+       text_color = 'text-rose-700',
+       border_color = 'border-rose-300',
+       description = 'Lead dropped, postponed, or selected competitor facility.',
+       stage_order = 10,
+       is_system = true,
+       created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP),
+       updated_at = COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP)
+     WHERE code = 'LOST' OR key = 'lost';`,
+
+    // Insert property_matched and property_shared if missing
+    `INSERT INTO pipeline_stages (id, key, label, color, bg_color, text_color, border_color, description, stage_order, is_system, name, code, "orderIndex", created_at, updated_at)
+     SELECT 'stg_4', 'property_matched', 'Property Matched', '#0F6B4F', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-300', 'At least one Fairway warehouse park matched to requirement.', 4, true, 'Property Matched', 'PROPERTY_MATCHED', 4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+     WHERE NOT EXISTS (SELECT 1 FROM pipeline_stages WHERE key = 'property_matched' OR code = 'PROPERTY_MATCHED');`,
+
+    `INSERT INTO pipeline_stages (id, key, label, color, bg_color, text_color, border_color, description, stage_order, is_system, name, code, "orderIndex", created_at, updated_at)
+     SELECT 'stg_5', 'property_shared', 'Property Shared', '#0D9488', 'bg-teal-50', 'text-teal-700', 'border-teal-300', 'Brochure, specs, and layout shared with decision-maker.', 5, true, 'Property Shared', 'PROPERTY_SHARED', 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+     WHERE NOT EXISTS (SELECT 1 FROM pipeline_stages WHERE key = 'property_shared' OR code = 'PROPERTY_SHARED');`,
+
+     // Ensure any other row has key, label, stage_order populated
+    `UPDATE pipeline_stages SET
+       key = COALESCE(key, LOWER(code), id),
+       label = COALESCE(label, name, 'Stage'),
+       stage_order = COALESCE(stage_order, "orderIndex", 1),
+       is_system = COALESCE(is_system, true),
+       created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP),
+       updated_at = COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP)
+     WHERE key IS NULL OR label IS NULL OR stage_order IS NULL;`,
+
+    // 11. notifications table
+    `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS user_id VARCHAR(255);`,
+    `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS entity_type VARCHAR(100);`,
+    `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS entity_id VARCHAR(255);`,
+    `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE;`,
+    `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
+    `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;`,
+    `ALTER TABLE notifications ALTER COLUMN "userId" DROP NOT NULL;`,
+    `ALTER TABLE notifications ALTER COLUMN "type" DROP NOT NULL;`,
+    `ALTER TABLE notifications ALTER COLUMN "title" DROP NOT NULL;`,
+    `ALTER TABLE notifications ALTER COLUMN "message" DROP NOT NULL;`,
+    `ALTER TABLE notifications ALTER COLUMN "isRead" DROP NOT NULL;`,
+    `ALTER TABLE notifications ALTER COLUMN "createdAt" DROP NOT NULL;`,
+    `DO $$ 
+     BEGIN 
+       IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notifications' AND column_name = 'userId') THEN
+         UPDATE notifications SET 
+           user_id = COALESCE(user_id, "userId"),
+           is_read = COALESCE(is_read, "isRead", false),
+           created_at = COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP);
+       END IF;
+     END $$;`,
   ];
 
   for (const q of queries) {
@@ -252,6 +426,156 @@ export async function runAllSchemaFixes() {
         console.warn('Failed to insert default perm row:', err.message);
       }
     }
+  }
+
+  // Check if notifications needs default seeding
+  try {
+    const checkNotifs = await pool.query('SELECT COUNT(*) as count FROM notifications;');
+    if (parseInt(checkNotifs.rows[0]?.count || '0', 10) === 0) {
+      console.log('Seeding initial notifications...');
+      const defaultNotifs = [
+        ['notif_1', null, 'inquiry_assigned', 'New High-Priority Inquiry', 'Titan Warehousing inquiry (120,000 sq ft) assigned for Chakan Phase 2.', 'inquiry', 'inq_62cd9514', false],
+        ['notif_2', null, 'site_visit_upcoming', 'Upcoming Client Site Inspection', 'Site inspection scheduled tomorrow at 11:30 AM with Decathlon Logistics team at Talegaon Park.', 'site_visit', 'sv_1', false],
+        ['notif_3', null, 'proposal_updated', 'Commercial Proposal Accepted', 'Client approved standard lease terms for Mahindra Logistics Unit 4B.', 'proposal', 'prop_1', true],
+        ['notif_4', null, 'system', 'Fairway CRM Live System', 'Real-time pipeline analytics, WhatsApp alerts, and PDF proposals are active.', 'user', 'usr_amit_1', true],
+      ];
+
+      for (const row of defaultNotifs) {
+        try {
+          await pool.query(
+            `INSERT INTO notifications (id, user_id, type, title, message, entity_type, entity_id, is_read, "userId", "isRead", created_at, "createdAt")
+             VALUES ($1, $2::text, $3, $4, $5, $6, $7, $8, $2::text, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+            row
+          );
+        } catch (err: any) {
+          console.warn('Failed to insert default notification row:', err.message);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('Notifications check note:', err.message);
+  }
+
+  // Check if calls table exists and needs seeding
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS calls (
+        id VARCHAR(255) PRIMARY KEY,
+        call_for_type VARCHAR(50) DEFAULT 'Contact',
+        call_for_id VARCHAR(255),
+        call_for_name VARCHAR(255),
+        related_to_type VARCHAR(50) DEFAULT 'Account',
+        related_to_id VARCHAR(255),
+        related_to_name VARCHAR(255),
+        call_type VARCHAR(50) DEFAULT 'Outbound',
+        call_status VARCHAR(50) DEFAULT 'Scheduled',
+        call_start_date VARCHAR(50) DEFAULT CURRENT_DATE::text,
+        call_start_time VARCHAR(50) DEFAULT '06:00 PM',
+        call_duration VARCHAR(50) DEFAULT '00:15',
+        call_owner_id VARCHAR(255),
+        call_owner_name VARCHAR(255),
+        subject VARCHAR(255) NOT NULL,
+        call_purpose VARCHAR(100) DEFAULT 'Prospecting',
+        agenda TEXT,
+        call_result VARCHAR(100),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_calls_owner ON calls(call_owner_id);
+      CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(call_status);
+      CREATE INDEX IF NOT EXISTS idx_calls_date ON calls(call_start_date);
+    `);
+
+    const checkCalls = await pool.query('SELECT COUNT(*) as count FROM calls;');
+    if (parseInt(checkCalls.rows[0]?.count || '0', 10) === 0) {
+      console.log('Seeding initial demo calls matching reference...');
+      const defaultCalls = [
+        [
+          'call_1', 'Contact', 'cnt_1', 'Rajesh Patel', 'Account', 'comp_1', 'Reliance Petrochemicals',
+          'Inbound', 'Completed', '2026-08-23', '01:59 PM', '00:15',
+          'usr_amit_1', 'Harsheel Kasodariya', 'Call Customer on Potential', 'Prospecting',
+          'Client called regarding 75,000 sq ft warehouse expansion in Dahej PCPIR node. Discussed high power load and fire sprinkler specifications.',
+          'Interested - Needs Site Visit'
+        ],
+        [
+          'call_2', 'Lead', 'inq_62cd9514', 'Titan Warehousing Lead', 'Deal', 'inq_62cd9514', 'INQ-1048 Titan Expansion',
+          'Outbound', 'Scheduled', '2026-08-23', '05:59 PM', '00:10',
+          'usr_amit_1', 'Harsheel Kasodariya', 'Follow up with Lead', 'Follow-up',
+          'Scheduled follow-up call to review preliminary layout drawings and commercial lease pricing.',
+          'Pending Call'
+        ],
+        [
+          'call_3', 'Contact', 'cnt_2', 'Sunil Deshmukh', 'Account', 'comp_2', 'Tata Advanced Systems',
+          'Outbound', 'Completed', '2026-08-24', '11:30 AM', '00:20',
+          'usr_sales_1', 'Pooja Hegde', 'Technical discussion on Clear Height & Apron', 'Project Demo',
+          'Reviewed 12m clear height and trailer turning apron radius requirement with client engineering head.',
+          'Positive - Specs Approved'
+        ],
+        [
+          'call_4', 'Lead', 'inq_2', 'Adani Ports Logistics Lead', 'Deal', 'inq_2', 'INQ-1049 Adani Cold Chain',
+          'Inbound', 'Scheduled', '2026-08-25', '04:00 PM', '00:30',
+          'usr_amit_1', 'Amit Patel', 'Commercial proposal review & negotiation', 'Negotiation',
+          'Scheduled conference call with CFO and procurement team to negotiate lease escalation and lock-in period.',
+          'Scheduled'
+        ],
+      ];
+
+      for (const row of defaultCalls) {
+        try {
+          await pool.query(
+            `INSERT INTO calls (
+              id, call_for_type, call_for_id, call_for_name,
+              related_to_type, related_to_id, related_to_name,
+              call_type, call_status, call_start_date, call_start_time, call_duration,
+              call_owner_id, call_owner_name, subject, call_purpose, agenda, call_result,
+              created_at, updated_at
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            );`,
+            row
+          );
+        } catch (err: any) {
+          console.warn('Failed to insert default call:', err.message);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('Calls table initialization note:', err.message);
+  }
+
+  // 17. site_visits table
+  try {
+    await pool.query(`
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS inquiry_id VARCHAR(255);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS inquiry_number VARCHAR(50);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS company_id VARCHAR(255);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS property_id VARCHAR(255);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS property_name VARCHAR(255);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS scheduled_date VARCHAR(50);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS scheduled_time VARCHAR(50) DEFAULT '11:00 AM';
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS host_user_id VARCHAR(255);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS host_user_name VARCHAR(255);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS visitor_name VARCHAR(255);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS visitor_phone VARCHAR(50);
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Scheduled';
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS client_feedback TEXT;
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS follow_up_action TEXT;
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `);
+
+    const legacyCols = ['updatedAt', 'visitDate', 'followUpRequired', 'createdAt', 'contactId', 'salespersonId', 'feedback', 'clientAttendees', 'inquiryId', 'propertyId', 'companyId'];
+    for (const col of legacyCols) {
+      try {
+        await pool.query(`ALTER TABLE site_visits ALTER COLUMN "${col}" DROP NOT NULL;`);
+      } catch {
+        // column may not exist or already nullable
+      }
+    }
+  } catch (err: any) {
+    console.warn('site_visits table alignment note:', err.message);
   }
 
   console.log('✓ All database schemas successfully aligned and verified.');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   Building2,
@@ -23,13 +23,17 @@ import {
   ExternalLink,
   User,
 } from 'lucide-react';
-import { StorageService } from '@/modules/core/services/storageService';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { TaskService } from '@/modules/core/services/taskService';
 import { ProposalService } from '@/modules/core/services/proposalService';
+import { SiteVisitsService } from '@/modules/core/services/siteVisitsService';
+import { PropertyService } from '@/modules/core/services/propertyService';
+import { ActivityService } from '@/modules/core/services/activityService';
+import { PipelineStageService } from '@/modules/core/services/pipelineStageService';
+import { matchPropertiesForInquiry } from '@/modules/core/utils/propertyMatcher';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
-import { Inquiry, PropertyMatchResult, Proposal, SiteVisit, PipelineStageKey, Task, Activity } from '@/modules/core/types';
+import { Inquiry, PropertyMatchResult, Proposal, SiteVisit, PipelineStageKey, PipelineStageConfig, Task, Activity, Property } from '@/modules/core/types';
 import { formatINR, formatSqFt, formatDate, formatRelativeDate, getPriorityBadge, getPipelineStageBadge } from '@/modules/core/utils/formatters';
 import { downloadProposalPDF } from '@/modules/core/utils/proposalPdfGenerator';
 import { Button } from '@/modules/core/components/ui/Button';
@@ -39,9 +43,10 @@ import { Breadcrumbs } from '@/modules/core/components/ui/Breadcrumbs';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { Input, Select, Textarea } from '@/modules/core/components/ui/Input';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
+import { TimePicker } from '@/modules/core/components/ui/TimePicker';
 import { LostReasonModal } from '@/modules/core/components/LostReasonModal';
-
 import { WonCelebrationModal } from '@/modules/core/components/WonCelebrationModal';
+import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
 
 export interface InquiryDetailViewProps {
   inquiryId: string;
@@ -61,88 +66,82 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
   const { canEdit, currentUser, users } = useAuth();
   const { success, error } = useToast();
 
-  const initialCached = StorageService.getInquiryById(inquiryId);
-  const [loading, setLoading] = useState(!initialCached);
-  const [inquiry, setInquiry] = useState<Inquiry | undefined>(initialCached);
-  const [propertyMatches, setPropertyMatches] = useState<PropertyMatchResult[]>(
-    initialCached ? StorageService.matchPropertiesForInquiry(initialCached) : []
-  );
-  const [proposals, setProposals] = useState<Proposal[]>(
-    initialCached ? StorageService.getProposals().filter((p) => p.inquiryId === initialCached.id) : []
-  );
-  const [siteVisits, setSiteVisits] = useState<SiteVisit[]>(
-    initialCached ? StorageService.getSiteVisits().filter((s) => s.inquiryId === initialCached.id) : []
-  );
-  const [tasks, setTasks] = useState<Task[]>(
-    initialCached ? StorageService.getTasks().filter((t) => t.inquiryId === initialCached.id) : []
-  );
-  const [activities, setActivities] = useState<Activity[]>(
-    initialCached ? StorageService.getActivities(initialCached.companyId).filter((a) => !a.inquiryId || a.inquiryId === initialCached.id) : []
-  );
+  const [loading, setLoading] = useState(true);
+  const [inquiry, setInquiry] = useState<Inquiry | undefined>(undefined);
+  const [propertyMatches, setPropertyMatches] = useState<PropertyMatchResult[]>([]);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [siteVisits, setSiteVisits] = useState<SiteVisit[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [pipelineStages, setPipelineStages] = useState<PipelineStageConfig[]>([]);
+
+  const refreshData = async () => {
+    try {
+      const [inqRes, propRes, visitRes, taskRes, actRes, catalogRes, stagesRes] = await Promise.allSettled([
+        InquiryService.getInquiryById(inquiryId),
+        ProposalService.getProposals({ inquiryId }),
+        SiteVisitsService.getSiteVisits({ inquiryId }),
+        TaskService.getTasks({ inquiryId }),
+        ActivityService.getActivities({ inquiryId }),
+        PropertyService.getProperties(),
+        PipelineStageService.getPipelineStages(),
+      ]);
+
+      let loadedInquiry: Inquiry | undefined;
+      let loadedProps: Property[] = [];
+
+      if (inqRes.status === 'fulfilled' && inqRes.value.success && inqRes.value.data) {
+        loadedInquiry = inqRes.value.data;
+        setInquiry(loadedInquiry);
+      }
+
+      if (propRes.status === 'fulfilled' && propRes.value.success && propRes.value.data) {
+        setProposals(propRes.value.data);
+      }
+
+      if (visitRes.status === 'fulfilled' && visitRes.value.success && visitRes.value.data) {
+        setSiteVisits(visitRes.value.data);
+      }
+
+      if (taskRes.status === 'fulfilled' && taskRes.value.success && taskRes.value.data) {
+        setTasks(taskRes.value.data);
+      }
+
+      if (actRes.status === 'fulfilled' && actRes.value.success && actRes.value.data) {
+        setActivities(actRes.value.data);
+      }
+
+      if (catalogRes.status === 'fulfilled' && catalogRes.value.success && catalogRes.value.data) {
+        loadedProps = catalogRes.value.data;
+        setProperties(loadedProps);
+      }
+
+      if (stagesRes.status === 'fulfilled' && stagesRes.value.success && stagesRes.value.data) {
+        setPipelineStages(stagesRes.value.data);
+      }
+
+      if (loadedInquiry) {
+        setPropertyMatches(matchPropertiesForInquiry(loadedInquiry, loadedProps));
+      }
+    } catch (err) {
+      console.error('Failed to load inquiry details from backend:', err);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
-    const fetchInquiry = async () => {
-      // 1. Check local cache first so UI responds immediately
-      const cached = StorageService.getInquiryById(inquiryId);
-      if (cached && isMounted) {
-        setInquiry(cached);
-        setPropertyMatches(StorageService.matchPropertiesForInquiry(cached));
-        setProposals(StorageService.getProposals().filter((p) => p.inquiryId === cached.id));
-        setSiteVisits(StorageService.getSiteVisits().filter((s) => s.inquiryId === cached.id));
-        setTasks(StorageService.getTasks().filter((t) => t.inquiryId === cached.id));
-        setActivities(
-          StorageService.getActivities(cached.companyId).filter((a) => !a.inquiryId || a.inquiryId === cached.id)
-        );
-        setLoading(false);
-      } else {
-        setLoading(true);
-      }
-
-      try {
-        // 2. Fetch latest data from backend API
-        const res = await InquiryService.getInquiryById(inquiryId);
-        if (isMounted && res.success && res.data) {
-          setInquiry(res.data);
-          StorageService.upsertInquiry(res.data);
-          setPropertyMatches(StorageService.matchPropertiesForInquiry(res.data));
-          setProposals(StorageService.getProposals().filter((p) => p.inquiryId === res.data!.id));
-          setSiteVisits(StorageService.getSiteVisits().filter((s) => s.inquiryId === res.data!.id));
-          setTasks(StorageService.getTasks().filter((t) => t.inquiryId === res.data!.id));
-          setActivities(
-            StorageService.getActivities(res.data!.companyId).filter((a) => !a.inquiryId || a.inquiryId === res.data!.id)
-          );
-        } else if (isMounted && !cached) {
-          const localInq = StorageService.getInquiryById(inquiryId);
-          if (localInq) {
-            setInquiry(localInq);
-            setPropertyMatches(StorageService.matchPropertiesForInquiry(localInq));
-            setProposals(StorageService.getProposals().filter((p) => p.inquiryId === localInq.id));
-            setSiteVisits(StorageService.getSiteVisits().filter((s) => s.inquiryId === localInq.id));
-            setTasks(StorageService.getTasks().filter((t) => t.inquiryId === localInq.id));
-            setActivities(
-              StorageService.getActivities(localInq.companyId).filter((a) => !a.inquiryId || a.inquiryId === localInq.id)
-            );
-          }
-        }
-      } catch (err) {
-        console.warn('Inquiry detail fetch error:', err);
-        if (isMounted) {
-          const localInq = StorageService.getInquiryById(inquiryId);
-          if (localInq) setInquiry(localInq);
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
+    const fetchInitial = async () => {
+      setLoading(true);
+      await refreshData();
+      if (isMounted) setLoading(false);
     };
 
-    fetchInquiry();
+    fetchInitial();
     return () => {
       isMounted = false;
     };
   }, [inquiryId]);
-
-  const pipelineStages = StorageService.getPipelineStages();
 
   // Modals state
   const [isLostModalOpen, setIsLostModalOpen] = useState(false);
@@ -172,6 +171,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
     visitDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
     visitTime: '11:00 AM',
     notes: 'Joint walkthrough with plant engineering lead and safety inspector.',
+    hostUserId: '',
   });
 
   // Task form
@@ -181,21 +181,18 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
     dueDate: new Date().toISOString().split('T')[0],
     dueTime: '11:00 AM',
     priority: 'High' as Task['priority'],
+    assignedUserId: '',
   });
 
-  const refreshData = () => {
-    const updated = StorageService.getInquiryById(inquiryId);
-    if (updated) {
-      setInquiry(updated);
-      setPropertyMatches(StorageService.matchPropertiesForInquiry(updated));
-      setProposals(StorageService.getProposals().filter((p) => p.inquiryId === updated.id));
-      setSiteVisits(StorageService.getSiteVisits().filter((s) => s.inquiryId === updated.id));
-      setTasks(StorageService.getTasks().filter((t) => t.inquiryId === updated.id));
-      setActivities(
-        StorageService.getActivities(updated.companyId).filter((a) => !a.inquiryId || a.inquiryId === updated.id)
-      );
-    }
-  };
+  const userComboboxOptions = useMemo<ComboboxOption[]>(() => {
+    return users.map((u) => ({
+      value: u.id,
+      label: u.name,
+      description: u.role,
+      avatar: u.avatar,
+      initials: u.name?.slice(0, 2).toUpperCase(),
+    }));
+  }, [users]);
 
   if (loading && !inquiry) {
     return (
@@ -219,7 +216,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
   }
 
   // Stage change handler
-  const handleStageChange = (newStage: PipelineStageKey) => {
+  const handleStageChange = async (newStage: PipelineStageKey) => {
     if (newStage === 'lost') {
       setIsLostModalOpen(true);
       return;
@@ -229,29 +226,47 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
       return;
     }
 
-    StorageService.changeInquiryStage(inquiry.id, newStage);
-    refreshData();
-    success('Stage Updated', `Inquiry advanced to ${newStage.replace(/_/g, ' ').toUpperCase()}`);
+    try {
+      await InquiryService.updateInquiry(inquiry.id, { stage: newStage });
+      await refreshData();
+      success('Stage Updated', `Inquiry advanced to ${newStage.replace(/_/g, ' ').toUpperCase()}`);
+    } catch (err: any) {
+      error('Stage Update Failed', err.message || 'Error updating stage');
+    }
   };
 
   // Lost Confirmation
-  const handleConfirmLost = (data: { lostReason: string; lostComments: string; lostDate: string; closedByUserId: string }) => {
-    StorageService.markInquiryLost(inquiry.id, data);
-    refreshData();
-    success('Opportunity Marked Lost', `Reason recorded: ${data.lostReason}`);
+  const handleConfirmLost = async (data: { lostReason: string; lostComments: string; lostDate: string; closedByUserId: string }) => {
+    try {
+      await InquiryService.updateInquiry(inquiry.id, {
+        stage: 'lost',
+        specialRequirements: `Lost Reason: ${data.lostReason}. Notes: ${data.lostComments}`,
+      });
+      await refreshData();
+      success('Opportunity Marked Lost', `Reason recorded: ${data.lostReason}`);
+    } catch (err: any) {
+      error('Update Failed', err.message || 'Could not record lost deal');
+    }
   };
 
   // Won Confirmation
-  const handleConfirmWon = (data: { wonPropertyId: string; wonPropertyName: string; wonFinalValueMonthlyINR: number; wonComments: string; wonDate: string }) => {
-    StorageService.markInquiryWon(inquiry.id, data);
-    refreshData();
-    success('Deal Won!', `Lease finalized for ${data.wonPropertyName}`);
+  const handleConfirmWon = async (data: { wonPropertyId: string; wonPropertyName: string; wonFinalValueMonthlyINR: number; wonComments: string; wonDate: string }) => {
+    try {
+      await InquiryService.updateInquiry(inquiry.id, {
+        stage: 'won',
+        budgetMonthlyINR: data.wonFinalValueMonthlyINR,
+      });
+      await refreshData();
+      success('Deal Won!', `Lease finalized for ${data.wonPropertyName}`);
+    } catch (err: any) {
+      error('Update Failed', err.message || 'Could not record won deal');
+    }
   };
 
   // Proposal Creation
   const handleCreateProposal = async (e: React.FormEvent) => {
     e.preventDefault();
-    const prop = StorageService.getPropertyById(proposalForm.propertyId) || propertyMatches[0]?.property;
+    const prop = properties.find((p) => p.id === proposalForm.propertyId) || propertyMatches[0]?.property;
     if (!prop) return;
 
     const totalMonthlyRentINR = proposalForm.proposedAreaSqFt * (proposalForm.baseRentPerSqFtINR + proposalForm.maintenancePerSqFtINR);
@@ -286,111 +301,93 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
         createdByUserName: currentUser.name,
       });
 
-      if (res.success && res.data) {
-        try {
-          StorageService.createProposal(res.data);
-        } catch {}
-      } else {
-        StorageService.createProposal({
-          inquiryId: inquiry.id,
-          inquiryNumber: inquiry.inquiryNumber,
-          companyId: inquiry.companyId,
-          companyName: inquiry.companyName,
-          contactName: inquiry.contactName,
-          propertyId: prop.id,
-          propertyName: prop.name,
-          proposedAreaSqFt: proposalForm.proposedAreaSqFt,
-          baseRentPerSqFtINR: proposalForm.baseRentPerSqFtINR,
-          maintenancePerSqFtINR: proposalForm.maintenancePerSqFtINR,
-          totalMonthlyRentINR,
-          securityDepositMonths: proposalForm.securityDepositMonths,
-          totalDepositINR,
-          leaseTenureYears: proposalForm.leaseTenureYears,
-          lockInMonths: proposalForm.lockInMonths,
-          escalationPercentPerYear: proposalForm.escalationPercentPerYear,
-          possessionDate: proposalForm.possessionDate,
-          commercialTerms: proposalForm.commercialTerms,
-          proposalDate: new Date().toISOString().split('T')[0],
-          expiryDate: proposalForm.expiryDate,
-          status: 'Sent',
-          documentName: `Fairway_Proposal_${inquiry.inquiryNumber}_${prop.code}.pdf`,
-          documentSize: '2.8 MB',
-          createdByUserId: currentUser.id,
-          createdByUserName: currentUser.name,
-        });
+      if (!res.success) {
+        error('Proposal Creation Failed', res.error || 'Server error creating proposal');
+        return;
       }
-    } catch {
-      StorageService.createProposal({
+
+      if (inquiry.stage !== 'proposal' && inquiry.stage !== 'negotiation' && inquiry.stage !== 'won') {
+        await InquiryService.updateInquiry(inquiry.id, { stage: 'proposal' });
+      }
+
+      setIsProposalModalOpen(false);
+      await refreshData();
+      success('Proposal Created & Sent', `Delivered commercial proposal for ${prop.name}`);
+    } catch (err: any) {
+      error('Proposal Error', err.message || 'Failed communicating with backend');
+    }
+  };
+
+  // Reassign Salesperson Handler
+  const handleReassignSalesperson = async (newSalespersonId: string) => {
+    if (!inquiry || !newSalespersonId || newSalespersonId === inquiry.salespersonId) return;
+    const targetUser = users.find((u) => u.id === newSalespersonId);
+    const newSalespersonName = targetUser ? targetUser.name : 'Unknown';
+    try {
+      const res = await InquiryService.updateInquiry(inquiry.id, {
+        salespersonId: newSalespersonId,
+        salespersonName: newSalespersonName,
+      });
+      if (res.success) {
+        setInquiry((prev) => (prev ? { ...prev, salespersonId: newSalespersonId, salespersonName: newSalespersonName } : prev));
+        success('Sales Owner Updated', `Inquiry assigned to ${newSalespersonName}`);
+        refreshData();
+      } else {
+        error('Reassignment Failed', res.error || 'Could not reassign salesperson');
+      }
+    } catch (err: any) {
+      error('Reassignment Failed', err.message || 'Error updating salesperson');
+    }
+  };
+
+  // Site Visit Creation
+  const handleCreateSiteVisit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const prop = properties.find((p) => p.id === siteVisitForm.propertyId) || propertyMatches[0]?.property;
+    if (!prop) return;
+
+    const hostUser = users.find((u) => u.id === (siteVisitForm.hostUserId || inquiry.salespersonId)) || currentUser;
+
+    try {
+      const res = await SiteVisitsService.createSiteVisit({
         inquiryId: inquiry.id,
         inquiryNumber: inquiry.inquiryNumber,
         companyId: inquiry.companyId,
         companyName: inquiry.companyName,
-        contactName: inquiry.contactName,
+        visitorName: inquiry.contactName,
+        visitorPhone: inquiry.contactPhone,
         propertyId: prop.id,
         propertyName: prop.name,
-        proposedAreaSqFt: proposalForm.proposedAreaSqFt,
-        baseRentPerSqFtINR: proposalForm.baseRentPerSqFtINR,
-        maintenancePerSqFtINR: proposalForm.maintenancePerSqFtINR,
-        totalMonthlyRentINR,
-        securityDepositMonths: proposalForm.securityDepositMonths,
-        totalDepositINR,
-        leaseTenureYears: proposalForm.leaseTenureYears,
-        lockInMonths: proposalForm.lockInMonths,
-        escalationPercentPerYear: proposalForm.escalationPercentPerYear,
-        possessionDate: proposalForm.possessionDate,
-        commercialTerms: proposalForm.commercialTerms,
-        proposalDate: new Date().toISOString().split('T')[0],
-        expiryDate: proposalForm.expiryDate,
-        status: 'Sent',
-        documentName: `Fairway_Proposal_${inquiry.inquiryNumber}_${prop.code}.pdf`,
-        documentSize: '2.8 MB',
-        createdByUserId: currentUser.id,
-        createdByUserName: currentUser.name,
+        scheduledDate: siteVisitForm.visitDate,
+        scheduledTime: siteVisitForm.visitTime,
+        hostUserId: hostUser?.id || inquiry.salespersonId,
+        hostUserName: hostUser?.name || inquiry.salespersonName,
+        status: 'Scheduled',
+        followUpAction: siteVisitForm.notes,
       });
+
+      if (!res.success) {
+        error('Site Visit Failed', res.error || 'Server error creating site visit');
+        return;
+      }
+
+      if (inquiry.stage !== 'site_visit' && inquiry.stage !== 'negotiation' && inquiry.stage !== 'won') {
+        await InquiryService.updateInquiry(inquiry.id, { stage: 'site_visit' });
+      }
+
+      setIsSiteVisitModalOpen(false);
+      setSiteVisitForm({
+        propertyId: propertyMatches[0]?.property.id || '',
+        visitDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+        visitTime: '11:00 AM',
+        notes: 'Joint walkthrough with plant engineering lead and safety inspector.',
+        hostUserId: '',
+      });
+      await refreshData();
+      success('Site Visit Scheduled', `Visit confirmed for ${siteVisitForm.visitDate} at ${prop.name}`);
+    } catch (err: any) {
+      error('Site Visit Error', err.message || 'Failed communicating with backend');
     }
-
-    // Advance stage to proposal if earlier
-    if (inquiry.stage !== 'proposal' && inquiry.stage !== 'negotiation' && inquiry.stage !== 'won') {
-      StorageService.changeInquiryStage(inquiry.id, 'proposal');
-    }
-
-    setIsProposalModalOpen(false);
-    refreshData();
-    success('Proposal Created & Sent', `Delivered commercial proposal for ${prop.name}`);
-  };
-
-  // Site Visit Creation
-  const handleCreateSiteVisit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const prop = StorageService.getPropertyById(siteVisitForm.propertyId) || propertyMatches[0]?.property;
-    if (!prop) return;
-
-    StorageService.createSiteVisit({
-      inquiryId: inquiry.id,
-      inquiryNumber: inquiry.inquiryNumber,
-      companyId: inquiry.companyId,
-      companyName: inquiry.companyName,
-      contactName: inquiry.contactName,
-      contactPhone: inquiry.contactPhone,
-      propertyId: prop.id,
-      propertyName: prop.name,
-      propertyLocation: prop.location,
-      visitDate: siteVisitForm.visitDate,
-      visitTime: siteVisitForm.visitTime,
-      assignedSalespersonId: inquiry.salespersonId,
-      assignedSalespersonName: inquiry.salespersonName,
-      status: 'Scheduled',
-      notes: siteVisitForm.notes,
-    });
-
-    // Advance stage to site_visit if earlier
-    if (inquiry.stage !== 'site_visit' && inquiry.stage !== 'negotiation' && inquiry.stage !== 'won') {
-      StorageService.changeInquiryStage(inquiry.id, 'site_visit');
-    }
-
-    setIsSiteVisitModalOpen(false);
-    refreshData();
-    success('Site Visit Scheduled', `Visit confirmed for ${siteVisitForm.visitDate} at ${prop.name}`);
   };
 
   // Task creation
@@ -398,14 +395,16 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
     e.preventDefault();
     if (!taskForm.description.trim()) return;
 
+    const assignedUser = users.find((u) => u.id === (taskForm.assignedUserId || inquiry.salespersonId)) || currentUser;
+
     try {
       const res = await TaskService.createTask({
         companyId: inquiry.companyId,
         companyName: inquiry.companyName,
         inquiryId: inquiry.id,
         inquiryNumber: inquiry.inquiryNumber,
-        assignedUserId: inquiry.salespersonId,
-        assignedUserName: inquiry.salespersonName,
+        assignedUserId: assignedUser?.id || inquiry.salespersonId,
+        assignedUserName: assignedUser?.name || inquiry.salespersonName,
         taskType: taskForm.taskType,
         description: taskForm.description,
         dueDate: taskForm.dueDate,
@@ -414,53 +413,25 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
         status: 'Pending',
       });
 
-      if (res.success && res.data) {
-        try {
-          StorageService.createTask(res.data);
-        } catch {}
-      } else {
-        StorageService.createTask({
-          companyId: inquiry.companyId,
-          companyName: inquiry.companyName,
-          inquiryId: inquiry.id,
-          inquiryNumber: inquiry.inquiryNumber,
-          assignedUserId: inquiry.salespersonId,
-          assignedUserName: inquiry.salespersonName,
-          taskType: taskForm.taskType,
-          description: taskForm.description,
-          dueDate: taskForm.dueDate,
-          dueTime: taskForm.dueTime,
-          priority: taskForm.priority,
-          status: 'Pending',
-        });
+      if (!res.success) {
+        error('Task Creation Failed', res.error || 'Server error creating task');
+        return;
       }
-    } catch {
-      StorageService.createTask({
-        companyId: inquiry.companyId,
-        companyName: inquiry.companyName,
-        inquiryId: inquiry.id,
-        inquiryNumber: inquiry.inquiryNumber,
-        assignedUserId: inquiry.salespersonId,
-        assignedUserName: inquiry.salespersonName,
-        taskType: taskForm.taskType,
-        description: taskForm.description,
-        dueDate: taskForm.dueDate,
-        dueTime: taskForm.dueTime,
-        priority: taskForm.priority,
-        status: 'Pending',
-      });
-    }
 
-    setIsTaskModalOpen(false);
-    setTaskForm({
-      taskType: 'Follow-up',
-      description: '',
-      dueDate: new Date().toISOString().split('T')[0],
-      dueTime: '11:00 AM',
-      priority: 'High',
-    });
-    refreshData();
-    success('Task Scheduled', 'Follow-up task logged for inquiry.');
+      setIsTaskModalOpen(false);
+      setTaskForm({
+        taskType: 'Follow-up',
+        description: '',
+        dueDate: new Date().toISOString().split('T')[0],
+        dueTime: '11:00 AM',
+        priority: 'High',
+        assignedUserId: '',
+      });
+      await refreshData();
+      success('Task Created', 'Follow-up task scheduled successfully.');
+    } catch (err: any) {
+      error('Task Error', err.message || 'Failed communicating with backend');
+    }
   };
 
   const prioBadge = getPriorityBadge(inquiry.priority);
@@ -512,24 +483,41 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
             </p>
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2 flex-wrap pt-2 lg:pt-0">
-            {canEdit && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => setIsProposalModalOpen(true)} leftIcon={<FileSpreadsheet className="w-4 h-4 text-purple-600 dark:text-purple-400" />} className="text-xs">
-                  Draft Proposal
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsSiteVisitModalOpen(true)} leftIcon={<Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400" />} className="text-xs">
-                  Schedule Site Visit
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setIsTaskModalOpen(true)} leftIcon={<Plus className="w-4 h-4 text-amber-600 dark:text-amber-400" />} className="text-xs">
-                  Add Task
-                </Button>
-              </>
-            )}
-            <Button size="sm" variant="secondary" onClick={onNavigateToMap} leftIcon={<MapPin className="w-4 h-4 text-primary" />} className="text-xs">
-              Corridor Map
-            </Button>
+          {/* Assigned Sales Owner & Quick Actions */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 pt-2 lg:pt-0">
+            <div className="w-full sm:w-56 space-y-1">
+              <label className="text-[11px] font-semibold text-foreground-muted block">
+                Assigned Sales Owner
+              </label>
+              <Combobox
+                options={userComboboxOptions}
+                value={inquiry.salespersonId}
+                onChange={handleReassignSalesperson}
+                placeholder="Select deal owner..."
+                searchPlaceholder="Search salesperson..."
+                disabled={!canEdit}
+              />
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-2 flex-wrap pb-0.5">
+              {canEdit && (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => setIsProposalModalOpen(true)} leftIcon={<FileSpreadsheet className="w-4 h-4 text-purple-600 dark:text-purple-400" />} className="text-xs">
+                    Draft Proposal
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setIsSiteVisitModalOpen(true)} leftIcon={<Calendar className="w-4 h-4 text-orange-600 dark:text-orange-400" />} className="text-xs">
+                    Schedule Site Visit
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setIsTaskModalOpen(true)} leftIcon={<Plus className="w-4 h-4 text-amber-600 dark:text-amber-400" />} className="text-xs">
+                    Add Task
+                  </Button>
+                </>
+              )}
+              <Button size="sm" variant="secondary" onClick={onNavigateToMap} leftIcon={<MapPin className="w-4 h-4 text-primary" />} className="text-xs">
+                Corridor Map
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1035,7 +1023,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
             label="Select Warehouse Property"
             value={proposalForm.propertyId}
             onChange={(e) => {
-              const prop = StorageService.getPropertyById(e.target.value);
+              const prop = properties.find((p) => p.id === e.target.value);
               setProposalForm({
                 ...proposalForm,
                 propertyId: e.target.value,
@@ -1149,6 +1137,19 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
             />
           </div>
 
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground block">
+              Host / Assigned Salesperson <span className="text-rose-500 font-bold">*</span>
+            </label>
+            <Combobox
+              options={userComboboxOptions}
+              value={siteVisitForm.hostUserId || inquiry.salespersonId}
+              onChange={(val) => setSiteVisitForm({ ...siteVisitForm, hostUserId: val })}
+              placeholder="Select host..."
+              searchPlaceholder="Search salesperson..."
+            />
+          </div>
+
           <Textarea
             label="Visit Agenda / Team Instructions"
             value={siteVisitForm.notes}
@@ -1188,6 +1189,19 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
             <option value="Other">Other</option>
           </Select>
 
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground block">
+              Assigned Salesperson <span className="text-rose-500 font-bold">*</span>
+            </label>
+            <Combobox
+              options={userComboboxOptions}
+              value={taskForm.assignedUserId || inquiry.salespersonId}
+              onChange={(val) => setTaskForm({ ...taskForm, assignedUserId: val })}
+              placeholder="Select salesperson..."
+              searchPlaceholder="Search salesperson..."
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <DatePicker
               label="Due Date"
@@ -1195,13 +1209,13 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
               onChange={(dateStr) => setTaskForm({ ...taskForm, dueDate: dateStr })}
               placeholder="Select due date"
             />
-            <Input
+            <TimePicker
               label="Due Time"
               value={taskForm.dueTime}
-              onChange={(e) => setTaskForm({ ...taskForm, dueTime: e.target.value })}
+              onChange={(timeStr) => setTaskForm({ ...taskForm, dueTime: timeStr })}
+              placeholder="Select due time"
             />
           </div>
-
 
           <Textarea
             label="Description"

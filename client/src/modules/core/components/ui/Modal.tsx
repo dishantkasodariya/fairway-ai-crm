@@ -10,8 +10,24 @@ export interface ModalProps {
   description?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  footerClassName?: string;
+  contentClassName?: string;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full';
 }
+
+export const ModalFooter: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+}> = ({ children, className }) => (
+  <div
+    className={cn(
+      'sticky -bottom-3.5 sm:-bottom-5 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 sm:py-3.5 bg-surface border-t border-border flex items-center justify-end gap-2.5 sm:gap-3 z-20 mt-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]',
+      className
+    )}
+  >
+    {children}
+  </div>
+);
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -20,6 +36,8 @@ export const Modal: React.FC<ModalProps> = ({
   description,
   children,
   footer,
+  footerClassName,
+  contentClassName,
   maxWidth = 'lg',
 }) => {
   const [mounted, setMounted] = useState(false);
@@ -89,11 +107,16 @@ export const Modal: React.FC<ModalProps> = ({
         )}
 
         {/* Content */}
-        <div className="px-4 sm:px-6 py-3.5 sm:py-5 overflow-y-auto flex-1">{children}</div>
+        <div className={cn("px-4 sm:px-6 py-3.5 sm:py-5 overflow-y-auto flex-1", contentClassName)}>{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-2.5 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-border bg-surface-muted/50 shrink-0 flex-wrap">
+          <div
+            className={cn(
+              "flex items-center justify-end gap-2.5 sm:gap-3 px-4 sm:px-6 py-3 sm:py-3.5 border-t border-border bg-surface shrink-0 flex-wrap z-10 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]",
+              footerClassName
+            )}
+          >
             {footer}
           </div>
         )}

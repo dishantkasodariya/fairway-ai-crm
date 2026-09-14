@@ -49,6 +49,8 @@ import { Modal } from '@/modules/core/components/ui/Modal';
 import { Input, Textarea } from '@/modules/core/components/ui/Input';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
 import { cn } from '@/modules/core/lib/utils';
+import { ContactsList } from '../components/ContactsList';
+import { ContactsCard } from '../components/ContactsCard';
 
 interface ContactsPageProps {
   onSelectCompany?: (companyId: string) => void;
@@ -316,8 +318,8 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
             Enterprise decision-makers, supply chain leads, and warehouse operational heads across Gujarat.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={handleOpenAdd} size="sm" className="gap-1.5 shadow-sm font-semibold">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button onClick={handleOpenAdd} size="sm" className="gap-1.5 shadow-sm font-semibold w-full sm:w-auto justify-center">
             <Plus className="w-4 h-4" />
             <span>Add Contact</span>
           </Button>
@@ -430,78 +432,80 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
               </TooltipContent>
             </Tooltip>
 
-            {/* Column Settings Dropdown */}
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
-                    >
-                      <Settings className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Column
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
-                <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
-                  Toggle Columns
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem
-                  checked={columns.contact}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, contact: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Contact Person
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.company}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, company: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Company
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.department}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, department: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Department
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.phone}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, phone: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Phone Number
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.email}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, email: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Email Address
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuCheckboxItem
-                  checked={columns.actions}
-                  onSelect={(e) => e.preventDefault()}
-                  onCheckedChange={(val) => setColumns((prev) => ({ ...prev, actions: !!val }))}
-                  className="text-xs cursor-pointer"
-                >
-                  Actions
-                </DropdownMenuCheckboxItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Column Settings Dropdown (Desktop Only) */}
+            <div className="hidden sm:block">
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Column
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
+                  <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
+                    Toggle Columns
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={columns.contact}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, contact: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Contact Person
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.company}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, company: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Company
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.department}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, department: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Department
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.phone}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, phone: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Phone Number
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.email}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, email: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Email Address
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={columns.actions}
+                    onSelect={(e) => e.preventDefault()}
+                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, actions: !!val }))}
+                    className="text-xs cursor-pointer"
+                  >
+                    Actions
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             {/* Refresh Button */}
             <Tooltip>
@@ -525,8 +529,8 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
               </TooltipContent>
             </Tooltip>
 
-            {/* Segmented View Switcher */}
-            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+            {/* Segmented View Switcher (Desktop Only) */}
+            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -594,184 +598,38 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
             </Button>
           )}
         </div>
-      ) : viewMode === 'table' ? (
-        /* View 1: Table List */
-        <Card className="bg-surface border border-border shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-surface-muted/60 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {columns.contact && <th className="py-3 px-4">Contact Person</th>}
-                  {columns.company && <th className="py-3 px-4">Company</th>}
-                  {columns.department && <th className="py-3 px-4">Department & Role</th>}
-                  {columns.phone && <th className="py-3 px-4">Phone Number</th>}
-                  {columns.email && <th className="py-3 px-4">Email Address</th>}
-                  {columns.actions && <th className="py-3 px-4 text-right">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredContacts.map((c) => (
-                  <tr key={c.id} className="hover:bg-surface-muted/50 transition-colors group">
-                    {columns.contact && (
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-950/70 text-orange-800 dark:text-orange-300 font-bold flex items-center justify-center text-xs shrink-0">
-                            {c.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-foreground flex items-center gap-2">
-                              <span>{c.name}</span>
-                              {c.isPrimary && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                                  PRIMARY
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-muted-foreground font-medium">{c.designation || 'Operational Liaison'}</div>
-                          </div>
-                        </div>
-                      </td>
-                    )}
-
-                    {columns.company && (
-                      <td className="py-3.5 px-4">
-                        {c.companyId ? (
-                          <button
-                            onClick={() => onSelectCompany && onSelectCompany(c.companyId)}
-                            className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5 text-left cursor-pointer"
-                          >
-                            <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            <span className="truncate max-w-[200px]">{c.companyName || 'Enterprise Account'}</span>
-                          </button>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">Unassigned</span>
-                        )}
-                      </td>
-                    )}
-
-                    {columns.department && (
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-foreground border border-border">
-                          {c.department || 'Supply Chain'}
-                        </span>
-                      </td>
-                    )}
-
-                    {columns.phone && (
-                      <td className="py-3.5 px-4">
-                        {c.phone ? (
-                          <a href={`tel:${c.phone}`} className="text-foreground hover:text-primary font-mono text-xs flex items-center gap-1.5">
-                            <Phone className="w-3 h-3 text-muted-foreground" />
-                            <span>{c.phone}</span>
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </td>
-                    )}
-
-                    {columns.email && (
-                      <td className="py-3.5 px-4">
-                        {c.email ? (
-                          <a href={`mailto:${c.email}`} className="text-foreground hover:text-primary text-xs flex items-center gap-1.5 truncate max-w-[190px]">
-                            <Mail className="w-3 h-3 text-muted-foreground shrink-0" />
-                            <span className="truncate">{c.email}</span>
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </td>
-                    )}
-
-                    {columns.actions && (
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button size="xs" variant="ghost" onClick={() => handleOpenEdit(c)} title="Edit Contact" className="h-7 w-7 p-0">
-                            <Edit2 className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-                          </Button>
-                          <Button size="xs" variant="ghost" onClick={() => handleDelete(c.id, c.name)} title="Delete Contact" className="h-7 w-7 p-0 hover:text-destructive">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
       ) : (
-        /* View 2: Cards Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredContacts.map((c) => (
-            <div
-              key={c.id}
-              className="bg-surface rounded-card border border-border p-4 shadow-subtle hover:border-fairway-500/60 hover:shadow-md transition-all flex flex-col justify-between gap-3 text-left"
-            >
-              <div className="flex items-start justify-between gap-2 border-b border-border/60 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-950/70 text-orange-800 dark:text-orange-300 font-bold flex items-center justify-center text-sm shrink-0">
-                    {c.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="font-bold text-foreground flex items-center gap-1.5">
-                      <span>{c.name}</span>
-                      {c.isPrimary && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                          PRIMARY
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{c.designation || 'Operational Liaison'}</p>
-                  </div>
-                </div>
+        <>
+          {/* Mobile view: ONLY Card View show, NOT list page show */}
+          <div className="block sm:hidden">
+            <ContactsCard
+              contacts={filteredContacts}
+              onSelectCompany={onSelectCompany}
+              onEdit={handleOpenEdit}
+              onDelete={handleDelete}
+            />
+          </div>
 
-                <div className="flex items-center gap-1">
-                  <Button size="xs" variant="ghost" onClick={() => handleOpenEdit(c)} className="h-7 w-7 p-0">
-                    <Edit2 className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-                  </Button>
-                  <Button size="xs" variant="ghost" onClick={() => handleDelete(c.id, c.name)} className="h-7 w-7 p-0 hover:text-destructive">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2 flex-1 text-xs">
-                {c.companyName && (
-                  <div
-                    onClick={() => c.companyId && onSelectCompany && onSelectCompany(c.companyId)}
-                    className="font-semibold text-foreground hover:underline cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                    <span>{c.companyName}</span>
-                  </div>
-                )}
-
-                <div className="inline-block">
-                  <span className="bg-surface-muted px-2 py-0.5 rounded border border-border text-[11px] text-muted-foreground">
-                    {c.department || 'Supply Chain'}
-                  </span>
-                </div>
-
-                <div className="pt-2 border-t border-border/60 space-y-1 text-muted-foreground">
-                  {c.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-3 h-3 text-muted-foreground" />
-                      <a href={`tel:${c.phone}`} className="hover:text-primary font-mono">{c.phone}</a>
-                    </div>
-                  )}
-                  {c.email && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-3 h-3 text-muted-foreground" />
-                      <a href={`mailto:${c.email}`} className="hover:text-primary truncate">{c.email}</a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+          {/* Desktop view: Respects user viewMode (List vs Card) */}
+          <div className="hidden sm:block">
+            {viewMode === 'table' ? (
+              <ContactsList
+                contacts={filteredContacts}
+                columns={columns}
+                onSelectCompany={onSelectCompany}
+                onEdit={handleOpenEdit}
+                onDelete={handleDelete}
+              />
+            ) : (
+              <ContactsCard
+                contacts={filteredContacts}
+                onSelectCompany={onSelectCompany}
+                onEdit={handleOpenEdit}
+                onDelete={handleDelete}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {/* Advanced Filters Drawer (Right Slide-out) */}

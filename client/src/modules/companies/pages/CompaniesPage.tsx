@@ -39,7 +39,6 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/modules/core/components/ui/tooltip';
-import { StorageService } from '@/modules/core/services/storageService';
 import { CompanyService } from '@/modules/core/services/companyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
@@ -53,12 +52,8 @@ import { Combobox } from '@/modules/core/components/ui/combobox-1';
 import { UserCombobox } from '@/modules/core/components/ui/UserCombobox';
 import { NewCompanyModal } from '../components/NewCompanyModal';
 import { NewCompanyPage } from './NewCompanyPage';
-import {
-  CompanyCard,
-  CompanyLineCard,
-  CompanyCardSkeleton,
-  CompanyEmptyState,
-} from '../components/CompanyCard';
+import { CompaniesList } from '../components/CompaniesList';
+import { CompaniesCard } from '../components/CompaniesCard';
 import {
   DataGrid,
   DataGridContainer,
@@ -158,7 +153,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
   onOpenImport,
   onNavigateToMap,
 }) => {
-  const { canEdit, currentUser } = useAuth();
+  const { canEdit, currentUser, users, canCreate, canEditModule, canDeleteModule, canExport, canImport } = useAuth();
   const { success, error } = useToast();
   const initialTableState = useMemo(() => getStoredTableState(), []);
 
@@ -291,15 +286,13 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         setCompanies(res.data);
         setTotalCount(res.totalCount ?? res.data.length);
       } else {
-        const localData = StorageService.getCompanies();
-        setCompanies(localData);
-        setTotalCount(localData.length);
+        setCompanies([]);
+        setTotalCount(0);
       }
     } catch (err) {
       console.error('Failed to load companies', err);
-      const localData = StorageService.getCompanies();
-      setCompanies(localData);
-      setTotalCount(localData.length);
+      setCompanies([]);
+      setTotalCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -318,10 +311,6 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
     ownerFilter,
     cityFilter,
   ]);
-
-  const users = StorageService.getUsers();
-  const allFacilities = StorageService.getFacilities();
-  const allInquiries = StorageService.getInquiries();
 
   // Extract unique industries & cities
   const uniqueIndustries = Array.from(new Set(companies.map((c) => c.industry))).filter(Boolean);
@@ -394,7 +383,6 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
     setIsDeleting(true);
     try {
       await CompanyService.deleteCompany(companyToDelete.id);
-      StorageService.deleteCompany(companyToDelete.id);
       success('Company Deleted', `Removed ${companyToDelete.name} from CRM.`);
       setIsDeleteModalOpen(false);
       setCompanyToDelete(null);
@@ -434,21 +422,27 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                     <Eye className="w-3.5 h-3.5 text-fairway-600" />
                     <span>View Company</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => handleOpenEditCompany(comp)}
-                    className="flex items-center gap-2 text-xs cursor-pointer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Edit Company</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => handleDeleteCompanyConfirm(comp)}
-                    className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete Company</span>
-                  </DropdownMenuItem>
+                  {canEditModule('companies') && (
+                    <DropdownMenuItem
+                      onClick={() => handleOpenEditCompany(comp)}
+                      className="flex items-center gap-2 text-xs cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Edit Company</span>
+                    </DropdownMenuItem>
+                  )}
+                  {canDeleteModule('companies') && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteCompanyConfirm(comp)}
+                        className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Company</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -605,7 +599,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         id: 'facilitiesCount',
         header: ({ column }) => <DataGridColumnHeader column={column} title="Facilities" className="justify-center" />,
         cell: ({ row }) => {
-          const count = row.original.facilitiesCount ?? StorageService.getFacilities(row.original.id).length;
+          const count = row.original.facilitiesCount ?? 0;
           return (
             <div className="text-center">
               <span className="font-mono font-bold bg-surface-muted dark:bg-[#161c24] px-2 py-0.5 rounded border border-border text-[11px]">
@@ -622,7 +616,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         id: 'inquiriesCount',
         header: ({ column }) => <DataGridColumnHeader column={column} title="Inquiries" className="justify-center" />,
         cell: ({ row }) => {
-          const count = row.original.inquiriesCount ?? StorageService.getInquiries(row.original.id).length;
+          const count = row.original.inquiriesCount ?? 0;
           return (
             <div className="text-center">
               <span className="font-mono font-bold bg-fairway-50 text-fairway-900 dark:bg-fairway-950 dark:text-fairway-300 px-2 py-0.5 rounded border border-fairway-200 dark:border-fairway-800 text-[11px]">
@@ -695,11 +689,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           allData = res.data;
         }
       } catch {
-        // Fallback to local
-      }
-
-      if (allData.length === 0) {
-        allData = StorageService.getCompanies();
+        // Continue with whatever data was retrieved
       }
 
       const headers = ['Company Name', 'Legal Name', 'Industry', 'Status', 'City', 'State', 'Phone', 'Email', 'Owner', 'Priority', 'Prospect Stage', 'Turnover', 'Employee Count'];
@@ -769,27 +759,31 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         </div>
 
         {/* Action Toolbar */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={exportCSV}
-            disabled={isExporting}
-            leftIcon={isExporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            className="flex-1 sm:flex-initial text-xs px-2.5 sm:px-3 justify-center"
-          >
-            {isExporting ? 'Exporting...' : 'Export CSV'}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onOpenImport}
-            leftIcon={<UploadCloud className="w-3.5 h-3.5" />}
-            className="flex-1 sm:flex-initial text-xs px-2.5 sm:px-3 justify-center"
-          >
-            Import
-          </Button>
-          {canEdit && (
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+          {canExport('companies') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={exportCSV}
+              disabled={isExporting}
+              leftIcon={isExporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" /> : <Download className="w-3.5 h-3.5 shrink-0" />}
+              className="flex-1 sm:flex-initial text-[11px] sm:text-xs px-1.5 sm:px-3 justify-center whitespace-nowrap h-8.5"
+            >
+              {isExporting ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          )}
+          {canImport('companies') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onOpenImport}
+              leftIcon={<UploadCloud className="w-3.5 h-3.5 shrink-0" />}
+              className="flex-1 sm:flex-initial text-[11px] sm:text-xs px-1.5 sm:px-3 justify-center whitespace-nowrap h-8.5"
+            >
+              Import
+            </Button>
+          )}
+          {canCreate('companies') && (
             <Button
               size="sm"
               variant="primary"
@@ -797,8 +791,8 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                 setCompanyToEdit(null);
                 setPageMode('form');
               }}
-              leftIcon={<Plus className="w-4 h-4" />}
-              className="flex-1 sm:flex-initial text-xs px-2.5 sm:px-3 justify-center whitespace-nowrap"
+              leftIcon={<Plus className="w-4 h-4 shrink-0" />}
+              className="flex-1 sm:flex-initial text-[11px] sm:text-xs px-1.5 sm:px-3 justify-center whitespace-nowrap h-8.5"
             >
               Add Company
             </Button>
@@ -855,7 +849,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
               Industrial Sites Mapped
             </span>
             <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
-              {allFacilities.length}
+              {companies.reduce((acc, curr) => acc + (curr.facilitiesCount || 0), 0)}
             </span>
           </div>
 
@@ -892,7 +886,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
               Ongoing Inquiries
             </span>
             <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
-              {allInquiries.filter((i) => i.status === 'Active').length}
+              {companies.reduce((acc, curr) => acc + (curr.inquiriesCount || 0), 0)}
             </span>
           </div>
 
@@ -1046,8 +1040,8 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
               </DropdownMenu>
             )}
 
-            {/* Segmented View Switcher (List / Card View) */}
-            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs shrink-0">
+            {/* Segmented View Switcher (Desktop Only) */}
+            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs shrink-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -1092,81 +1086,51 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         </TooltipProvider>
       </div>
 
-      {/* ================= VIEW MODE 1: TANSTACK DATA-GRID TABLE ================= */}
-      {viewMode === 'table' ? (
-        <DataGrid
+      {/* Mobile view: ONLY Card View show, NOT list page show */}
+      <div className="block sm:hidden">
+        <CompaniesCard
           table={table}
+          companies={pagedCompanies}
           recordCount={totalCount || companies.length}
           isLoading={isLoading}
-          tableLayout={{
-            columnsPinnable: true,
-            columnsResizable: true,
-            headerSticky: true,
-          }}
-        >
-          <div className="w-full space-y-2.5">
-            {companies.length === 0 && !isLoading ? (
-              <CompanyEmptyState
-                hasFilters={activeFiltersCount > 0 || !!searchQuery}
-                onClearFilters={handleClearAllFilters}
-                onNewCompany={onOpenNewCompany}
-              />
-            ) : (
-              <Card className="p-0 border border-border bg-surface shadow-xs rounded-xl overflow-hidden">
-                {/* Mobile horizontal scroll helper */}
-                <div className="sm:hidden px-3 py-1.5 bg-surface-muted/40 border-b border-border/80 flex items-center justify-between text-[11px] text-foreground-muted font-medium">
-                  <span>Swipe to view all columns</span>
-                  <span className="text-fairway-600 font-semibold">Scroll &rarr;</span>
-                </div>
-                <DataGridContainer className="w-full">
-                  <DataGridScrollArea className="w-full max-h-[calc(100vh-280px)] overflow-auto" orientation="both">
-                    <DataGridTable />
-                  </DataGridScrollArea>
-                </DataGridContainer>
-              </Card>
-            )}
-            {companies.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
-          </div>
-        </DataGrid>
-      ) : (
-        /* ================= VIEW MODE 2: RICH GRID CARDS ================= */
-        <DataGrid
-          table={table}
-          recordCount={totalCount || companies.length}
-          isLoading={isLoading}
-        >
-          <div className="space-y-4">
-            {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-                {Array.from({ length: Math.min(pagination.pageSize, 6) }).map((_, i) => (
-                  <CompanyCardSkeleton key={i} mode="grid" />
-                ))}
-              </div>
-            ) : pagedCompanies.length === 0 ? (
-              <CompanyEmptyState
-                hasFilters={activeFiltersCount > 0 || !!searchQuery}
-                onClearFilters={handleClearAllFilters}
-                onNewCompany={onOpenNewCompany}
-              />
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
-                {pagedCompanies.map((comp) => (
-                  <CompanyCard
-                    key={comp.id}
-                    company={comp}
-                    onSelect={onSelectCompany}
-                    onEdit={handleOpenEditCompany}
-                    onDelete={handleDeleteCompanyConfirm}
-                  />
-                ))}
-              </div>
-            )}
+          hasFilters={activeFiltersCount > 0 || !!searchQuery}
+          onClearFilters={handleClearAllFilters}
+          onNewCompany={onOpenNewCompany}
+          onSelectCompany={onSelectCompany}
+          onEditCompany={handleOpenEditCompany}
+          onDeleteCompany={handleDeleteCompanyConfirm}
+          pageSize={pagination.pageSize}
+        />
+      </div>
 
-            {/* Pagination for Card View */}
-            {pagedCompanies.length > 0 && <DataGridPagination sizes={[5, 10, 20, 50, 100]} />}
-          </div>
-        </DataGrid>
-      )}
+      {/* Desktop view: Respects user viewMode (List vs Card) */}
+      <div className="hidden sm:block">
+        {viewMode === 'table' ? (
+          <CompaniesList
+            table={table}
+            companies={companies}
+            recordCount={totalCount || companies.length}
+            isLoading={isLoading}
+            hasFilters={activeFiltersCount > 0 || !!searchQuery}
+            onClearFilters={handleClearAllFilters}
+            onNewCompany={onOpenNewCompany}
+          />
+        ) : (
+          <CompaniesCard
+            table={table}
+            companies={pagedCompanies}
+            recordCount={totalCount || companies.length}
+            isLoading={isLoading}
+            hasFilters={activeFiltersCount > 0 || !!searchQuery}
+            onClearFilters={handleClearAllFilters}
+            onNewCompany={onOpenNewCompany}
+            onSelectCompany={onSelectCompany}
+            onEditCompany={handleOpenEditCompany}
+            onDeleteCompany={handleDeleteCompanyConfirm}
+            pageSize={pagination.pageSize}
+          />
+        )}
+      </div>
 
 
 

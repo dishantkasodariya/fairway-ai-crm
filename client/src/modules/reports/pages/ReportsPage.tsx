@@ -16,7 +16,6 @@ import {
   Layers,
   MapPin,
 } from 'lucide-react';
-import { StorageService } from '@/modules/core/services/storageService';
 import { formatINR, formatSqFt, formatDate } from '@/modules/core/utils/formatters';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/modules/core/components/ui/Card';
@@ -28,33 +27,37 @@ import {
 } from '@/modules/core/components/ui';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
 import { useToast } from '@/modules/core/providers/ToastContext';
+import { useAuth } from '@/modules/core/providers/AuthContext';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { CompanyService } from '@/modules/core/services/companyService';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { TaskService } from '@/modules/core/services/taskService';
-import { Inquiry, Company, Property, Task } from '@/modules/core/types';
+import { PipelineStageService } from '@/modules/core/services/pipelineStageService';
+import { PIPELINE_STAGES } from '@/modules/core/data/seedData';
+import { Inquiry, Company, Property, Task, PipelineStageConfig } from '@/modules/core/types';
 
 export const ReportsView: React.FC = () => {
   const [dateRange, setDateRange] = useState<'q3_2026' | 'ytd' | 'all_time'>('q3_2026');
   const [ownerFilter, setOwnerFilter] = useState('all');
   const { success } = useToast();
+  const { users } = useAuth();
 
-  const [allInquiries, setAllInquiries] = useState<Inquiry[]>(() => StorageService.getInquiries());
-  const [companies, setCompanies] = useState<Company[]>(() => StorageService.getCompanies());
-  const [properties, setProperties] = useState<Property[]>(() => StorageService.getProperties());
-  const [tasks, setTasks] = useState<Task[]>(() => StorageService.getTasks());
-  const users = StorageService.getUsers();
-  const stages = StorageService.getPipelineStages();
+  const [allInquiries, setAllInquiries] = useState<Inquiry[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [stages, setStages] = useState<PipelineStageConfig[]>(PIPELINE_STAGES);
 
   useEffect(() => {
     let isMounted = true;
     const fetchLiveData = async () => {
       try {
-        const [inqRes, compRes, propRes, taskRes] = await Promise.allSettled([
+        const [inqRes, compRes, propRes, taskRes, stageRes] = await Promise.allSettled([
           InquiryService.getInquiries({ pageSize: 500 }),
           CompanyService.getCompanies({ pageSize: 500 }),
           PropertyService.getProperties(),
           TaskService.getTasks(),
+          PipelineStageService.getPipelineStages(),
         ]);
 
         if (isMounted) {
@@ -69,6 +72,9 @@ export const ReportsView: React.FC = () => {
           }
           if (taskRes.status === 'fulfilled' && taskRes.value.success && taskRes.value.data) {
             setTasks(taskRes.value.data);
+          }
+          if (stageRes.status === 'fulfilled' && stageRes.value.success && stageRes.value.data) {
+            setStages(stageRes.value.data);
           }
         }
       } catch (e) {
@@ -146,46 +152,48 @@ export const ReportsView: React.FC = () => {
   return (
     <div className="space-y-6 max-w-8xl mx-auto text-left">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4 pb-3 border-b border-border">
         <div>
-          <span className="text-xs font-semibold text-fairway-800 dark:text-fairway-400 uppercase tracking-wider">
+          <span className="text-[11px] sm:text-xs font-semibold text-fairway-800 dark:text-fairway-400 uppercase tracking-wider">
             CRM / Executive Intelligence
           </span>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 mt-0.5">
-            <BarChart3 className="w-6 h-6 text-fairway-600 dark:text-fairway-400" />
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 mt-0.5">
+            <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-fairway-600 dark:text-fairway-400 shrink-0" />
             <span>Reports & Real-Time Analytics</span>
           </h1>
-          <p className="text-xs text-foreground-muted mt-1">
+          <p className="text-xs text-foreground-muted mt-1 max-w-2xl">
             Real-time pipeline trajectory, corridor demand absorption, sector breakdown, and salesperson performance.
           </p>
         </div>
 
-        <div className="flex flex-col xs:flex-row flex-wrap items-stretch xs:items-center gap-2.5 w-full sm:w-auto">
-          {/* Owner Filter */}
-          <div className="w-full xs:w-48 sm:w-56">
-            <Combobox
-              options={[
-                { value: 'all', label: 'All Team Members' },
-                ...users.map((u) => ({ value: u.id, label: `${u.name} (${u.role})` })),
-              ]}
-              value={ownerFilter}
-              onChange={(val) => setOwnerFilter(val || 'all')}
-              placeholder="All Team Members"
-            />
-          </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full lg:w-auto shrink-0">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-2.5 flex-1 lg:flex-initial">
+            {/* Owner Filter */}
+            <div className="w-full sm:w-44 lg:w-48">
+              <Combobox
+                options={[
+                  { value: 'all', label: 'All Team Members' },
+                  ...users.map((u) => ({ value: u.id, label: `${u.name} (${u.role})` })),
+                ]}
+                value={ownerFilter}
+                onChange={(val) => setOwnerFilter(val || 'all')}
+                placeholder="All Team Members"
+              />
+            </div>
 
-          {/* Timeframe Filter */}
-          <div className="w-full xs:w-52 sm:w-60">
-            <Combobox
-              options={[
-                { value: 'q3_2026', label: 'Q3 FY27 (Jul - Sep 2026)' },
-                { value: 'ytd', label: 'Year to Date (FY 2026-27)' },
-                { value: 'all_time', label: 'All Time Active Data' },
-              ]}
-              value={dateRange}
-              onChange={(val) => setDateRange((val || 'q3_2026') as any)}
-              placeholder="Select Period"
-            />
+            {/* Timeframe Filter */}
+            <div className="w-full sm:w-48 lg:w-56">
+              <Combobox
+                options={[
+                  { value: 'q3_2026', label: 'Q3 FY27 (Jul - Sep 2026)' },
+                  { value: 'ytd', label: 'Year to Date (FY 2026-27)' },
+                  { value: 'all_time', label: 'All Time Active Data' },
+                ]}
+                value={dateRange}
+                onChange={(val) => setDateRange((val || 'q3_2026') as any)}
+                placeholder="Select Period"
+              />
+            </div>
           </div>
 
           {/* Export Button */}
@@ -193,8 +201,8 @@ export const ReportsView: React.FC = () => {
             size="sm"
             variant="outline"
             onClick={handleExportCSV}
-            leftIcon={<Download className="w-3.5 h-3.5" />}
-            className="w-full xs:w-auto justify-center font-semibold"
+            leftIcon={<Download className="w-3.5 h-3.5 shrink-0" />}
+            className="w-full sm:w-auto justify-center font-semibold h-9 shrink-0 shadow-2xs"
           >
             Export CSV
           </Button>
@@ -264,6 +272,8 @@ export const ReportsView: React.FC = () => {
           <span className="text-[11px] text-foreground-muted font-mono">Live CRM Data Feed</span>
         </div>
         <ChartAreaInteractive
+          inquiries={inquiries}
+          tasks={tasks}
           title="Industrial Inquiries & Site Visits Trajectory"
           subtitle="Real-time demand trend and client property inspections computed directly from CRM pipeline"
         />
@@ -284,12 +294,15 @@ export const ReportsView: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Real-time Sector Breakdown Donut Chart */}
           <ChartPieDonutActive
+            inquiries={inquiries}
             title="Tenant Demand by Industry Category"
             subtitle="Hover over segments to inspect sector distribution & market share"
           />
 
           {/* Real-time Corridor Absorption Bar Chart */}
           <ChartBarStacked
+            inquiries={inquiries}
+            properties={properties}
             title="Corridor Demand & Monthly Pipeline Value"
             subtitle="Active tenant requirements & monthly rental budget across Western India hubs"
           />

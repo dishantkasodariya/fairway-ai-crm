@@ -1,5 +1,5 @@
 import { ImportResult } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export interface ColumnMapping {
   companyName?: string;
@@ -42,7 +42,7 @@ export class ImportService {
     try {
       const res = await fetch(`${API_BASE_URL}/import/inquiries`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ rows, columnMapping }),
       });
       const json = await res.json();

@@ -132,10 +132,7 @@ export const initDatabase = async () => {
     if (parseInt(roleCountRes.rows[0].count, 10) === 0) {
       console.log('🌱 Seeding default roles into PostgreSQL...');
       const defaultRoles = [
-        ['role_super_admin', 'Super Admin', 'super_admin', 'Full platform authority with unrestricted access to all data, security logs, and configuration.', 'purple', true],
-        ['role_admin', 'Admin', 'admin', 'Management access across inquiries, companies, inventory, and user accounts.', 'blue', true],
-        ['role_sales', 'Sales', 'sales', 'Deal pipeline execution, contact management, task follow-ups, and proposal creation.', 'emerald', true],
-        ['role_viewer', 'Viewer', 'viewer', 'Read-only visibility into portfolio metrics and authorized company dossiers.', 'slate', true],
+        ['role_admin', 'Admin', 'admin', 'Full platform authority with unrestricted access to all data, security logs, and configuration.', 'blue', true],
       ];
 
       for (const r of defaultRoles) {
@@ -210,7 +207,7 @@ export const initDatabase = async () => {
         'Amit Patel',
         'amit@fairway.co.in',
         defaultPasswordHash,
-        'super_admin',
+        'admin',
         'Executive Leadership',
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
         '+91 98250 12345',
@@ -222,7 +219,7 @@ export const initDatabase = async () => {
         'Aryan Verma',
         'aryan@fairway.co.in',
         defaultPasswordHash,
-        'super_admin',
+        'admin',
         'Executive Leadership',
         'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
         '+91 98250 67890',
@@ -234,7 +231,7 @@ export const initDatabase = async () => {
         'Bhavya Sharma',
         'bhavya@gmail.com',
         defaultPasswordHash,
-        'super_admin',
+        'management',
         'Executive Leadership',
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
         '+91 98250 12345',
@@ -246,7 +243,7 @@ export const initDatabase = async () => {
         'Bhavya Sharma',
         'bhavya.sharma@fairwaylogistics.in',
         defaultPasswordHash,
-        'super_admin',
+        'management',
         'Executive Leadership',
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
         '+91 98250 12345',
@@ -259,7 +256,7 @@ export const initDatabase = async () => {
         'Pooja Hegde',
         'sales@fairway.co.in',
         defaultPasswordHash,
-        'sales',
+        'admin',
         'Gujarat Leasing Desk',
         'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
         '+91 98980 11223',
@@ -275,17 +272,16 @@ export const initDatabase = async () => {
          ON CONFLICT (email) DO UPDATE 
          SET name = EXCLUDED.name, 
              password = EXCLUDED.password, 
-             role = EXCLUDED.role, 
              department = EXCLUDED.department, 
              avatar = EXCLUDED.avatar;`,
         u
       );
     }
 
-    // Explicitly ensure Amit and Aryan are Super Admin with standard fairway123 password
+    // Explicitly ensure Amit and Aryan are Admin with standard fairway123 password
     await client.query(`
       UPDATE users 
-      SET role = 'super_admin',
+      SET role = 'admin',
           password = $1,
           department = 'Executive Leadership'
       WHERE LOWER(email) IN ('amit@fairway.co.in', 'aryan@fairway.co.in');
@@ -541,9 +537,23 @@ export const initDatabase = async () => {
     `);
     console.log('✅ Tables "companies", "contacts", "facilities", and "inquiries" verified / updated in PostgreSQL.');
 
-    // Seed initial companies & inquiries if empty
+    // System metadata for tracking migrations and seeds
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS system_metadata (
+        key VARCHAR(100) PRIMARY KEY,
+        value TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    const seedMetaCheck = await client.query(
+      "SELECT value FROM system_metadata WHERE key = 'initial_demo_seed_applied';"
+    );
+    const initialSeedAlreadyApplied = seedMetaCheck.rows.length > 0;
+
+    // Seed initial companies & inquiries only if seed hasn't been applied yet
     const compCount = await client.query('SELECT COUNT(*) FROM companies;');
-    if (parseInt(compCount.rows[0].count, 10) === 0) {
+    if (!initialSeedAlreadyApplied && process.env.SEED_DEMO_DATA !== 'false' && parseInt(compCount.rows[0].count, 10) === 0) {
       console.log('🌱 Seeding initial demo companies and inquiries into PostgreSQL...');
       
       const comp1Id = 'comp_1';
@@ -610,9 +620,9 @@ export const initDatabase = async () => {
     `);
     console.log('✅ Table "tasks" verified / updated in PostgreSQL.');
 
-    // Seed initial demo tasks if table is empty
+    // Seed initial demo tasks if table is empty and seed not applied yet
     const taskCount = await client.query('SELECT COUNT(*) FROM tasks;');
-    if (parseInt(taskCount.rows[0].count, 10) === 0) {
+    if (!initialSeedAlreadyApplied && process.env.SEED_DEMO_DATA !== 'false' && parseInt(taskCount.rows[0].count, 10) === 0) {
       console.log('🌱 Seeding initial demo tasks into PostgreSQL...');
       const todayStr = new Date().toISOString().split('T')[0];
       const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -678,9 +688,9 @@ export const initDatabase = async () => {
     `);
     console.log('✅ Table "properties" verified / updated in PostgreSQL.');
 
-    // Seed initial properties if empty
+    // Seed initial properties if empty and seed not applied yet
     const propCount = await client.query('SELECT COUNT(*) FROM properties;');
-    if (parseInt(propCount.rows[0].count, 10) === 0) {
+    if (!initialSeedAlreadyApplied && process.env.SEED_DEMO_DATA !== 'false' && parseInt(propCount.rows[0].count, 10) === 0) {
       console.log('🌱 Seeding initial demo properties into PostgreSQL...');
       
       const demoProps = [
@@ -853,9 +863,9 @@ export const initDatabase = async () => {
     `);
     console.log('✅ Table "proposals" verified / updated in PostgreSQL.');
 
-    // Seed initial proposals if empty
+    // Seed initial proposals if empty and seed not applied yet
     const proposalCount = await client.query('SELECT COUNT(*) FROM proposals;');
-    if (parseInt(proposalCount.rows[0].count, 10) === 0) {
+    if (!initialSeedAlreadyApplied && process.env.SEED_DEMO_DATA !== 'false' && parseInt(proposalCount.rows[0].count, 10) === 0) {
       console.log('🌱 Seeding initial demo proposals into PostgreSQL...');
       await client.query(`
         INSERT INTO proposals (
@@ -877,6 +887,15 @@ export const initDatabase = async () => {
         );
       `);
       console.log('✅ Demo proposals seeded successfully.');
+    }
+
+    // Mark that initial demo seed has been processed so deleted records never resurrect
+    if (!initialSeedAlreadyApplied) {
+      await client.query(`
+        INSERT INTO system_metadata (key, value)
+        VALUES ('initial_demo_seed_applied', 'true')
+        ON CONFLICT (key) DO NOTHING;
+      `);
     }
 
     // 13. Create activities table
@@ -1150,6 +1169,95 @@ export const initDatabase = async () => {
       `);
       console.log('✅ Demo communications seeded.');
     }
+
+    // 20. Create site_visits table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS site_visits (
+        id VARCHAR(255) PRIMARY KEY,
+        inquiry_id VARCHAR(255) REFERENCES inquiries(id) ON DELETE SET NULL,
+        inquiry_number VARCHAR(50),
+        company_id VARCHAR(255) REFERENCES companies(id) ON DELETE CASCADE,
+        company_name VARCHAR(255) NOT NULL,
+        property_id VARCHAR(255) REFERENCES properties(id) ON DELETE SET NULL,
+        property_name VARCHAR(255) NOT NULL,
+        scheduled_date VARCHAR(50) NOT NULL,
+        scheduled_time VARCHAR(50) DEFAULT '11:00 AM',
+        host_user_id VARCHAR(255),
+        host_user_name VARCHAR(255),
+        visitor_name VARCHAR(255),
+        visitor_phone VARCHAR(50),
+        status VARCHAR(50) DEFAULT 'Scheduled',
+        client_feedback TEXT,
+        follow_up_action TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_site_visits_company ON site_visits(company_id);
+      CREATE INDEX IF NOT EXISTS idx_site_visits_inquiry ON site_visits(inquiry_id);
+      CREATE INDEX IF NOT EXISTS idx_site_visits_date ON site_visits(scheduled_date);
+    `);
+    console.log('✅ Table "site_visits" verified / updated in PostgreSQL.');
+
+    // 21. Create pipeline_stages table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS pipeline_stages (
+        id VARCHAR(255) PRIMARY KEY,
+        key VARCHAR(100) UNIQUE NOT NULL,
+        label VARCHAR(255) NOT NULL,
+        color VARCHAR(50) DEFAULT '#64748B',
+        bg_color VARCHAR(50) DEFAULT 'bg-slate-50',
+        text_color VARCHAR(50) DEFAULT 'text-slate-700',
+        border_color VARCHAR(50) DEFAULT 'border-slate-300',
+        description TEXT,
+        stage_order INT DEFAULT 1,
+        is_system BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Table "pipeline_stages" verified / updated in PostgreSQL.');
+
+    // Seed default pipeline stages
+    const defaultPipelineStages = [
+      ['stg_1', 'new', 'New Lead', '#64748B', 'bg-slate-50', 'text-slate-700', 'border-slate-300', 'Inquiry received, awaiting initial sales touchpoint.', 1, true],
+      ['stg_2', 'contacted', 'Contacted', '#0284C7', 'bg-sky-50', 'text-sky-700', 'border-sky-300', 'Initial interaction conducted via call, WhatsApp, or email.', 2, true],
+      ['stg_3', 'requirement_confirmed', 'Req. Confirmed', '#4F46E5', 'bg-indigo-50', 'text-indigo-700', 'border-indigo-300', 'Area, timeline, budget, and technical specs validated.', 3, true],
+      ['stg_4', 'property_matched', 'Property Matched', '#0F6B4F', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-300', 'At least one Fairway warehouse park matched to requirement.', 4, true],
+      ['stg_5', 'property_shared', 'Property Shared', '#0D9488', 'bg-teal-50', 'text-teal-700', 'border-teal-300', 'Brochure, specs, and layout shared with decision-maker.', 5, true],
+      ['stg_6', 'proposal', 'Proposal Sent', '#7C3AED', 'bg-purple-50', 'text-purple-700', 'border-purple-300', 'Formal commercial proposal document drafted & delivered.', 6, true],
+      ['stg_7', 'site_visit', 'Site Visit', '#EA580C', 'bg-orange-50', 'text-orange-700', 'border-orange-300', 'Site inspection scheduled or in progress at warehouse park.', 7, true],
+      ['stg_8', 'negotiation', 'Negotiation', '#D97706', 'bg-amber-50', 'text-amber-700', 'border-amber-300', 'Commercial terms, lock-in, and lease duration under active review.', 8, true],
+      ['stg_9', 'won', 'Won (Closed)', '#059669', 'bg-green-100', 'text-green-800', 'border-green-400', 'Lease agreement finalized and LOI signed.', 9, true],
+      ['stg_10', 'lost', 'Lost', '#DC2626', 'bg-rose-50', 'text-rose-700', 'border-rose-300', 'Deal lost with mandatory documented reason and context.', 10, true],
+    ];
+
+    for (const stage of defaultPipelineStages) {
+      await client.query(
+        `INSERT INTO pipeline_stages (id, key, label, color, bg_color, text_color, border_color, description, stage_order, is_system)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (key) DO NOTHING;`,
+        stage
+      );
+    }
+    console.log('✅ Default pipeline stages seeded in PostgreSQL.');
+
+    // 22. Create notifications table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255),
+        type VARCHAR(50) DEFAULT 'info',
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        entity_type VARCHAR(100),
+        entity_id VARCHAR(255),
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+      CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);
+    `);
+    console.log('✅ Table "notifications" verified / updated in PostgreSQL.');
 
     // Ensure all CRM schema columns, constraints, and matrix baseline are in sync
     await runAllSchemaFixes();

@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'admin' | 'sales' | 'viewer';
+export type UserRole = 'super_admin' | 'admin' | 'sales' | 'viewer' | (string & {});
 
 export interface User {
   id: string;
@@ -422,3 +422,6 @@ export interface ImportResult {
   importedCompanies: string[];
   importedInquiries: string[];
 }
+
+export * from './call';
+

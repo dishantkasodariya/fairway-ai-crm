@@ -1,5 +1,5 @@
 import { Proposal, ProposalStatus } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export class ProposalService {
   /**
@@ -27,7 +27,9 @@ export class ProposalService {
       }
 
       const queryString = params.toString() ? `?${params.toString()}` : '';
-      const res = await fetch(`${API_BASE_URL}/proposals${queryString}`);
+      const res = await fetch(`${API_BASE_URL}/proposals${queryString}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -41,7 +43,9 @@ export class ProposalService {
    */
   static async getProposalById(id: string): Promise<{ success: boolean; data?: Proposal; error?: string }> {
     try {
-      const res = await fetch(`${API_BASE_URL}/proposals/${id}`);
+      const res = await fetch(`${API_BASE_URL}/proposals/${id}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -57,7 +61,7 @@ export class ProposalService {
     try {
       const res = await fetch(`${API_BASE_URL}/proposals`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(proposalData),
       });
       const json = await res.json();
@@ -75,7 +79,7 @@ export class ProposalService {
     try {
       const res = await fetch(`${API_BASE_URL}/proposals/${id}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ status }),
       });
       const json = await res.json();
@@ -93,7 +97,7 @@ export class ProposalService {
     try {
       const res = await fetch(`${API_BASE_URL}/proposals/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(proposalData),
       });
       const json = await res.json();
@@ -111,6 +115,7 @@ export class ProposalService {
     try {
       const res = await fetch(`${API_BASE_URL}/proposals/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const json = await res.json();
       return json;

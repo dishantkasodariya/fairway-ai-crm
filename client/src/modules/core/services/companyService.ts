@@ -1,5 +1,5 @@
 import { Company, Contact, Facility, Inquiry } from '@/modules/core/types';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, getAuthHeaders } from './api';
 
 export interface CreateCompanyPayload {
   name: string;
@@ -67,7 +67,9 @@ export class CompanyService {
       if (params?.city && params.city !== 'all') queryParams.set('city', params.city);
       if (params?.assignedOwnerId && params.assignedOwnerId !== 'all') queryParams.set('assignedOwnerId', params.assignedOwnerId);
 
-      const res = await fetch(`${API_BASE_URL}/companies?${queryParams.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/companies?${queryParams.toString()}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -89,7 +91,9 @@ export class CompanyService {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE_URL}/companies/${id}`);
+      const res = await fetch(`${API_BASE_URL}/companies/${id}`, {
+        headers: getAuthHeaders(),
+      });
       const json = await res.json();
       return json;
     } catch (err: any) {
@@ -98,24 +102,63 @@ export class CompanyService {
     }
   }
 
+  private static duplicateAbortController: AbortController | null = null;
+  private static duplicateCache: Map<string, Array<{ id: string; name: string; legal_name: string; city: string; industry: string }>> = new Map();
+
   /**
-   * Check for duplicate companies by name
+   * Check for duplicate companies by name with debounced abort controller and query cache
    */
   static async checkDuplicates(name: string): Promise<{
     success: boolean;
     duplicates?: Array<{ id: string; name: string; legal_name: string; city: string; industry: string }>;
     error?: string;
   }> {
+    const trimmed = (name || '').trim();
+    if (trimmed.length < 3) {
+      return { success: true, duplicates: [] };
+    }
+
+    const cacheKey = trimmed.toLowerCase();
+    if (this.duplicateCache.has(cacheKey)) {
+      return { success: true, duplicates: this.duplicateCache.get(cacheKey) };
+    }
+
+    // Abort any existing in-flight duplicate check
+    if (this.duplicateAbortController) {
+      this.duplicateAbortController.abort();
+      this.duplicateAbortController = null;
+    }
+
+    const controller = new AbortController();
+    this.duplicateAbortController = controller;
+
     try {
       const res = await fetch(`${API_BASE_URL}/companies/check-duplicate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ name: trimmed }),
+        signal: controller.signal,
       });
+
       const json = await res.json();
+      if (json.success && Array.isArray(json.duplicates)) {
+        if (this.duplicateCache.size > 100) {
+          const firstKey = this.duplicateCache.keys().next().value;
+          if (firstKey) this.duplicateCache.delete(firstKey);
+        }
+        this.duplicateCache.set(cacheKey, json.duplicates);
+      }
       return json;
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        // Silently swallowed for superseded keystroke requests
+        return { success: true, duplicates: [] };
+      }
       return { success: false, error: err.message };
+    } finally {
+      if (this.duplicateAbortController === controller) {
+        this.duplicateAbortController = null;
+      }
     }
   }
 
@@ -130,7 +173,7 @@ export class CompanyService {
     try {
       const res = await fetch(`${API_BASE_URL}/companies`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -152,7 +195,7 @@ export class CompanyService {
     try {
       const res = await fetch(`${API_BASE_URL}/companies/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
       const json = await res.json();
@@ -169,6 +212,7 @@ export class CompanyService {
     try {
       const res = await fetch(`${API_BASE_URL}/companies/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
       const json = await res.json();
       return json;

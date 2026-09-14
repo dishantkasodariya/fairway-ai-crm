@@ -13,8 +13,6 @@ import { useTheme } from "@/modules/core/providers/ThemeContext";
 import { Card, CardHeader, CardTitle } from "@/modules/core/components/ui/Card";
 import { cn } from "@/modules/core/lib/utils";
 
-import { StorageService } from "@/modules/core/services/storageService";
-
 export const chartPieDonutTitle = "A donut chart with an active sector";
 
 export interface DonutDataItem {
@@ -27,15 +25,15 @@ export interface DonutDataItem {
 
 export interface ChartPieDonutActiveProps {
   data?: DonutDataItem[];
+  inquiries?: Array<{ industry?: string }>;
   title?: string;
   subtitle?: string;
   className?: string;
   showCardWrapper?: boolean;
 }
 
-// Generate real-time industry category distribution from actual CRM inquiries
-export const generateRealtimeIndustryData = (): DonutDataItem[] => {
-  const inquiries = StorageService.getInquiries();
+// Generate real-time industry category distribution from inquiries
+export const generateRealtimeIndustryData = (inquiries: Array<{ industry?: string }> = []): DonutDataItem[] => {
   const counts: Record<string, number> = {};
 
   inquiries.forEach((inq) => {
@@ -57,6 +55,7 @@ export const generateRealtimeIndustryData = (): DonutDataItem[] => {
 
 export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
   data,
+  inquiries,
   title: cardTitle = "Tenant Demand by Industry Category",
   subtitle = "Real-time sector distribution and market share from active inquiries",
   className,
@@ -67,8 +66,9 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
 
   const sourceData = useMemo(() => {
     if (data && data.length > 0) return data;
-    return generateRealtimeIndustryData();
-  }, [data]);
+    if (inquiries) return generateRealtimeIndustryData(inquiries);
+    return [];
+  }, [data, inquiries]);
 
   const totalValue = useMemo(() => {
     return sourceData.reduce((acc, item) => acc + item.value, 0);
@@ -110,12 +110,33 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
     return cfg;
   }, [computedData]);
 
+  if (computedData.length === 0) {
+    const emptyContent = (
+      <div className="flex flex-col items-center justify-center py-12 text-center text-foreground-muted">
+        <p className="text-sm font-medium">No industry data recorded yet</p>
+        <p className="text-xs mt-1">Data will appear once inquiries are added to the pipeline.</p>
+      </div>
+    );
+    if (!showCardWrapper) return emptyContent;
+    return (
+      <Card className="flex flex-col border border-border shadow-xs bg-surface">
+        <CardHeader className="pb-2 border-b border-border/40">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold text-foreground tracking-tight">{cardTitle}</CardTitle>
+          </div>
+          {subtitle && <p className="text-xs text-foreground-muted mt-1 leading-relaxed">{subtitle}</p>}
+        </CardHeader>
+        <div className="p-4">{emptyContent}</div>
+      </Card>
+    );
+  }
+
   const activeItem = computedData[activeIndex] || computedData[0];
 
   const content = (
     <div className={cn("flex flex-col sm:flex-row items-center justify-between gap-6 p-2", className)}>
       {/* Donut Chart with Active Center Title & Value */}
-      <div className="relative w-full max-w-[240px] aspect-square flex items-center justify-center">
+      <div className="relative w-full max-w-[240px] aspect-square flex items-center justify-center shrink-0">
         <ChartContainer
           config={dynamicChartConfig}
           className="mx-auto aspect-square w-full max-h-[240px]"
@@ -224,7 +245,12 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
       </div>
 
       {/* Side Legend with Vertical Indicators and Percentage Values */}
-      <div className="flex-1 w-full flex flex-col justify-center space-y-2.5">
+      <div
+        className={cn(
+          "flex-1 w-full flex flex-col max-h-[250px] overflow-y-auto pr-1.5 space-y-1.5 min-w-0",
+          computedData.length <= 4 ? "justify-center" : "justify-start"
+        )}
+      >
         {computedData.map((item, idx) => {
           const isActive = activeIndex === idx;
           return (
@@ -232,7 +258,7 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
               key={item.name}
               onMouseEnter={() => setActiveIndex(idx)}
               className={cn(
-                "flex items-center justify-between p-2 rounded-lg transition-all duration-150 cursor-pointer select-none group",
+                "flex items-center justify-between py-1.5 px-2.5 rounded-lg transition-all duration-150 cursor-pointer select-none group",
                 isActive
                   ? "bg-surface-muted/90 shadow-xs border border-border font-semibold text-foreground"
                   : "hover:bg-surface-muted/50 border border-transparent text-foreground-muted hover:text-foreground"

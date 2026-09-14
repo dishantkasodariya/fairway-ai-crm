@@ -19,6 +19,10 @@ import followUpsRoutes from './followups.routes.js';
 import auditRoutes from './audit.routes.js';
 import documentsRoutes from './documents.routes.js';
 import communicationsRoutes from './communications.routes.js';
+import siteVisitsRoutes from './site-visits.routes.js';
+import pipelineStagesRoutes from './pipeline-stages.routes.js';
+import notificationsRoutes from './notifications.routes.js';
+import callsRoutes from './calls.routes.js';
 
 const router = Router();
 
@@ -45,6 +49,10 @@ router.use('/roles', authenticateJWT, roleRoutes);
 router.use('/audit-logs', authenticateJWT, auditRoutes);
 router.use('/documents', authenticateJWT, documentsRoutes);
 router.use('/communications', authenticateJWT, communicationsRoutes);
+router.use('/site-visits', authenticateJWT, siteVisitsRoutes);
+router.use('/pipeline-stages', authenticateJWT, pipelineStagesRoutes);
+router.use('/notifications', authenticateJWT, notificationsRoutes);
+router.use('/calls', authenticateJWT, callsRoutes);
 
 export default router;
 

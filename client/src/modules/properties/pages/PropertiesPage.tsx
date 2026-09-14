@@ -33,7 +33,6 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/modules/core/components/ui/tooltip';
-import { StorageService } from '@/modules/core/services/storageService';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { Property, PropertyStatus } from '@/modules/core/types';
@@ -42,6 +41,8 @@ import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { DataTable7, ColumnConfig } from '@/modules/core/components/ui/data-table-7';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
+import { PropertiesList } from '../components/PropertiesList';
+import { PropertiesCard } from '../components/PropertiesCard';
 import { cn } from '@/modules/core/lib/utils';
 
 export interface PropertyListViewProps {
@@ -50,61 +51,12 @@ export interface PropertyListViewProps {
   onOpenNewProperty?: () => void;
 }
 
-const PropertyCardBanner: React.FC<{
-  photoSrc?: string;
-  code: string;
-  status: string;
-  isAvail: boolean;
-  rentPerSqFtINR: number;
-}> = ({ photoSrc, code, status, isAvail, rentPerSqFtINR }) => {
-  const [hasError, setHasError] = useState(false);
-
-  return (
-    <div className="relative h-44 sm:h-48 w-full bg-slate-900 overflow-hidden shrink-0 select-none">
-      {!hasError && photoSrc ? (
-        <img
-          src={photoSrc}
-          alt=""
-          onError={() => setHasError(true)}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          loading="lazy"
-        />
-      ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-linear-to-br from-slate-900 via-slate-800 to-fairway-950 text-white relative">
-          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
-          <Warehouse className="w-10 h-10 text-fairway-400/70 mb-1 z-1" />
-          <span className="text-[11px] font-medium text-slate-300 z-1">Grade-A Logistics Facility</span>
-        </div>
-      )}
-
-      {/* Top Badges */}
-      <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 flex items-center gap-1.5 flex-wrap max-w-[85%] z-10">
-        <span className="font-mono text-[11px] sm:text-xs font-bold bg-slate-950/85 text-white backdrop-blur-md px-2 py-0.5 rounded shadow-xs border border-white/10">
-          {code}
-        </span>
-        <span
-          className={`text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur-md shadow-xs ${
-            isAvail ? 'bg-emerald-600/90 text-white' : 'bg-amber-600/90 text-white'
-          }`}
-        >
-          {status}
-        </span>
-      </div>
-
-      {/* Rent Badge */}
-      <div className="absolute bottom-2.5 right-2.5 sm:bottom-3 sm:right-3 bg-slate-950/85 text-white backdrop-blur-md px-2.5 py-1 rounded text-xs font-black border border-white/10 shadow-xs z-10">
-        ₹{rentPerSqFtINR} <span className="text-[10px] font-normal text-slate-300">/ sq.ft</span>
-      </div>
-    </div>
-  );
-};
-
 export const PropertyListView: React.FC<PropertyListViewProps> = ({
   onSelectProperty,
   onNavigateToMap,
   onOpenNewProperty,
 }) => {
-  const { canEdit } = useAuth();
+  const { canEdit, canCreate } = useAuth();
 
   // Search & View Mode
   const [searchQuery, setSearchQuery] = useState('');
@@ -148,15 +100,13 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
 
     try {
       const res = await PropertyService.getProperties();
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         setProperties(res.data);
       } else {
-        const local = StorageService.getProperties();
-        setProperties(local);
+        setProperties([]);
       }
     } catch {
-      const local = StorageService.getProperties();
-      setProperties(local);
+      setProperties([]);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -382,24 +332,24 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           <Button
             size="sm"
             variant="outline"
             onClick={onNavigateToMap}
-            leftIcon={<MapPin className="w-3.5 h-3.5 text-fairway-600" />}
-            className="text-xs"
+            leftIcon={<MapPin className="w-3.5 h-3.5 text-fairway-600 shrink-0" />}
+            className="flex-1 sm:flex-initial text-[11px] sm:text-xs px-2 sm:px-3 justify-center whitespace-nowrap h-8.5"
           >
             <span>View Map</span>
           </Button>
 
-          {canEdit && onOpenNewProperty && (
+          {canCreate('properties') && onOpenNewProperty && (
             <Button
               size="sm"
               variant="primary"
               onClick={onOpenNewProperty}
-              leftIcon={<Plus className="w-3.5 h-3.5" />}
-              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs shadow-xs"
+              leftIcon={<Plus className="w-3.5 h-3.5 shrink-0" />}
+              className="flex-1 sm:flex-initial bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-[11px] sm:text-xs px-2 sm:px-3 justify-center whitespace-nowrap shadow-xs h-8.5"
             >
               <span>Add Warehouse</span>
             </Button>
@@ -408,16 +358,16 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
       </div>
 
       {/* Sleek Search & Control Toolbar matching reference */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+      <div className="flex items-center justify-between gap-2 sm:gap-3 pt-1 w-full">
         {/* Left: Search Bar */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5" />
+        <div className="relative flex-1 min-w-0 max-w-md">
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5 pointer-events-none" />
           <input
             type="text"
             placeholder="Search warehouse parks, codes, cities, or corridors..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors h-9"
           />
           {searchQuery && (
             <button
@@ -433,7 +383,7 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
 
         {/* Right: Controls & View Switcher */}
         <TooltipProvider delayDuration={150}>
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Filter Drawer Trigger Button */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -458,41 +408,43 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Column Settings Dropdown */}
-            <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+            {/* Column Settings Dropdown (Desktop Only) */}
+            <div className="hidden sm:block">
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        <Settings className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Column
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
+                  <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
+                    Toggle Columns
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {allColumns.filter((c) => c.key !== 'actions').map((col) => (
+                    <DropdownMenuCheckboxItem
+                      key={col.key}
+                      checked={columnVisibility[col.key] !== false}
+                      onSelect={(e) => e.preventDefault()}
+                      onCheckedChange={(val) => setColumnVisibility((prev) => ({ ...prev, [col.key]: !!val }))}
+                      className="text-xs cursor-pointer"
                     >
-                      <Settings className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Column
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
-                <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
-                  Toggle Columns
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {allColumns.filter((c) => c.key !== 'actions').map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={col.key}
-                    checked={columnVisibility[col.key] !== false}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumnVisibility((prev) => ({ ...prev, [col.key]: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    {col.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                      {col.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             {/* Refresh Button */}
             <Tooltip>
@@ -516,8 +468,8 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Segmented View Switcher */}
-            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+            {/* Segmented View Switcher (Desktop Only) */}
+            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -595,77 +547,32 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
             </Button>
           )}
         </div>
-      ) : viewMode === 'table' ? (
-        /* View 1: Data Table */
-        <DataTable7<Property>
-          data={filteredProps}
-          columns={visibleColumns}
-          keyExtractor={(p) => p.id}
-          onRowClick={(p) => onSelectProperty(p.id)}
-        />
       ) : (
-        /* View 2: Cards Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {filteredProps.map((p) => {
-            const isAvail = p.status?.toLowerCase() === 'available';
-            return (
-              <div
-                key={p.id}
-                onClick={() => onSelectProperty(p.id)}
-                className="group bg-surface rounded-card border border-border hover:border-fairway-500/60 transition-all duration-200 shadow-subtle hover:shadow-card flex flex-col overflow-hidden text-left cursor-pointer"
-              >
-                <PropertyCardBanner
-                  photoSrc={p.photos?.[0]}
-                  code={p.code}
-                  status={p.status || 'Available'}
-                  isAvail={isAvail}
-                  rentPerSqFtINR={p.rentPerSqFtINR}
-                />
+        <>
+          {/* Mobile view: ONLY Card View show, NOT list page show */}
+          <div className="block sm:hidden">
+            <PropertiesCard
+              properties={filteredProps}
+              onSelectProperty={onSelectProperty}
+            />
+          </div>
 
-                <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3">
-                  <div className="space-y-1.5">
-                    <h3 className="font-bold text-foreground text-sm group-hover:text-fairway-700 transition-colors line-clamp-2">
-                      {p.name}
-                    </h3>
-                    <p className="text-xs text-foreground-muted flex items-center gap-1 line-clamp-1">
-                      <MapPin className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
-                      <span>{p.city || 'Gujarat'}, {p.corridor || p.location || 'Industrial Belt'}</span>
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/70 text-xs">
-                    <div>
-                      <span className="text-[11px] text-foreground-muted block">Available Space</span>
-                      <span className="font-bold text-foreground">{formatSqFt(p.availableAreaSqFt)}</span>
-                    </div>
-                    <div>
-                      <span className="text-[11px] text-foreground-muted block">Total Area</span>
-                      <span className="font-medium text-foreground">{formatSqFt(p.totalAreaSqFt)}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-border/70 text-[11px] text-foreground-muted flex-wrap">
-                    {p.clearHeightFt && (
-                      <span className="bg-surface-muted px-2 py-0.5 rounded border border-border/60">
-                        {p.clearHeightFt}m Height
-                      </span>
-                    )}
-                    {p.docksCount && (
-                      <span className="bg-surface-muted px-2 py-0.5 rounded border border-border/60">
-                        {p.docksCount} Docks
-                      </span>
-                    )}
-                    {p.flooringCapacityMT && (
-                      <span className="bg-surface-muted px-2 py-0.5 rounded border border-border/60">
-                        {p.flooringCapacityMT} MT Flooring
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          {/* Desktop view: Respects user viewMode (List vs Card) */}
+          <div className="hidden sm:block">
+            {viewMode === 'table' ? (
+              <PropertiesList
+                properties={filteredProps}
+                columns={visibleColumns}
+                onSelectProperty={onSelectProperty}
+              />
+            ) : (
+              <PropertiesCard
+                properties={filteredProps}
+                onSelectProperty={onSelectProperty}
+              />
+            )}
+          </div>
+        </>
       )}
 
       {/* Advanced Filters Drawer (Right Slide-out) */}

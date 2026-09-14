@@ -12,8 +12,6 @@ import {
   ChartTooltipContent,
 } from "@/modules/core/components/ui/chart";
 import { useTheme } from "@/modules/core/providers/ThemeContext";
-import { StorageService } from "@/modules/core/services/storageService";
-
 export interface AreaChartItem {
   date: string;
   inquiries: number;
@@ -23,6 +21,8 @@ export interface AreaChartItem {
 
 export interface ChartAreaInteractiveProps {
   data?: AreaChartItem[];
+  inquiries?: Array<{ inquiryDate?: string; createdAt?: string; requiredAreaSqFt?: number }>;
+  tasks?: Array<{ taskType?: string; dueDate?: string }>;
   title?: string;
   subtitle?: string;
   metric1Label?: string;
@@ -30,11 +30,11 @@ export interface ChartAreaInteractiveProps {
   className?: string;
 }
 
-// Helper to generate dynamic real-time timeline from actual CRM data
-const generateRealtimeCRMData = (): AreaChartItem[] => {
-  const inquiries = StorageService.getInquiries();
-  const tasks = StorageService.getTasks();
-
+// Helper to generate dynamic real-time timeline from CRM data
+export const generateRealtimeCRMData = (
+  inquiries: Array<{ inquiryDate?: string; createdAt?: string; requiredAreaSqFt?: number }> = [],
+  tasks: Array<{ taskType?: string; dueDate?: string }> = []
+): AreaChartItem[] => {
   const now = new Date();
   const days = 90;
   const mapByDate: Record<string, { inquiries: number; visits: number; area: number }> = {};
@@ -69,21 +69,14 @@ const generateRealtimeCRMData = (): AreaChartItem[] => {
     }
   });
 
-  // If inquiries count across the 90 days is sparse (e.g. sample data with spread dates),
-  // distribute realistic rolling moving averages around the actual inquiries so chart looks alive and authentic
   const result: AreaChartItem[] = Object.keys(mapByDate)
     .sort()
-    .map((dateStr, idx) => {
+    .map((dateStr) => {
       const actual = mapByDate[dateStr];
-      // Seed-aligned micro baseline so line doesn't drop to zero on non-deal days
-      const simulatedBaseline = (Math.sin(idx * 0.3) + 1.2) * 1.5;
-      const finalInquiries = actual.inquiries > 0 ? actual.inquiries * 4 + 2 : Math.max(1, Math.round(simulatedBaseline));
-      const finalVisits = actual.visits > 0 ? actual.visits * 3 + 1 : Math.max(0, Math.round(simulatedBaseline * 0.75));
-
       return {
         date: dateStr,
-        inquiries: finalInquiries,
-        visits: finalVisits,
+        inquiries: actual.inquiries,
+        visits: actual.visits,
         demandAreaSqFt: actual.area,
       };
     });
@@ -93,6 +86,8 @@ const generateRealtimeCRMData = (): AreaChartItem[] => {
 
 export const ChartAreaInteractive: React.FC<ChartAreaInteractiveProps> = ({
   data,
+  inquiries,
+  tasks,
   title = "Inquiries & Site Visits Trajectory",
   subtitle = "Interactive area trend of demand generation and client property inspections across key corridors",
   metric1Label = "Inquiries Logged",
@@ -107,8 +102,9 @@ export const ChartAreaInteractive: React.FC<ChartAreaInteractiveProps> = ({
 
   const sourceData = useMemo(() => {
     if (data && data.length > 0) return data;
-    return generateRealtimeCRMData();
-  }, [data]);
+    if (inquiries || tasks) return generateRealtimeCRMData(inquiries, tasks);
+    return [];
+  }, [data, inquiries, tasks]);
 
   const dynamicChartConfig = {
     activity: {
