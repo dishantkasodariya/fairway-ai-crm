@@ -10,6 +10,9 @@ import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 
+// Trust reverse proxy headers (Render, Vercel, Cloudflare) for accurate rate limiting
+app.set('trust proxy', 1);
+
 // Security Headers with Helmet
 app.use(
   helmet({
@@ -26,10 +29,10 @@ const globalApiLimiter = rateLimit({
 });
 app.use('/api', globalApiLimiter);
 
-// Rate Limiting: Authentication brute-force protection (20 req / 15 min)
+// Rate Limiting: Authentication brute-force protection (100 req / 15 min)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -72,10 +75,21 @@ app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps, curl, server-to-server)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin) return callback(null, true);
+
+      // Support wildcard CLIENT_URL=* (reflect origin so credentials work without browser block)
+      if (config.clientUrl === '*') return callback(null, true);
+
+      // Automatically allow all *.onrender.com and *.vercel.app deployments
+      if (origin.endsWith('.onrender.com') || origin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
-      return callback(new Error('Cross-Origin Request Blocked by CORS policy'));
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(null, false);
     },
     credentials: true,
   })
