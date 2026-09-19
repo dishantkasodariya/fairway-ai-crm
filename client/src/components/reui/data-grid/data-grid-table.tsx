@@ -832,8 +832,10 @@ function DataGridTableHeadRowCell<TData extends object>({
         props.tableLayout?.columnsPinnable &&
           column.getCanPin() &&
           cn(
-            "data-[pinned]:bg-surface data-[pinned]:z-20 data-outer-pinned-col:bg-clip-padding data-[pinned]:isolate",
-            "[&[data-pinned=end]:last-child_div.cursor-col-resize:last-child]:opacity-0 [&[data-pinned=end][data-last-col=end]]:shadow-[inset_1px_0_0_0_var(--border-color)] [&[data-pinned=start][data-last-col=start]]:shadow-[inset_-1px_0_0_0_var(--border-color)]",
+            "data-[pinned]:bg-surface dark:data-[pinned]:bg-[#161c24] dark:bg-[#161c24] data-[pinned]:z-20 data-outer-pinned-col:bg-clip-padding data-[pinned]:isolate",
+            "[&[data-pinned=end]:last-child_div.cursor-col-resize:last-child]:opacity-0",
+            "[&[data-pinned=end][data-last-col=end]]:shadow-[inset_1px_0_0_0_var(--border-color)] dark:[&[data-pinned=end][data-last-col=end]]:shadow-[inset_1px_0_0_0_rgba(255,255,255,0.07)]",
+            "[&[data-pinned=start][data-last-col=start]]:shadow-[inset_-1px_0_0_0_var(--border-color)] dark:[&[data-pinned=start][data-last-col=start]]:shadow-[inset_-1px_0_0_0_rgba(255,255,255,0.07)]",
             "[&:not([data-pinned]):has(+[data-pinned])_div.cursor-col-resize:last-child]:opacity-0 [&[data-last-col=start]_div.cursor-col-resize:last-child]:opacity-0"
           ),
         header.column.columnDef.meta?.headerClassName,
@@ -958,12 +960,12 @@ function DataGridTableHeadRowCellResize<TData extends object>({
                   // column showing a resize cursor and no indicator at all.
                   props.tableLayout?.columnsPinnable
                     ? "before:hidden"
-                    : "before:absolute before:inset-y-0 before:end-0 before:w-px before:bg-border"
+                    : "before:absolute before:inset-y-1.5 before:end-0 before:w-px before:bg-border/50 dark:before:bg-white/[0.08]"
                 )
-              : "-end-2 w-5 justify-center before:absolute before:inset-y-0 before:w-px before:-translate-x-px before:bg-border",
+              : "-end-2 w-5 justify-center before:absolute before:inset-y-1.5 before:w-px before:-translate-x-px before:bg-border/50 dark:before:bg-white/[0.08]",
           column.getIsResizing() &&
             (isResizeModeOnEnd
-              ? "opacity-100"
+              ? "before:hidden opacity-0"
               : isLastVisibleColumn
                 ? "before:absolute before:end-0 before:block before:inset-y-0 before:w-0.5 before:bg-primary opacity-100"
                 : "before:block before:bg-primary before:w-0.5 opacity-100")
@@ -1168,7 +1170,7 @@ function DataGridTableBodyRowSkeleton({ children }: { children: ReactNode }) {
         props.onRowClick && "cursor-pointer",
         !props.tableLayout?.stripped &&
           props.tableLayout?.rowBorder &&
-          "border-border border-b [&:not(:last-child)>td]:border-b",
+          "border-border/40 dark:border-white/[0.04] border-b [&:not(:last-child)>td]:border-b [&:not(:last-child)>td]:border-border/40 dark:[&:not(:last-child)>td]:border-white/[0.04]",
         props.tableLayout?.cellBorder && "*:last:border-e-0",
         props.tableLayout?.stripped &&
           "odd:bg-muted/90 odd:hover:bg-muted hover:bg-transparent",
@@ -1257,7 +1259,7 @@ function DataGridTableBodyRow<TData extends object>({
   const isRowPinned = row.getIsPinned()
 
   const bodyRowBottomBorderClasses =
-    "[&:not(:last-child)>td]:border-b [tbody:has(+tfoot)_&:last-child>td]:border-b [*:has(>[data-slot=data-grid]+[data-slot=data-grid-pagination])_[data-slot=data-grid]_&:last-child>td]:border-b"
+    "[&:not(:last-child)>td]:border-b [&:not(:last-child)>td]:border-border/40 dark:[&:not(:last-child)>td]:border-white/[0.04] [tbody:has(+tfoot)_&:last-child>td]:border-b [tbody:has(+tfoot)_&:last-child>td]:border-border/40 dark:[tbody:has(+tfoot)_&:last-child>td]:border-white/[0.04] [*:has(>[data-slot=data-grid]+[data-slot=data-grid-pagination])_[data-slot=data-grid]_&:last-child>td]:border-b [*:has(>[data-slot=data-grid]+[data-slot=data-grid-pagination])_[data-slot=data-grid]_&:last-child>td]:border-border/40 dark:[*:has(>[data-slot=data-grid]+[data-slot=data-grid-pagination])_[data-slot=data-grid]_&:last-child>td]:border-white/[0.04]"
 
   return (
     <tr
@@ -1278,7 +1280,7 @@ function DataGridTableBodyRow<TData extends object>({
       data-row-pinned-boundary={pinnedBoundary}
       onClick={() => props.onRowClick && props.onRowClick(row.original)}
       className={cn(
-        "hover:bg-muted/40 data-[state=selected]:bg-muted/50",
+        "group/row hover:bg-surface-muted/90 dark:hover:bg-white/[0.04] data-[state=selected]:bg-surface-muted transition-colors cursor-pointer",
         props.onRowClick && "cursor-pointer",
         !props.tableLayout?.stripped &&
           props.tableLayout?.rowBorder &&
@@ -1299,9 +1301,9 @@ function DataGridTableBodyRow<TData extends object>({
           isRowPinned &&
           "bg-muted/30 hover:bg-muted/50",
         pinnedBoundary === "top" &&
-          "[&>td]:shadow-[0_2px_0_rgba(0,0,0,0.03)] dark:[&>td]:shadow-[0_2px_0_rgba(255,255,255,0.06)]",
+          "[&>td]:shadow-[0_1px_0_rgba(0,0,0,0.03)] dark:[&>td]:shadow-[0_1px_0_rgba(255,255,255,0.04)]",
         pinnedBoundary === "bottom" &&
-          "[&>td]:shadow-[0_2px_0_rgba(0,0,0,0.03)] dark:[&>td]:shadow-[0_2px_0_rgba(255,255,255,0.06)]",
+          "[&>td]:shadow-[0_1px_0_rgba(0,0,0,0.03)] dark:[&>td]:shadow-[0_1px_0_rgba(255,255,255,0.04)]",
         props.tableClassNames?.bodyRow
       )}
     >
@@ -1395,8 +1397,9 @@ function DataGridTableBodyRowCell<TData extends object>({
           column.getCanPin() &&
           cn(
             "data-[pinned]:bg-surface data-[pinned]:z-10 data-[pinned]:isolate",
-            "[&[data-pinned=start][data-last-col=start]]:shadow-[inset_-1px_0_0_0_var(--border-color)]",
-            "[&[data-pinned=end][data-last-col=end]]:shadow-[inset_1px_0_0_0_var(--border-color)]"
+            "group-hover/row:data-[pinned]:bg-surface-muted dark:group-hover/row:data-[pinned]:bg-[#1c1c20] data-[state=selected]:data-[pinned]:bg-primary/10 dark:data-[state=selected]:data-[pinned]:bg-[#222226] transition-colors",
+            "[&[data-pinned=start][data-last-col=start]]:shadow-[inset_-1px_0_0_0_var(--border-color)] dark:[&[data-pinned=start][data-last-col=start]]:shadow-[inset_-1px_0_0_0_rgba(255,255,255,0.07)]",
+            "[&[data-pinned=end][data-last-col=end]]:shadow-[inset_1px_0_0_0_var(--border-color)] dark:[&[data-pinned=end][data-last-col=end]]:shadow-[inset_1px_0_0_0_rgba(255,255,255,0.07)]"
           ),
         column.getIndex() === 0 ||
           column.getIndex() === row.getVisibleCells().length - 1

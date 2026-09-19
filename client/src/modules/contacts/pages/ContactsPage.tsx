@@ -331,7 +331,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
         <Card className="p-3.5 bg-surface border border-border shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total Contacts</span>
-            <span className="p-1.5 rounded-lg bg-orange-50 dark:bg-orange-950/50 text-primary">
+            <span className="p-1.5 rounded-lg bg-surface-muted text-foreground border border-border">
               <Users className="w-4 h-4" />
             </span>
           </div>
@@ -344,7 +344,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
         <Card className="p-3.5 bg-surface border border-border shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Decision Makers</span>
-            <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600">
+            <span className="p-1.5 rounded-lg bg-surface-muted text-foreground border border-border">
               <ShieldCheck className="w-4 h-4" />
             </span>
           </div>
@@ -357,7 +357,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
         <Card className="p-3.5 bg-surface border border-border shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Primary Liaisons</span>
-            <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600">
+            <span className="p-1.5 rounded-lg bg-surface-muted text-foreground border border-border">
               <Star className="w-4 h-4" />
             </span>
           </div>
@@ -370,7 +370,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
         <Card className="p-3.5 bg-surface border border-border shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Companies Connected</span>
-            <span className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600">
+            <span className="p-1.5 rounded-lg bg-surface-muted text-foreground border border-border">
               <Building2 className="w-4 h-4" />
             </span>
           </div>
@@ -450,7 +450,7 @@ export const ContactsPage: React.FC<ContactsPageProps> = ({ onSelectCompany }) =
                     Column
                   </TooltipContent>
                 </Tooltip>
-                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
+                <DropdownMenuContent align="end" className="w-48 bg-surface dark:bg-[#161c24] border border-border dark:border-white/[0.12] shadow-none ring-0 outline-none p-1 rounded-card z-50">
                   <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
                     Toggle Columns
                   </DropdownMenuLabel>

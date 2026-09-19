@@ -26,6 +26,7 @@ const CommandInput = React.forwardRef<
     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50 text-foreground-muted" />
     <CommandPrimitive.Input
       ref={ref}
+      style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
       className={cn(
         'flex h-10 w-full rounded-none bg-transparent py-2 text-xs outline-none border-0 ring-0 ring-offset-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0 shadow-none placeholder:text-foreground-muted disabled:cursor-not-allowed disabled:opacity-50 text-foreground',
         className

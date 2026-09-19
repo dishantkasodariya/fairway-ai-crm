@@ -75,7 +75,9 @@ export const generateRealtimeCorridorData = (
       activeLeads: data.leads,
       monthlyValueLakhs: Math.round((data.valueINR || 0) / 100000),
       availableStockK: Math.round((data.stockSqFt || 0) / 1000),
-    }));
+    }))
+    .sort((a, b) => b.monthlyValueLakhs - a.monthlyValueLakhs)
+    .slice(0, 6);
 };
 
 export interface ChartBarStackedProps {
@@ -103,22 +105,17 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
     return [];
   }, [data, inquiries, properties]);
 
-  const primaryColor = currentTheme.shades[700];
-  const accentColor = currentTheme.accentShades[500];
-  const secondaryColor = currentTheme.shades[400];
+  const barColor = useMemo(() => {
+    if (currentTheme.id === 'slate') {
+      return isDark ? '#38bdf8' : '#0284c7';
+    }
+    return currentTheme.shades[500] || '#10b981';
+  }, [currentTheme, isDark]);
 
   const dynamicConfig = {
     monthlyValueLakhs: {
       label: "Monthly Budget (₹ Lakhs)",
-      color: primaryColor,
-    },
-    activeLeads: {
-      label: "Active Inquiries",
-      color: accentColor,
-    },
-    availableStockK: {
-      label: "Ready Stock ('000 sq.ft)",
-      color: secondaryColor,
+      color: barColor,
     },
   } satisfies ChartConfig;
 
@@ -151,7 +148,7 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
       <CardHeader className="pb-3 pt-5 px-6">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg border border-border bg-surface-muted text-foreground flex items-center justify-center shadow-xs">
-            <BarChart3 className="w-4 h-4" />
+            <BarChart3 className="w-4 h-4 text-fairway-600 dark:text-fairway-400" />
           </div>
           <div>
             <CardTitle className="text-base font-bold text-foreground tracking-tight">
@@ -166,16 +163,9 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
           <div className="flex items-center gap-2">
             <span
               className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-              style={{ backgroundColor: primaryColor }}
+              style={{ backgroundColor: barColor }}
             />
-            <span className="text-foreground">Budget (₹ Lakhs/mo)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-              style={{ backgroundColor: accentColor }}
-            />
-            <span className="text-foreground">Active Inquiries</span>
+            <span className="text-foreground">Monthly Pipeline Demand (₹ Lakhs)</span>
           </div>
         </div>
       </CardHeader>
@@ -183,17 +173,17 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
       <CardContent className="px-3 pb-5 pt-1">
         <ChartContainer
           config={dynamicConfig}
-          className="aspect-auto h-[290px] w-full"
+          className="aspect-auto h-[320px] w-full"
         >
           <BarChart
             accessibilityLayer
             data={sourceData}
             layout="vertical"
-            barSize={24}
-            barCategoryGap={8}
-            margin={{ top: 8, right: 24, left: 10, bottom: 0 }}
+            barSize={20}
+            barCategoryGap={10}
+            margin={{ top: 8, right: 30, left: 10, bottom: 0 }}
           >
-            <CartesianGrid horizontal={false} stroke="var(--border)" opacity={0.6} />
+            <CartesianGrid horizontal={false} stroke="var(--border)" opacity={0.5} />
             <YAxis
               dataKey="corridor"
               type="category"
@@ -202,7 +192,7 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
               tickMargin={8}
               stroke="var(--foreground)"
               fontSize={11}
-              width={110}
+              width={140}
             />
             <XAxis
               type="number"
@@ -218,27 +208,18 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
               cursor={{ fill: "rgba(0, 0, 0, 0.04)" }}
               content={
                 <ChartTooltipContent
-                  formatter={(value, name) => {
-                    if (name === "monthlyValueLakhs") {
-                      return (
-                        <div className="flex items-center justify-between gap-4 w-full text-xs">
-                          <span className="text-foreground-muted">Monthly Pipeline:</span>
+                  formatter={(value, name, item) => {
+                    const activeCount = item.payload?.activeLeads || 0;
+                    return (
+                      <div className="space-y-1 text-xs">
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-foreground-muted">Monthly Value:</span>
                           <strong className="text-foreground font-mono">₹{value} Lakhs/mo</strong>
                         </div>
-                      );
-                    }
-                    if (name === "activeLeads") {
-                      return (
-                        <div className="flex items-center justify-between gap-4 w-full text-xs">
-                          <span className="text-foreground-muted">Inquiries Count:</span>
-                          <strong className="text-foreground font-mono">{value} Inquiries</strong>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-foreground-muted">Active Inquiries:</span>
+                          <strong className="text-fairway-600 dark:text-fairway-400 font-mono">{activeCount} Inquiries</strong>
                         </div>
-                      );
-                    }
-                    return (
-                      <div className="flex items-center justify-between gap-4 w-full text-xs">
-                        <span className="text-foreground-muted">Ready Space:</span>
-                        <strong className="text-foreground font-mono">{value},000 sq.ft</strong>
                       </div>
                     );
                   }}
@@ -248,15 +229,8 @@ export const ChartBarStacked: React.FC<ChartBarStackedProps> = ({
 
             <Bar
               dataKey="monthlyValueLakhs"
-              fill={primaryColor}
+              fill={barColor}
               radius={[0, 6, 6, 0]}
-              stackId="a"
-            />
-            <Bar
-              dataKey="activeLeads"
-              fill={accentColor}
-              radius={[0, 6, 6, 0]}
-              stackId="a"
             />
           </BarChart>
         </ChartContainer>

@@ -16,14 +16,15 @@ export const Badge: React.FC<BadgeProps> = ({
   ...props
 }) => {
   const variants = {
-    default: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/90 dark:text-slate-200 dark:border-slate-700',
-    primary: 'bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40',
-    accent: 'bg-amber-500/10 text-amber-700 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/30',
-    success: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-200 dark:border-emerald-500/30',
-    warning: 'bg-amber-500/10 text-amber-700 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-200 dark:border-amber-500/30',
-    danger: 'bg-rose-500/10 text-rose-700 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/30',
-    info: 'bg-sky-500/10 text-sky-700 border-sky-500/20 dark:bg-sky-500/20 dark:text-sky-200 dark:border-sky-500/30',
-    outline: 'bg-transparent text-foreground-muted border-border dark:text-foreground-muted dark:border-border',
+    default: 'bg-surface-muted text-foreground border-border',
+    neutral: 'bg-surface-muted text-foreground border-border',
+    primary: 'bg-primary/10 text-primary border-primary/25',
+    accent: 'bg-surface-muted text-foreground border-border',
+    success: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+    warning: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+    danger: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+    info: 'bg-surface-muted text-foreground border-border',
+    outline: 'bg-transparent text-foreground-muted border-border',
   };
 
 

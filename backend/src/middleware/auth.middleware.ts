@@ -10,10 +10,6 @@ export const authenticateJWT = (
   res: Response,
   next: NextFunction
 ): void => {
-  const customRole = (req.headers['x-user-role'] as string)?.trim().toLowerCase();
-  const customUserId = (req.headers['x-user-id'] as string)?.trim();
-  const customEmail = (req.headers['x-user-email'] as string)?.trim().toLowerCase();
-
   const authHeader = req.headers.authorization;
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -21,36 +17,14 @@ export const authenticateJWT = (
     try {
       const decoded = verifyToken(token);
       req.user = decoded;
-      // If client explicitly passed active switch-user role, respect it
-      if (customRole) {
-        req.user.role = customRole;
-      }
-      if (customUserId) {
-        req.user.userId = customUserId;
-      }
       return next();
     } catch (error) {
-      console.warn('Token verify failed:', error);
+      res.status(401).json({
+        success: false,
+        error: { message: 'Invalid or expired session token.' },
+      });
+      return;
     }
-  }
-
-  // If client passed role/userId headers without valid Bearer
-  if (customRole) {
-    req.user = {
-      userId: customUserId || 'usr_client',
-      email: customEmail || '',
-      role: customRole,
-    };
-    return next();
-  }
-
-  if (process.env.NODE_ENV !== 'production') {
-    req.user = {
-      userId: 'usr_amit_1',
-      email: 'amit@fairway.co.in',
-      role: 'admin',
-    };
-    return next();
   }
 
   res.status(401).json({

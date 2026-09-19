@@ -60,7 +60,8 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
   onNavigateToCompany,
   onNavigateToInquiry,
 }) => {
-  const { canEdit } = useAuth();
+  const { canEditModule } = useAuth();
+  const canEdit = canEditModule('proposals');
   const { success, error } = useToast();
 
   // Search & View
@@ -80,7 +81,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
 
   // Column Visibility Config
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
-    proposalNumber: true,
+    srNo: true,
     companyName: true,
     propertyName: true,
     proposedAreaSqFt: true,
@@ -179,9 +180,9 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
       const q = searchQuery.toLowerCase().trim();
       const matchesQuery =
         !q ||
-        p.proposalNumber.toLowerCase().includes(q) ||
-        p.companyName.toLowerCase().includes(q) ||
-        p.propertyName.toLowerCase().includes(q);
+        (p.proposalNumber && p.proposalNumber.toLowerCase().includes(q)) ||
+        (p.companyName && p.companyName.toLowerCase().includes(q)) ||
+        (p.propertyName && p.propertyName.toLowerCase().includes(q));
 
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
       const matchesCompany = companyFilter === 'all' || p.companyId === companyFilter;
@@ -199,12 +200,12 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
 
   const allColumns: ColumnConfig<Proposal>[] = [
     {
-      key: 'proposalNumber',
-      label: 'Proposal #',
-      width: 140,
-      render: (prp) => (
-        <span className="font-mono font-bold text-purple-700 dark:text-purple-300 bg-purple-500/10 dark:bg-purple-950/60 px-2 py-0.5 rounded border border-purple-500/20 dark:border-purple-800/60">
-          {prp.proposalNumber}
+      key: 'srNo',
+      label: 'Sr. No.',
+      width: 95,
+      render: (_prp, index) => (
+        <span className="font-semibold text-foreground-muted tabular-nums text-xs pl-2">
+          {(index ?? 0) + 1}
         </span>
       ),
     },
@@ -218,7 +219,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
             e.stopPropagation();
             onNavigateToCompany(prp.companyId);
           }}
-          className="font-bold text-foreground hover:text-primary hover:underline cursor-pointer"
+          className="font-bold text-foreground hover:text-fairway-600 dark:hover:text-fairway-400 transition-colors cursor-pointer"
         >
           {prp.companyName}
         </span>
@@ -356,9 +357,9 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
-          <span className="text-xs font-semibold text-primary uppercase tracking-wider">CRM / Proposals</span>
+          <span className="text-xs font-semibold text-fairway-800 dark:text-fairway-400 uppercase tracking-wider">CRM / Proposals</span>
           <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 mt-0.5">
-            <FileSpreadsheet className="w-6 h-6 text-purple-600" />
+            <FileSpreadsheet className="w-6 h-6 text-fairway-600 dark:text-fairway-400" />
             <span>Commercial Proposal Management</span>
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
@@ -381,7 +382,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
           <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search proposals by number, company, or property..."
+            placeholder="Search proposals by company or property..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors h-9"
@@ -443,7 +444,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
                     Column
                   </TooltipContent>
                 </Tooltip>
-                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
+                <DropdownMenuContent align="end" className="w-48 bg-surface dark:bg-[#161c24] border border-border dark:border-white/[0.12] shadow-none ring-0 outline-none p-1 rounded-card z-50">
                   <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
                     Toggle Columns
                   </DropdownMenuLabel>
@@ -580,6 +581,7 @@ export const ProposalListView: React.FC<ProposalListViewProps> = ({
                 proposals={filteredProposals}
                 columns={visibleColumns}
                 onNavigateToInquiry={onNavigateToInquiry}
+                onNavigateToCompany={onNavigateToCompany}
               />
             ) : (
               <ProposalsCard

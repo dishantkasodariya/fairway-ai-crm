@@ -36,6 +36,13 @@ import { Card } from '@/modules/core/components/ui/Card';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { Input, Textarea } from '@/modules/core/components/ui/Input';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/modules/core/components/ui/Select';
 
 export const CommunicationsPage: React.FC = () => {
   const { currentUser } = useAuth();
@@ -395,28 +402,30 @@ export const CommunicationsPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={directionFilter}
-              onChange={(e) => setDirectionFilter(e.target.value as any)}
-              className="px-3 py-2 bg-slate-50/50 border border-border rounded-lg text-xs font-medium text-foreground focus:outline-none focus:border-primary"
-            >
-              <option value="all">All Directions</option>
-              <option value="Outbound">Outbound (Sent)</option>
-              <option value="Inbound">Inbound (Received)</option>
-            </select>
+            <Select value={directionFilter} onValueChange={(val) => setDirectionFilter(val as any)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="All Directions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Directions</SelectItem>
+                <SelectItem value="Outbound">Outbound (Sent)</SelectItem>
+                <SelectItem value="Inbound">Inbound (Received)</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <select
-              value={selectedCompanyId}
-              onChange={(e) => setSelectedCompanyId(e.target.value)}
-              className="px-3 py-2 bg-slate-50/50 border border-border rounded-lg text-xs font-medium text-foreground focus:outline-none focus:border-primary max-w-[200px] truncate"
-            >
-              <option value="all">All Companies</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Companies" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Companies</SelectItem>
+                {companies.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </Card>
@@ -564,10 +573,9 @@ export const CommunicationsPage: React.FC = () => {
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
                 Target Enterprise Company *
               </label>
-              <select
+              <Select
                 value={emailForm.companyId}
-                onChange={(e) => {
-                  const compId = e.target.value;
+                onValueChange={(compId) => {
                   const comp = companies.find((c) => c.id === compId);
                   const defaultContact = contacts.find((c) => c.companyId === compId && c.isPrimary) || contacts.find((c) => c.companyId === compId);
 
@@ -578,16 +586,18 @@ export const CommunicationsPage: React.FC = () => {
                     contactName: defaultContact?.name || '',
                   });
                 }}
-                required
-                className="w-full px-3 py-2 bg-white border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
               >
-                <option value="" disabled>Select Company</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -608,16 +618,20 @@ export const CommunicationsPage: React.FC = () => {
             <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
               Industrial Email Template
             </label>
-            <select
+            <Select
               value={emailForm.template}
-              onChange={(e) => handleTemplateChange(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+              onValueChange={(val) => handleTemplateChange(val)}
             >
-              <option value="custom">Custom Email Draft</option>
-              <option value="commercial_proposal">Commercial Proposal & Technical Specs</option>
-              <option value="site_visit_invite">Site Visit Formal Invitation</option>
-              <option value="follow_up_reminder">Follow-up & Committee Decision Reminder</option>
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select Template" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="custom">Custom Email Draft</SelectItem>
+                <SelectItem value="commercial_proposal">Commercial Proposal & Technical Specs</SelectItem>
+                <SelectItem value="site_visit_invite">Site Visit Formal Invitation</SelectItem>
+                <SelectItem value="follow_up_reminder">Follow-up & Committee Decision Reminder</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -688,18 +702,21 @@ export const CommunicationsPage: React.FC = () => {
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
                 Enterprise Company
               </label>
-              <select
+              <Select
                 value={callForm.companyId}
-                onChange={(e) => setCallForm({ ...callForm, companyId: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                onValueChange={(val) => setCallForm({ ...callForm, companyId: val })}
               >
-                <option value="">Select Company</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -719,14 +736,18 @@ export const CommunicationsPage: React.FC = () => {
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
                 Call Direction
               </label>
-              <select
+              <Select
                 value={callForm.direction}
-                onChange={(e) => setCallForm({ ...callForm, direction: e.target.value as any })}
-                className="w-full px-3 py-2 bg-white border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                onValueChange={(val) => setCallForm({ ...callForm, direction: val as any })}
               >
-                <option value="Outbound">Outbound (We Called)</option>
-                <option value="Inbound">Inbound (Client Called)</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Direction" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Outbound">Outbound (We Called)</SelectItem>
+                  <SelectItem value="Inbound">Inbound (Client Called)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -746,17 +767,21 @@ export const CommunicationsPage: React.FC = () => {
               <label className="block text-xs font-semibold text-foreground uppercase tracking-wider mb-1.5">
                 Call Outcome
               </label>
-              <select
+              <Select
                 value={callForm.outcome}
-                onChange={(e) => setCallForm({ ...callForm, outcome: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary"
+                onValueChange={(val) => setCallForm({ ...callForm, outcome: val })}
               >
-                <option value="Positive - Requirement Confirmed">Positive - Requirement Confirmed</option>
-                <option value="Site Visit Scheduled">Site Visit Scheduled</option>
-                <option value="Commercial Terms Negotiating">Commercial Terms Negotiating</option>
-                <option value="Proposal Requested">Proposal Requested</option>
-                <option value="Left Voicemail / Callback Later">Left Voicemail / Callback Later</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Outcome" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Positive - Requirement Confirmed">Positive - Requirement Confirmed</SelectItem>
+                  <SelectItem value="Site Visit Scheduled">Site Visit Scheduled</SelectItem>
+                  <SelectItem value="Commercial Terms Negotiating">Commercial Terms Negotiating</SelectItem>
+                  <SelectItem value="Proposal Requested">Proposal Requested</SelectItem>
+                  <SelectItem value="Left Voicemail / Callback Later">Left Voicemail / Callback Later</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

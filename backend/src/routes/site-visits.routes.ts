@@ -14,6 +14,8 @@ router.get('/', requirePermission('tasks', 'view'), getSiteVisits);
 router.get('/:id', requirePermission('tasks', 'view'), getSiteVisitById);
 router.post('/', requirePermission('tasks', 'create'), createSiteVisit);
 router.put('/:id', requirePermission('tasks', 'edit'), updateSiteVisit);
+router.patch('/:id/status', requirePermission('tasks', 'edit'), updateSiteVisit);
+router.patch('/:id', requirePermission('tasks', 'edit'), updateSiteVisit);
 router.delete('/:id', requirePermission('tasks', 'delete'), deleteSiteVisit);
 
 export default router;

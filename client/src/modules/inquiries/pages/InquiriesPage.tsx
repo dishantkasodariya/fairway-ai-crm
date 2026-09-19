@@ -50,7 +50,6 @@ import {
   TooltipProvider,
 } from '@/modules/core/components/ui/tooltip';
 import { PipelineStageService } from '@/modules/core/services/pipelineStageService';
-import { PIPELINE_STAGES } from '@/modules/core/data/seedData';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
@@ -298,7 +297,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
   }, [pagination, sorting, columnVisibility, columnPinning, columnOrder, columnSizing]);
 
   const { users } = useAuth();
-  const [pipelineStages, setPipelineStages] = useState(PIPELINE_STAGES);
+  const [pipelineStages, setPipelineStages] = useState<any[]>([]);
 
   useEffect(() => {
     PipelineStageService.getPipelineStages().then((res) => {
@@ -361,13 +360,49 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     [onSelectInquiry]
   );
 
-  // Reset pageIndex when search or filter values change
-  useEffect(() => {
-    setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }));
-  }, [debouncedSearchQuery, stageFilter, priorityFilter, corridorFilter, ownerFilter, areaFilter, budgetFilter, industryFilter]);
+  // Track previous filter values to prevent duplicate concurrent API calls
+  const prevFiltersRef = useRef({
+    debouncedSearchQuery,
+    stageFilter,
+    priorityFilter,
+    corridorFilter,
+    ownerFilter,
+    areaFilter,
+    budgetFilter,
+    industryFilter,
+  });
 
-  // Load inquiries when pagination, sorting, or search changes
+  // Load inquiries when pagination, sorting, or search/filters change (strictly single call per user action)
   useEffect(() => {
+    const filtersChanged =
+      prevFiltersRef.current.debouncedSearchQuery !== debouncedSearchQuery ||
+      prevFiltersRef.current.stageFilter !== stageFilter ||
+      prevFiltersRef.current.priorityFilter !== priorityFilter ||
+      prevFiltersRef.current.corridorFilter !== corridorFilter ||
+      prevFiltersRef.current.ownerFilter !== ownerFilter ||
+      prevFiltersRef.current.areaFilter !== areaFilter ||
+      prevFiltersRef.current.budgetFilter !== budgetFilter ||
+      prevFiltersRef.current.industryFilter !== industryFilter;
+
+    if (filtersChanged) {
+      prevFiltersRef.current = {
+        debouncedSearchQuery,
+        stageFilter,
+        priorityFilter,
+        corridorFilter,
+        ownerFilter,
+        areaFilter,
+        budgetFilter,
+        industryFilter,
+      };
+
+      if (pagination.pageIndex !== 0) {
+        // Resetting page to 0 will re-trigger this effect once cleanly with pageIndex 0
+        setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+        return;
+      }
+    }
+
     loadInquiries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -376,6 +411,9 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     priorityFilter,
     corridorFilter,
     ownerFilter,
+    areaFilter,
+    budgetFilter,
+    industryFilter,
     pagination.pageIndex,
     pagination.pageSize,
     sorting,
@@ -387,7 +425,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
   const statusOptions = useMemo(
     () => [
       { value: 'all', label: 'All statuses' },
-      ...pipelineStages.map((stg) => ({ value: stg.key, label: stg.label })),
+      ...pipelineStages.map((stg: any) => ({ value: stg.key, label: stg.label })),
     ],
     [pipelineStages]
   );
@@ -486,7 +524,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
 
   const getStageBadgeStyle = (stageKey: string) => {
     const config = STAGE_CONFIGS[stageKey as PipelineStageKey];
-    if (!config) return { className: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700', label: stageKey };
+    if (!config) return { className: 'bg-surface-muted text-foreground border-border', label: stageKey };
     return {
       className: `${config.bg} ${config.text} ${config.border}`,
       label: config.label,
@@ -500,11 +538,11 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     const q = searchQuery.toLowerCase().trim();
     const matchesQuery =
       !q ||
-      inq.inquiryNumber.toLowerCase().includes(q) ||
-      inq.companyName.toLowerCase().includes(q) ||
-      inq.location.toLowerCase().includes(q) ||
-      inq.requirement.toLowerCase().includes(q) ||
-      (inq.contactName && inq.contactName.toLowerCase().includes(q));
+      Boolean(inq.inquiryNumber && inq.inquiryNumber.toLowerCase().includes(q)) ||
+      Boolean(inq.companyName && inq.companyName.toLowerCase().includes(q)) ||
+      Boolean(inq.location && inq.location.toLowerCase().includes(q)) ||
+      Boolean(inq.requirement && inq.requirement.toLowerCase().includes(q)) ||
+      Boolean(inq.contactName && inq.contactName.toLowerCase().includes(q));
 
     const matchesStage = stageFilter === 'all' || inq.stage === stageFilter;
     const matchesPriority = priorityFilter === 'all' || inq.priority === priorityFilter;
@@ -546,7 +584,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
     () => [
       {
         id: 'actions',
-        header: ({ column }) => <DataGridColumnHeader title="Action" column={column} />,
+        header: () => <span className="text-[11px] font-semibold text-foreground-muted pl-1">Action</span>,
         cell: ({ row }) => {
           const inq = row.original;
           return (
@@ -602,9 +640,9 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             </div>
           );
         },
-        size: 75,
-        minSize: 65,
-        maxSize: 90,
+        size: 70,
+        minSize: 60,
+        maxSize: 80,
         enableSorting: false,
         enableResizing: false,
         enablePinning: true,
@@ -612,84 +650,75 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
       {
         accessorKey: 'inquiryNumber',
         id: 'inquiryNumber',
-        header: ({ column }) => <DataGridColumnHeader title="Inquiry #" column={column} />,
-        cell: ({ row }) => (
-          <button
-            type="button"
-            onClick={() => handleSelectInquiry(row.original)}
-            className="font-mono font-bold text-primary dark:text-white bg-primary/10 dark:bg-primary/20 px-2.5 py-1 rounded-full border border-primary/25 dark:border-primary/40 hover:bg-primary/20 dark:hover:bg-primary/30 transition-colors text-xs text-left cursor-pointer inline-flex items-center shadow-xs"
-          >
-            {row.original.inquiryNumber}
-          </button>
-        ),
-        size: 140,
-        minSize: 130,
+        meta: { headerTitle: 'Sr. No.' },
+        header: ({ column }) => <DataGridColumnHeader title="Sr. No." column={column} />,
+        cell: ({ row }) => {
+          const serialNo = pagination.pageIndex * pagination.pageSize + row.index + 1;
+          return (
+            <span className="font-medium text-foreground-muted tabular-nums text-xs pl-2">
+              {serialNo}
+            </span>
+          );
+        },
+        size: 85,
+        minSize: 75,
+        maxSize: 95,
         enableSorting: true,
         enablePinning: true,
       },
       {
         accessorKey: 'companyName',
         id: 'companyName',
-        header: ({ column }) => <DataGridColumnHeader title="Customer Company" column={column} />,
+        header: ({ column }) => <DataGridColumnHeader title="Customer Company & Contact" column={column} />,
         cell: ({ row }) => (
-          <button
-            type="button"
-            onClick={() => handleSelectInquiry(row.original)}
-            className="font-semibold text-foreground hover:text-fairway-600 dark:hover:text-fairway-400 text-left transition-colors truncate max-w-[200px] block cursor-pointer text-xs"
-          >
-            {row.original.companyName}
-          </button>
+          <div className="py-0.5 min-w-0 max-w-[240px]">
+            <button
+              type="button"
+              onClick={() => handleSelectInquiry(row.original)}
+              className="font-bold text-foreground hover:text-primary transition-colors truncate block text-left cursor-pointer text-xs w-full"
+            >
+              {row.original.companyName}
+            </button>
+            {row.original.contactName ? (
+              <span className="text-[11px] text-foreground-muted truncate block">
+                {row.original.contactName} {row.original.contactPhone ? `• ${row.original.contactPhone}` : ''}
+              </span>
+            ) : row.original.location ? (
+              <span className="text-[10px] text-foreground-muted/70 truncate block">
+                {row.original.location}
+              </span>
+            ) : null}
+          </div>
         ),
         size: 220,
         minSize: 180,
         enableSorting: true,
       },
       {
-        accessorKey: 'requirement',
-        id: 'requirement',
-        header: ({ column }) => <DataGridColumnHeader title="Requirement / Specs" column={column} />,
-        cell: ({ row }) => (
-          <span className="truncate block text-foreground-muted max-w-xs text-xs" title={row.original.requirement}>
-            {row.original.requirement}
-          </span>
-        ),
-        size: 240,
-        minSize: 200,
-        enableSorting: false,
-      },
-      {
         accessorKey: 'requiredAreaSqFt',
-        id: 'requiredAreaSqFt',
-        header: ({ column }) => <DataGridColumnHeader title="Required Area" column={column} />,
+        id: 'requirement',
+        header: ({ column }) => <DataGridColumnHeader title="Requirement & Budget" column={column} />,
         cell: ({ row }) => (
-          <span className="font-bold text-fairway-900 dark:text-fairway-300 text-xs tabular-nums">
-            {formatSqFt(row.original.requiredAreaSqFt)}
-          </span>
+          <div className="py-0.5 text-xs" title={row.original.requirement || undefined}>
+            <div className="font-bold text-foreground tabular-nums whitespace-nowrap">
+              {formatSqFt(row.original.requiredAreaSqFt)}
+            </div>
+            <div className="font-mono text-[11px] text-foreground-muted tabular-nums whitespace-nowrap">
+              {formatINR(row.original.budgetMonthlyINR, true)} / mo
+            </div>
+          </div>
         ),
-        size: 150,
-        minSize: 130,
+        size: 170,
+        minSize: 140,
         enableSorting: true,
       },
       {
         accessorKey: 'location',
         id: 'location',
-        header: ({ column }) => <DataGridColumnHeader title="Location / Corridor" column={column} />,
-        cell: ({ row }) => <span className="text-foreground-muted text-xs truncate block">{row.original.location}</span>,
-        size: 170,
-        minSize: 150,
-        enableSorting: true,
-      },
-      {
-        accessorKey: 'budgetMonthlyINR',
-        id: 'budgetMonthlyINR',
-        header: ({ column }) => <DataGridColumnHeader title="Monthly Budget" column={column} />,
-        cell: ({ row }) => (
-          <span className="font-mono font-semibold text-foreground text-xs tabular-nums">
-            {formatINR(row.original.budgetMonthlyINR)}
-          </span>
-        ),
+        header: ({ column }) => <DataGridColumnHeader title="Corridor" column={column} />,
+        cell: ({ row }) => <span className="text-foreground-muted text-xs truncate block">{row.original.targetCorridor || row.original.location || '—'}</span>,
         size: 150,
-        minSize: 140,
+        minSize: 130,
         enableSorting: true,
       },
       {
@@ -704,8 +733,8 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             </span>
           );
         },
-        size: 150,
-        minSize: 130,
+        size: 140,
+        minSize: 120,
         enableSorting: true,
       },
       {
@@ -713,25 +742,41 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         id: 'priority',
         header: ({ column }) => <DataGridColumnHeader title="Priority" column={column} />,
         cell: ({ row }) => {
-          const priority = row.original.priority || 'Medium';
-          const prioBadge = getPriorityBadge(priority);
+          const priority = (row.original.priority || 'Medium').toLowerCase();
           return (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border inline-flex items-center whitespace-nowrap ${prioBadge?.bg || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-              {priority}
+            <span className={cn(
+              "text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center whitespace-nowrap",
+              priority === 'high'
+                ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                : priority === 'medium'
+                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                : "bg-surface-muted text-foreground-muted border-border"
+            )}>
+              {row.original.priority || 'Normal'}
             </span>
           );
         },
-        size: 110,
-        minSize: 100,
+        size: 100,
+        minSize: 90,
         enableSorting: true,
       },
       {
         accessorKey: 'salespersonName',
         id: 'salespersonName',
         header: ({ column }) => <DataGridColumnHeader title="Owner" column={column} />,
-        cell: ({ row }) => <span className="text-foreground-muted font-medium text-xs truncate block">{row.original.salespersonName}</span>,
-        size: 140,
-        minSize: 120,
+        cell: ({ row }) => {
+          const ownerName = row.original.salespersonName || 'Unassigned';
+          return (
+            <div className="flex items-center gap-1.5 text-xs text-foreground-muted font-medium truncate">
+              <div className="w-5 h-5 rounded-full bg-surface-muted border border-border text-foreground font-bold text-[9px] flex items-center justify-center shrink-0">
+                {ownerName.charAt(0).toUpperCase()}
+              </div>
+              <span className="truncate">{ownerName}</span>
+            </div>
+          );
+        },
+        size: 130,
+        minSize: 110,
         enableSorting: true,
       },
     ],
@@ -945,121 +990,79 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
         </div>
       </div>
 
-      {/* Modern KPI Cards with Glowing Sparkline Waves (Fully Theme-Adaptive) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: Open Pipeline */}
-        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-fairway-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-sm font-bold text-foreground tracking-tight block">
-              Open Pipeline
-            </span>
-            <span className="text-xs text-foreground-muted mt-4 block font-medium">
-              {inquiries.length} open deals
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
-              {formatINR(totalPipelineValue, true)}
-            </span>
-          </div>
-
-          <div className="shrink-0 pb-1">
-            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="themeWave1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4 L 120 40 L 0 40 Z"
-                fill="url(#themeWave1)"
-              />
-              <path
-                d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4"
-                fill="none"
-                stroke="var(--fw-600, #0084FF)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
+      {/* 1-Line Minimal Quick Filter Chips & Pipeline Summary */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-surface p-2 sm:p-2.5 rounded-xl border border-border shadow-2xs text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full sm:w-auto pb-1 sm:pb-0">
+          <button
+            type="button"
+            onClick={() => {
+              setStageFilter('all');
+              setPriorityFilter('all');
+              setOwnerFilter('all');
+            }}
+            className={cn(
+              "px-3 py-1 rounded-lg font-bold transition-all cursor-pointer select-none whitespace-nowrap border text-xs",
+              stageFilter === 'all' && priorityFilter === 'all' && ownerFilter === 'all'
+                ? "bg-primary text-white border-primary shadow-xs"
+                : "bg-surface-muted text-foreground-muted hover:text-foreground border-border"
+            )}
+          >
+            All Inquiries ({totalCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOwnerFilter(ownerFilter === currentUser?.id ? 'all' : currentUser?.id);
+            }}
+            className={cn(
+              "px-3 py-1 rounded-lg font-bold transition-all cursor-pointer select-none whitespace-nowrap border text-xs",
+              ownerFilter === currentUser?.id
+                ? "bg-primary text-white border-primary shadow-xs"
+                : "bg-surface-muted text-foreground-muted hover:text-foreground border-border"
+            )}
+          >
+            My Leads
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPriorityFilter(priorityFilter === 'High' ? 'all' : 'High');
+            }}
+            className={cn(
+              "px-3 py-1 rounded-lg font-bold transition-all cursor-pointer select-none whitespace-nowrap border text-xs",
+              priorityFilter === 'High'
+                ? "bg-primary text-white border-primary shadow-xs"
+                : "bg-surface-muted text-foreground-muted hover:text-foreground border-border"
+            )}
+          >
+            High Priority {highPriorityCount > 0 && `(${highPriorityCount})`}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStageFilter(stageFilter === 'negotiation' ? 'all' : 'negotiation');
+            }}
+            className={cn(
+              "px-3 py-1 rounded-lg font-bold transition-all cursor-pointer select-none whitespace-nowrap border text-xs",
+              stageFilter === 'negotiation'
+                ? "bg-primary text-white border-primary shadow-xs"
+                : "bg-surface-muted text-foreground-muted hover:text-foreground border-border"
+            )}
+          >
+            In Negotiation
+          </button>
         </div>
 
-        {/* Card 2: Weighted Forecast */}
-        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-accent-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-sm font-bold text-foreground tracking-tight block">
-              Weighted Forecast
-            </span>
-            <span className="text-xs text-foreground-muted mt-4 block font-medium">
-              Next 90 days
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
-              {formatINR(Math.round(totalPipelineValue * 0.65), true)}
-            </span>
-          </div>
-
-          <div className="shrink-0 pb-1">
-            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="themeWave2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent-500, #10B981)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--accent-500, #10B981)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 30 Q 15 22, 30 25 T 60 19 T 90 12 T 120 8 L 120 40 L 0 40 Z"
-                fill="url(#themeWave2)"
-              />
-              <path
-                d="M 0 30 Q 15 22, 30 25 T 60 19 T 90 12 T 120 8"
-                fill="none"
-                stroke="var(--accent-500, #10B981)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-        </div>
-
-        {/* Card 3: Win Rate */}
-        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-indigo-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-sm font-bold text-foreground tracking-tight block">
-              Win Rate
-            </span>
-            <span className="text-xs text-foreground-muted mt-4 block font-medium">
-              Last 90 days
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
-              26%
-            </span>
-          </div>
-
-          <div className="shrink-0 pb-1">
-            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="themeWave3" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--chart-5, #8B5CF6)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--chart-5, #8B5CF6)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6 L 120 40 L 0 40 Z"
-                fill="url(#themeWave3)"
-              />
-              <path
-                d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6"
-                fill="none"
-                stroke="var(--chart-5, #8B5CF6)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
+        {/* Right: Sleek Pipeline Value Pill */}
+        <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 w-full sm:w-auto text-foreground-muted text-[11px] font-medium border-t sm:border-t-0 pt-2 sm:pt-0">
+          <span>Active Pipeline:</span>
+          <span className="font-mono font-bold text-foreground bg-surface-muted px-2 py-0.5 rounded-md border border-border whitespace-nowrap">
+            {formatINR(totalPipelineValue, true)} / mo
+          </span>
         </div>
       </div>
 
-      {/* Sleek Search & Control Toolbar matching reference */}
+      {/* Sleek Search & Control Toolbar */}
       <div className="flex items-center justify-between gap-2 sm:gap-3 pt-1 w-full">
         {/* Left: Search Bar */}
         <div className="relative flex-1 min-w-0 max-w-md">
@@ -1069,7 +1072,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             placeholder="Search inquiries, requirements, companies, cities..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors h-9"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/70 border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-primary focus:outline-none transition-colors h-9"
           />
           {searchQuery && (
             <button
@@ -1093,13 +1096,13 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                   type="button"
                   onClick={openFilterDrawer}
                   className={cn(
-                    "relative size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs",
-                    activeFiltersCount > 0 && "text-fairway-600 border-fairway-400 bg-fairway-50 dark:bg-fairway-950/40"
+                    "relative size-9 rounded-button border border-border bg-surface hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs",
+                    activeFiltersCount > 0 && "text-primary border-primary bg-primary/10"
                   )}
                 >
                   <Filter className="w-4 h-4" />
                   {activeFiltersCount > 0 && (
-                    <span className="absolute -top-1 -right-1 size-4 rounded-full bg-fairway-600 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
+                    <span className="absolute -top-1 -right-1 size-4 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
                       {activeFiltersCount}
                     </span>
                   )}
@@ -1122,12 +1125,12 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                   type="button"
                   onClick={handleRefresh}
                   disabled={isRefreshing || isLoading}
-                  className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-70"
+                  className="size-9 rounded-button border border-border bg-surface hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-70"
                 >
                   <RefreshCw
                     className={cn(
                       "w-4 h-4 transition-transform duration-700",
-                      (isRefreshing || isLoading) && "animate-spin text-fairway-600"
+                      (isRefreshing || isLoading) && "animate-spin text-primary"
                     )}
                   />
                 </button>
@@ -1138,7 +1141,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             </Tooltip>
 
             {/* Segmented View Switcher (Desktop Only) */}
-            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+            <div className="hidden sm:flex items-center h-9 bg-surface border border-border rounded-button overflow-hidden shadow-2xs">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -1147,7 +1150,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                     className={cn(
                       "w-9 h-full flex items-center justify-center transition-all cursor-pointer",
                       viewMode === 'table'
-                        ? "bg-fairway-600 text-white font-bold"
+                        ? "bg-primary text-white font-bold"
                         : "text-foreground hover:text-foreground hover:bg-surface-muted/60"
                     )}
                   >
@@ -1167,7 +1170,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                     className={cn(
                       "w-9 h-full flex items-center justify-center transition-all cursor-pointer",
                       viewMode === 'grid'
-                        ? "bg-fairway-600 text-white font-bold"
+                        ? "bg-primary text-white font-bold"
                         : "text-foreground hover:text-foreground hover:bg-surface-muted/60"
                     )}
                   >
@@ -1175,7 +1178,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  Card
+                  Grid
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -1209,6 +1212,7 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             hasFilters={activeFiltersCount > 0 || !!searchQuery}
             onClearFilters={handleClearAllFilters}
             onNewInquiry={onOpenNewInquiry}
+            onRowClick={handleSelectInquiry}
           />
         ) : (
           <InquiriesCard

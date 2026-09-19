@@ -60,13 +60,15 @@ export const createActivity = async (req: Request, res: Response): Promise<void>
       userId,
       userName,
       activityType = 'Call',
-      title,
+      title: rawTitle,
       description = '',
       metadata = {},
       activityDate,
     } = req.body;
 
-    if (!title || !title.trim()) {
+    const title = (rawTitle || description || `${activityType} Activity`).trim().slice(0, 150);
+
+    if (!title) {
       res.status(400).json({ success: false, error: { message: 'Title is required' } });
       return;
     }
@@ -121,5 +123,23 @@ export const createActivity = async (req: Request, res: Response): Promise<void>
   } catch (error: any) {
     console.error('Error creating activity:', error);
     res.status(500).json({ success: false, error: { message: error.message || 'Failed to create activity' } });
+  }
+};
+
+/**
+ * DELETE /api/activities/:id
+ */
+export const deleteActivity = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const result = await query('DELETE FROM activities WHERE id = $1 RETURNING id;', [id]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, error: { message: 'Activity not found' } });
+      return;
+    }
+    res.status(200).json({ success: true, message: 'Activity deleted successfully' });
+  } catch (error: any) {
+    console.error('Error deleting activity:', error);
+    res.status(500).json({ success: false, error: { message: error.message || 'Failed to delete activity' } });
   }
 };

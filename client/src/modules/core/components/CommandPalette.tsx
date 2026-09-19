@@ -92,10 +92,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     ? inquiries
         .filter(
           (i) =>
-            i.inquiryNumber.toLowerCase().includes(q) ||
-            i.companyName.toLowerCase().includes(q) ||
-            i.location.toLowerCase().includes(q) ||
-            i.requirement.toLowerCase().includes(q)
+            Boolean(i.inquiryNumber && i.inquiryNumber.toLowerCase().includes(q)) ||
+            Boolean(i.companyName && i.companyName.toLowerCase().includes(q)) ||
+            Boolean(i.location && i.location.toLowerCase().includes(q)) ||
+            Boolean(i.requirement && i.requirement.toLowerCase().includes(q))
         )
         .slice(0, 5)
     : inquiries.slice(0, 3);
@@ -104,9 +104,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     ? companies
         .filter(
           (c) =>
-            c.name.toLowerCase().includes(q) ||
-            c.industry.toLowerCase().includes(q) ||
-            c.city.toLowerCase().includes(q)
+            Boolean(c.name && c.name.toLowerCase().includes(q)) ||
+            Boolean(c.industry && c.industry.toLowerCase().includes(q)) ||
+            Boolean(c.city && c.city.toLowerCase().includes(q))
         )
         .slice(0, 5)
     : companies.slice(0, 3);
@@ -115,9 +115,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     ? properties
         .filter(
           (p) =>
-            p.name.toLowerCase().includes(q) ||
-            p.city.toLowerCase().includes(q) ||
-            p.corridor.toLowerCase().includes(q)
+            Boolean(p.name && p.name.toLowerCase().includes(q)) ||
+            Boolean(p.city && p.city.toLowerCase().includes(q)) ||
+            Boolean(p.corridor && p.corridor.toLowerCase().includes(q))
         )
         .slice(0, 4)
     : properties.slice(0, 2);
@@ -126,9 +126,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
     ? contacts
         .filter(
           (c) =>
-            c.name.toLowerCase().includes(q) ||
-            c.companyName.toLowerCase().includes(q) ||
-            c.designation.toLowerCase().includes(q)
+            Boolean(c.name && c.name.toLowerCase().includes(q)) ||
+            Boolean(c.companyName && c.companyName.toLowerCase().includes(q)) ||
+            Boolean(c.designation && c.designation.toLowerCase().includes(q))
         )
         .slice(0, 4)
     : [];
@@ -193,43 +193,33 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   let runningIndex = 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-4 pt-8 sm:pt-18">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in-0 duration-150"
+        className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs transition-opacity animate-in fade-in-0 duration-150"
         onClick={onClose}
       />
 
-      {/* shadcn Command Dialog Box */}
-      <div className="relative w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl z-10 flex flex-col max-h-[80vh] animate-in fade-in-0 zoom-in-95 duration-150 text-left">
+      {/* Command Dialog Box */}
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl z-10 flex flex-col max-h-[85vh] sm:max-h-[80vh] animate-in fade-in-0 zoom-in-95 duration-150 text-left">
         {/* Command Input Bar */}
-        <div className="flex items-center border-b border-border px-4" cmdk-input-wrapper="">
-          <Search className="mr-3 h-4 w-4 shrink-0 text-foreground-muted opacity-70" />
+        <div className="flex items-center border-b border-border px-3.5 sm:px-4.5 h-13 shrink-0">
+          <Search className="mr-3 h-4 w-4 shrink-0 text-foreground-muted" />
           <input
             ref={inputRef}
             type="text"
-            cmdk-input=""
-            data-transparent="true"
-            placeholder="Search companies, inquiries, properties, contacts..."
+            placeholder="Search inquiries, companies, properties, contacts..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            style={{
-              backgroundColor: 'transparent',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: '0px',
-              boxShadow: 'none',
-              outline: 'none',
-            }}
-            className="cmdk-input flex-1 h-12 w-full !bg-transparent py-3 text-sm text-foreground placeholder:text-foreground-muted/70 !border-0 !border-none !outline-none focus:!outline-none !shadow-none !rounded-none"
+            className="flex-1 h-full w-full bg-transparent text-xs sm:text-sm text-foreground placeholder:text-foreground-muted/60 border-0 outline-none focus:outline-none shadow-none"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
               className="p-1 text-foreground-muted hover:text-foreground rounded transition-colors mr-2 cursor-pointer"
-              title="Clear"
+              title="Clear search"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -237,7 +227,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-surface-muted px-1.5 font-mono text-[10px] font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer shrink-0 ml-1"
+            className="inline-flex h-6 select-none items-center gap-1 rounded-md border border-border bg-surface-muted px-2 font-mono text-[10px] font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer shrink-0"
             title="Close dialog (Escape)"
           >
             <span>ESC</span>
@@ -246,10 +236,10 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
         </div>
 
         {/* Command List Body */}
-        <div className="overflow-y-auto max-h-[380px] p-2 space-y-2 flex-1 scrollbar-thin">
+        <div className="overflow-y-auto p-2 sm:p-2.5 space-y-2 flex-1 scrollbar-thin">
           {!hasResults && (
-            <div className="py-10 text-center text-sm text-foreground-muted">
-              No results found.
+            <div className="py-12 text-center text-xs text-foreground-muted">
+              No results found for &ldquo;{query}&rdquo;
             </div>
           )}
 
@@ -273,15 +263,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                         onSelect('inquiry', inq.id);
                         onClose();
                       }}
-                      className={`relative flex items-center justify-between rounded-lg px-2.5 py-2 text-sm cursor-pointer select-none transition-colors gap-2 ${
+                      className={`relative flex items-center justify-between rounded-xl px-3 py-2 text-xs sm:text-sm cursor-pointer select-none transition-colors gap-2.5 ${
                         isSelected
-                          ? 'bg-surface-muted text-foreground'
+                          ? 'bg-surface-muted text-foreground font-medium'
                           : 'text-foreground hover:bg-surface-muted/60'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <FileText className="h-4 w-4 shrink-0 text-foreground-muted" />
-                        <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-surface border border-border shrink-0">
+                        <span className="font-mono text-[11px] font-semibold px-2 py-0.5 rounded-md bg-surface border border-border shrink-0">
                           {inq.inquiryNumber}
                         </span>
                         <div className="truncate min-w-0 flex-1 flex items-baseline gap-1.5">
@@ -292,7 +282,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full capitalize text-foreground-muted bg-surface border border-border whitespace-nowrap">
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize text-foreground-muted bg-surface border border-border whitespace-nowrap">
                           {inq.stage.replace(/_/g, ' ')}
                         </span>
                         {isSelected && (
@@ -309,7 +299,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           {/* Companies Group */}
           {filteredCompanies.length > 0 && (
             <div>
-              <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted/70">
+              <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
                 Companies
               </div>
               <div className="space-y-0.5 mt-0.5">
@@ -326,9 +316,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                         onSelect('company', c.id);
                         onClose();
                       }}
-                      className={`relative flex items-center justify-between rounded-lg px-2.5 py-2 text-sm cursor-pointer select-none transition-colors gap-2 ${
+                      className={`relative flex items-center justify-between rounded-xl px-3 py-2 text-xs sm:text-sm cursor-pointer select-none transition-colors gap-2.5 ${
                         isSelected
-                          ? 'bg-surface-muted text-foreground'
+                          ? 'bg-surface-muted text-foreground font-medium'
                           : 'text-foreground hover:bg-surface-muted/60'
                       }`}
                     >
@@ -359,7 +349,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           {/* Properties Group */}
           {filteredProperties.length > 0 && (
             <div>
-              <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted/70">
+              <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
                 Properties
               </div>
               <div className="space-y-0.5 mt-0.5">
@@ -376,9 +366,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                         onSelect('property', p.id);
                         onClose();
                       }}
-                      className={`relative flex items-center justify-between rounded-lg px-2.5 py-2 text-sm cursor-pointer select-none transition-colors gap-2 ${
+                      className={`relative flex items-center justify-between rounded-xl px-3 py-2 text-xs sm:text-sm cursor-pointer select-none transition-colors gap-2.5 ${
                         isSelected
-                          ? 'bg-surface-muted text-foreground'
+                          ? 'bg-surface-muted text-foreground font-medium'
                           : 'text-foreground hover:bg-surface-muted/60'
                       }`}
                     >
@@ -402,7 +392,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           {/* Contacts Group */}
           {filteredContacts.length > 0 && (
             <div>
-              <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted/70">
+              <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
                 Contacts
               </div>
               <div className="space-y-0.5 mt-0.5">
@@ -419,9 +409,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                         onSelect('contact', cnt.companyId);
                         onClose();
                       }}
-                      className={`relative flex items-center justify-between rounded-lg px-2.5 py-2 text-sm cursor-pointer select-none transition-colors gap-2 ${
+                      className={`relative flex items-center justify-between rounded-xl px-3 py-2 text-xs sm:text-sm cursor-pointer select-none transition-colors gap-2.5 ${
                         isSelected
-                          ? 'bg-surface-muted text-foreground'
+                          ? 'bg-surface-muted text-foreground font-medium'
                           : 'text-foreground hover:bg-surface-muted/60'
                       }`}
                     >
@@ -445,7 +435,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
           {/* Facilities Group */}
           {filteredFacilities.length > 0 && (
             <div>
-              <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground-muted/70">
+              <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-foreground-muted">
                 Facilities
               </div>
               <div className="space-y-0.5 mt-0.5">
@@ -462,9 +452,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                         onSelect('facility', fac.companyId);
                         onClose();
                       }}
-                      className={`relative flex items-center justify-between rounded-lg px-2.5 py-2 text-sm cursor-pointer select-none transition-colors gap-2 ${
+                      className={`relative flex items-center justify-between rounded-xl px-3 py-2 text-xs sm:text-sm cursor-pointer select-none transition-colors gap-2.5 ${
                         isSelected
-                          ? 'bg-surface-muted text-foreground'
+                          ? 'bg-surface-muted text-foreground font-medium'
                           : 'text-foreground hover:bg-surface-muted/60'
                       }`}
                     >
@@ -487,26 +477,26 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
         </div>
 
         {/* Clean shadcn Command Footer */}
-        <div className="flex items-center justify-between border-t border-border px-3.5 py-2 text-[11px] text-foreground-muted bg-surface-muted/20">
+        <div className="flex items-center justify-between border-t border-border px-3.5 sm:px-4 py-2 text-[11px] text-foreground-muted bg-surface-muted/30 shrink-0">
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-border bg-surface px-1 py-0.2 font-mono text-[10px]">↑</kbd>
-              <kbd className="rounded border border-border bg-surface px-1 py-0.2 font-mono text-[10px]">↓</kbd>
+              <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-foreground">↑</kbd>
+              <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-foreground">↓</kbd>
               <span>Navigate</span>
             </span>
             <span className="text-foreground-muted/40">•</span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-border bg-surface px-1.5 py-0.2 font-mono text-[10px]">↵</kbd>
+              <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-foreground">↵</kbd>
               <span>Select</span>
             </span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex items-center gap-1 text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
           >
             <span>Close</span>
-            <kbd className="rounded border border-border bg-surface px-1.5 py-0.2 font-mono text-[10px]">ESC</kbd>
+            <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] text-foreground">ESC</kbd>
           </button>
         </div>
       </div>

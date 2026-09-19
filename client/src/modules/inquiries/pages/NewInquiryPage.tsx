@@ -31,7 +31,6 @@ import { cn } from '@/modules/core/lib/utils';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
-import { UserCombobox } from '@/modules/core/components/ui/UserCombobox';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { matchPropertiesForInquiry } from '@/modules/core/utils/propertyMatcher';
@@ -51,31 +50,6 @@ import {
   formatSqFt,
 } from '@/modules/core/utils/formatters';
 
-const CORRIDOR_OPTIONS = [
-  'Dahej PCPIR Corridor',
-  'Sanand Industrial Corridor',
-  'Changodar - Bavla Corridor',
-  'Aslali - Kheda Industrial Corridor',
-  'Ankleshwar - Panoli Chemical Corridor',
-  'Halol - Kalol Industrial Belt',
-  'Hazira Port Logistics Zone',
-  'Jhagadia GIDC Logistics Park',
-  'Mundra Port SEZ Corridor',
-  'Vapi - Sarigam Industrial Corridor',
-];
-
-const INDUSTRY_OPTIONS = [
-  'Specialty Chemicals & Polymers',
-  '3PL & Contract Logistics',
-  'Automotive & EV Components',
-  'FMCG & Retail Logistics',
-  'Pharmaceutical & Cold Chain',
-  'Heavy Engineering & Machinery',
-  'Solar & Renewable Energy Equipment',
-  'E-Commerce Fulfillment',
-  'Agri-Logistics & Grains',
-];
-
 export interface NewInquiryPageProps {
   onBack: () => void;
   onSuccess: (inquiryId: string) => void;
@@ -93,11 +67,23 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessView, setShowSuccessView] = useState(false);
   const [existingCompanies, setExistingCompanies] = useState<Company[]>([]);
+  const [corridors, setCorridors] = useState<string[]>([]);
+  const [industries, setIndustries] = useState<string[]>([]);
 
   useEffect(() => {
     CompanyService.getCompanies({ pageSize: 1000 }).then((res) => {
       if (res && res.data) {
         setExistingCompanies(res.data);
+      }
+    });
+    PropertyService.getCorridors().then((res) => {
+      if (res.success && res.data) {
+        setCorridors(res.data.map((c: any) => c.corridor || c).filter(Boolean));
+      }
+    });
+    PropertyService.getIndustries().then((res) => {
+      if (res.success && res.data) {
+        setIndustries(res.data);
       }
     });
   }, []);
@@ -146,6 +132,10 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
   });
 
   const [duplicateWarnings, setDuplicateWarnings] = useState<any[]>([]);
+
+  // Progressive disclosure accordions
+  const [showAdditionalCompanyFields, setShowAdditionalCompanyFields] = useState(false);
+  const [showTechnicalSpecs, setShowTechnicalSpecs] = useState(false);
 
   // Contact Person
   const [contactMode, setContactMode] = useState<'existing' | 'new'>('new');
@@ -452,18 +442,18 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
   }, [existingCompanies]);
 
   const industryComboboxOptions = useMemo<ComboboxOption[]>(() => {
-    return INDUSTRY_OPTIONS.map((ind) => ({
+    return industries.map((ind) => ({
       value: ind,
       label: ind,
     }));
-  }, []);
+  }, [industries]);
 
   const corridorComboboxOptions = useMemo<ComboboxOption[]>(() => {
-    return CORRIDOR_OPTIONS.map((cor) => ({
+    return corridors.map((cor) => ({
       value: cor,
       label: cor,
     }));
-  }, []);
+  }, [corridors]);
 
   const clearHeightOptions: ComboboxOption[] = [
     { value: '9', label: '9 Meters (Standard Box - 30 Ft)' },
@@ -508,6 +498,19 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
       description: `${cnt.designation || 'Contact'} • ${cnt.phone}`,
     }));
   }, [existingCompanyContacts]);
+
+  // Clean 1-line owner options without bulky role sub-text (identical to CompanyDetailPage)
+  const ownerComboboxOptions = useMemo<ComboboxOption[]>(() => {
+    return users.map((u) => ({
+      value: u.id,
+      label: u.name,
+      icon: (
+        <span className="w-5 h-5 rounded-full bg-surface-muted border border-border text-[10px] font-bold text-foreground flex items-center justify-center shrink-0">
+          {u.name?.slice(0, 2).toUpperCase()}
+        </span>
+      ),
+    }));
+  }, [users]);
 
   // Handle Form Submission
   const handleFinalSubmit = async (e?: React.FormEvent) => {
@@ -608,7 +611,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               <Button
                 variant="primary"
                 onClick={() => onSuccess(createdInquiry.id)}
-                className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs px-5 shadow-xs"
+                className="font-semibold text-xs px-5 shadow-xs"
               >
                 Go to Inquiry Record
               </Button>
@@ -627,29 +630,29 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
   }
 
   return (
-    <div className="w-full text-left space-y-6 pb-20">
+    <div className="w-full text-left space-y-6 pb-8">
       {/* Top Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 pb-4 border-b border-border">
         <div className="flex items-start sm:items-center gap-3 sm:gap-3.5">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-fairway-500/10 text-fairway-600 dark:bg-fairway-500/20 dark:text-fairway-400 border border-fairway-500/20 flex items-center justify-center shrink-0 shadow-xs mt-0.5 sm:mt-0">
-            <Warehouse className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-surface-muted text-foreground border border-border flex items-center justify-center shrink-0 shadow-2xs">
+            <Warehouse className="w-5 h-5 text-foreground" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
                 Create Warehouse Inquiry
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 border border-fairway-500/20 whitespace-nowrap shrink-0">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-surface-muted text-foreground border border-border whitespace-nowrap shrink-0">
                 New Requirement
               </span>
             </div>
             <p className="text-xs text-foreground-muted mt-0.5">
-              Create a new warehouse requirement & register client in pipeline
+              Log client leasing demand & match pipeline warehouse assets
             </p>
           </div>
         </div>
 
-        {/* Right Action Buttons - Full Width on Mobile */}
+        {/* Right Action Buttons */}
         <div className="flex items-center w-full sm:w-auto">
           <Button
             type="button"
@@ -657,7 +660,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
             size="sm"
             onClick={onBack}
             leftIcon={<ArrowLeft className="w-4 h-4 shrink-0" />}
-            className="w-full sm:w-auto rounded-xl font-semibold justify-center h-9 shadow-2xs"
+            className="w-full sm:w-auto rounded-xl font-medium justify-center h-9"
           >
             Back
           </Button>
@@ -667,21 +670,21 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
       {/* Main Form Body */}
       <form onSubmit={handleFinalSubmit} className="w-full space-y-6">
         {/* ========================================================================= */}
-        {/* SECTION 1: BASIC INFORMATION (Company & Customer Entity) */}
+        {/* SECTION 1: CLIENT ENTITY SELECTION */}
         {/* ========================================================================= */}
-        <div className="bg-surface border border-border rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
+        <div className="bg-surface border border-border rounded-2xl p-4 sm:p-5 md:p-6 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
             <div>
-              <h2 className="text-base font-bold text-foreground tracking-tight">
-                Basic Information
+              <h2 className="text-sm font-bold text-foreground tracking-tight">
+                1. Client Corporate Entity
               </h2>
               <p className="text-xs text-foreground-muted mt-0.5">
-                Specify client corporate entity and business category
+                Select an existing client company or register a new commercial prospect
               </p>
             </div>
 
             {/* Entity Selection Mode Pills */}
-            <div className="flex items-center gap-1 p-1 bg-surface-muted rounded-xl border border-border w-full sm:w-auto">
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-1 p-1 bg-surface-muted rounded-xl border border-border w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -690,16 +693,13 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   clearError('companyIndustry');
                   clearError('companyCity');
                 }}
-                className={`flex-1 sm:flex-initial px-2 sm:px-3.5 py-2 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer text-center whitespace-nowrap flex items-center justify-center ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center whitespace-nowrap flex items-center justify-center ${
                   selectedCompanyMode === 'existing'
                     ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
                     : 'text-foreground-muted hover:text-foreground'
                 }`}
               >
-                <span>
-                  <span className="hidden sm:inline">Select </span>Existing Company
-                  <span className="ml-1 text-[10px] sm:text-xs font-mono font-medium opacity-80">({existingCompanies.length})</span>
-                </span>
+                <span>Existing Company ({existingCompanies.length})</span>
               </button>
               <button
                 type="button"
@@ -707,24 +707,22 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   setSelectedCompanyMode('new');
                   clearError('selectedCompanyId');
                 }}
-                className={`flex-1 sm:flex-initial px-2 sm:px-3.5 py-2 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
                   selectedCompanyMode === 'new'
                     ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
                     : 'text-foreground-muted hover:text-foreground'
                 }`}
               >
                 <Plus className="w-3.5 h-3.5 shrink-0" />
-                <span>
-                  <span className="hidden sm:inline">Register </span>New Entity
-                </span>
+                <span>+ Register New Entity</span>
               </button>
             </div>
           </div>
 
           {/* Existing Company Mode View */}
           {selectedCompanyMode === 'existing' ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                 <div id="field-selectedCompanyId" className="md:col-span-2 space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Choose Customer Company <span className="text-rose-500 font-bold">*</span>
@@ -753,54 +751,58 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   <label className="text-xs font-semibold text-foreground block">
                     Customer Priority
                   </label>
-                  <div className="h-10 px-3.5 rounded-xl bg-surface-muted/50 border border-border flex items-center justify-between text-xs font-semibold text-foreground">
-                    <span>{selectedCompany?.priority || 'High'} Priority</span>
-                    <Badge
-                      variant={selectedCompany?.priority === 'High' ? 'danger' : selectedCompany?.priority === 'Medium' ? 'warning' : 'default'}
-                      size="sm"
-                    >
-                      {selectedCompany?.priority || 'High'}
-                    </Badge>
+                  <div className="h-10 px-3.5 rounded-xl bg-surface-muted/40 border border-border flex items-center justify-between text-xs font-semibold text-foreground">
+                    <span>{selectedCompany?.priority || 'Medium'} Priority</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold border border-border bg-surface text-foreground-muted">
+                      {selectedCompany?.priority || 'Medium'}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Selected Company Preview Bar */}
-              {selectedCompany && (
-                <div className="p-3.5 bg-surface-muted/40 border border-border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div className="space-y-0.5">
-                    <div className="font-bold text-foreground flex items-center gap-2">
-                      <span>{selectedCompany.name}</span>
-                      <span className="text-[10px] px-2 py-0.2 font-normal rounded-full bg-fairway-500/10 text-fairway-700 dark:text-fairway-300 border border-fairway-500/20">
-                        {selectedCompany.industry}
+              {/* Selected Company Preview Chip (Sanitized) */}
+              {selectedCompany && (() => {
+                const loc = [selectedCompany.city, selectedCompany.state].filter(Boolean).join(', ');
+                return (
+                  <div className="p-3.5 bg-surface-muted/30 border border-border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="space-y-1 min-w-0">
+                      <div className="font-bold text-foreground flex items-center gap-2 flex-wrap">
+                        <span className="truncate">{selectedCompany.name}</span>
+                        {selectedCompany.industry && (
+                          <span className="text-[10px] px-2 py-0.5 font-medium rounded-full bg-surface border border-border text-foreground shrink-0">
+                            {selectedCompany.industry}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-foreground-muted text-[11px] truncate">
+                        {[selectedCompany.address, loc, selectedCompany.pincode].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-3 text-foreground-muted shrink-0 flex-wrap">
+                      {selectedCompany.phone && <span className="text-xs">{selectedCompany.phone}</span>}
+                      <span className="font-semibold text-foreground px-2.5 py-0.5 rounded-lg bg-surface border border-border text-[11px]">
+                        {selectedCompany.inquiriesCount || 1} Active Inquiries
                       </span>
                     </div>
-                    <div className="text-foreground-muted">
-                      {selectedCompany.address}, {selectedCompany.city}, {selectedCompany.state} — {selectedCompany.pincode}
-                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-foreground-muted shrink-0">
-                    <span>{selectedCompany.phone}</span>
-                    <span>{selectedCompany.email}</span>
-                    <span className="font-semibold text-foreground">{selectedCompany.inquiriesCount || 1} Active Inquiries</span>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           ) : (
-            /* Register New Entity Fields */
-            <div className="space-y-4">
+            /* Register New Entity: 4 Essentials + Progressive Disclosure */
+            <div className="space-y-3.5">
               {duplicateWarnings.length > 0 && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 rounded-xl flex items-center gap-2.5 text-xs">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
                   <div>
-                    <strong>Potential duplicate match:</strong> We found {duplicateWarnings.length} company records matching "{newCompanyData.name}".
+                    <strong>Potential duplicate:</strong> Found {duplicateWarnings.length} records matching "{newCompanyData.name}".
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div id="field-companyName" className="space-y-1.5">
+              {/* Primary 4 Fields */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+                <div id="field-companyName" className="space-y-1.5 sm:col-span-2 md:col-span-2">
                   <label className="text-xs font-semibold text-foreground block">
                     Company Trade Name <span className="text-rose-500 font-bold">*</span>
                   </label>
@@ -816,7 +818,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                       "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
                       errors.companyName
                         ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
+                        : "border-border focus:border-foreground"
                     )}
                   />
                   {errors.companyName && (
@@ -827,21 +829,6 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   )}
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground block">
-                    Registered Legal Entity Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Acme Logistics Solutions Private Limited"
-                    value={newCompanyData.legalName}
-                    onChange={(e) => setNewCompanyData({ ...newCompanyData, legalName: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div id="field-companyIndustry" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Industry Segment <span className="text-rose-500 font-bold">*</span>
@@ -864,54 +851,13 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   )}
                 </div>
 
-                <div id="field-companyWebsite" className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground block">
-                    Company Website
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="https://company.example.com"
-                    value={newCompanyData.website}
-                    onChange={(e) => {
-                      setNewCompanyData({ ...newCompanyData, website: e.target.value });
-                      clearError('companyWebsite');
-                    }}
-                    className={cn(
-                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
-                      errors.companyWebsite
-                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
-                    )}
-                  />
-                  {errors.companyWebsite && (
-                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      <span>{errors.companyWebsite}</span>
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground block">
-                    Company Priority
-                  </label>
-                  <Combobox
-                    options={priorityOptions}
-                    value={newCompanyData.priority}
-                    onChange={(val) => setNewCompanyData({ ...newCompanyData, priority: val as Company['priority'] })}
-                    placeholder="Select priority..."
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div id="field-companyCity" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
-                    City <span className="text-rose-500 font-bold">*</span>
+                    Primary City / Hub <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
-                    placeholder="Dahej / Ahmedabad / Surat"
+                    placeholder="e.g. Dahej / Ahmedabad"
                     value={newCompanyData.city}
                     onChange={(e) => {
                       setNewCompanyData({ ...newCompanyData, city: e.target.value });
@@ -921,7 +867,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                       "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
                       errors.companyCity
                         ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
+                        : "border-border focus:border-foreground"
                     )}
                   />
                   {errors.companyCity && (
@@ -931,63 +877,10 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     </p>
                   )}
                 </div>
-
-                <div id="field-companyState" className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground block">
-                    State
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Gujarat"
-                    value={newCompanyData.state}
-                    onChange={(e) => {
-                      setNewCompanyData({ ...newCompanyData, state: e.target.value });
-                      clearError('companyState');
-                    }}
-                    className={cn(
-                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
-                      errors.companyState
-                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
-                    )}
-                  />
-                  {errors.companyState && (
-                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      <span>{errors.companyState}</span>
-                    </p>
-                  )}
-                </div>
-
-                <div id="field-companyPincode" className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground block">
-                    Postal Pincode
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="392130"
-                    value={newCompanyData.pincode}
-                    onChange={(e) => {
-                      setNewCompanyData({ ...newCompanyData, pincode: e.target.value });
-                      clearError('companyPincode');
-                    }}
-                    className={cn(
-                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
-                      errors.companyPincode
-                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
-                    )}
-                  />
-                  {errors.companyPincode && (
-                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      <span>{errors.companyPincode}</span>
-                    </p>
-                  )}
-                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Contact Information */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div id="field-companyPhone" className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
                     Official Phone
@@ -1000,19 +893,8 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                       setNewCompanyData({ ...newCompanyData, phone: e.target.value });
                       clearError('companyPhone');
                     }}
-                    className={cn(
-                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
-                      errors.companyPhone
-                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
-                    )}
+                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-foreground focus:outline-none transition-colors"
                   />
-                  {errors.companyPhone && (
-                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      <span>{errors.companyPhone}</span>
-                    </p>
-                  )}
                 </div>
 
                 <div id="field-companyEmail" className="space-y-1.5">
@@ -1027,47 +909,110 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                       setNewCompanyData({ ...newCompanyData, email: e.target.value });
                       clearError('companyEmail');
                     }}
-                    className={cn(
-                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
-                      errors.companyEmail
-                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
-                    )}
+                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-foreground focus:outline-none transition-colors"
                   />
-                  {errors.companyEmail && (
-                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      <span>{errors.companyEmail}</span>
-                    </p>
-                  )}
                 </div>
+              </div>
+
+              {/* Collapsible Additional Details */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdditionalCompanyFields(!showAdditionalCompanyFields)}
+                  className="text-xs font-semibold text-foreground-muted hover:text-foreground flex items-center gap-1.5 transition-colors cursor-pointer py-1"
+                >
+                  <ChevronRight className={cn("w-3.5 h-3.5 transition-transform", showAdditionalCompanyFields && "rotate-90")} />
+                  <span>{showAdditionalCompanyFields ? 'Hide additional corporate details' : '+ Add Legal Entity Name, Website, State, Pincode (Optional)'}</span>
+                </button>
+
+                {showAdditionalCompanyFields && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 pt-3 animate-fade-in">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-semibold text-foreground block">
+                        Registered Legal Entity Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Acme Logistics Solutions Private Limited"
+                        value={newCompanyData.legalName}
+                        onChange={(e) => setNewCompanyData({ ...newCompanyData, legalName: e.target.value })}
+                        className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-foreground focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-semibold text-foreground block">
+                        Company Website URL
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="https://company.example.com"
+                        value={newCompanyData.website}
+                        onChange={(e) => setNewCompanyData({ ...newCompanyData, website: e.target.value })}
+                        className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-foreground focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground block">State</label>
+                      <input
+                        type="text"
+                        placeholder="Gujarat"
+                        value={newCompanyData.state}
+                        onChange={(e) => setNewCompanyData({ ...newCompanyData, state: e.target.value })}
+                        className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-foreground focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground block">Postal Pincode</label>
+                      <input
+                        type="text"
+                        placeholder="392130"
+                        value={newCompanyData.pincode}
+                        onChange={(e) => setNewCompanyData({ ...newCompanyData, pincode: e.target.value })}
+                        className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-foreground focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-xs font-semibold text-foreground block">Company Priority</label>
+                      <Combobox
+                        options={priorityOptions}
+                        value={newCompanyData.priority}
+                        onChange={(val) => setNewCompanyData({ ...newCompanyData, priority: val as Company['priority'] })}
+                        placeholder="Select priority..."
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </div>
 
         {/* ========================================================================= */}
-        {/* SECTION 2: WAREHOUSE REQUIREMENTS & TECHNICAL SPECS */}
+        {/* SECTION 2: WAREHOUSE REQUIREMENTS & COMMERCIAL TERMS */}
         {/* ========================================================================= */}
-        <div className="bg-surface border border-border rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
+        <div className="bg-surface border border-border rounded-2xl p-4 sm:p-5 md:p-6 shadow-xs space-y-4">
           <div className="pb-3 border-b border-border">
-            <h2 className="text-base font-bold text-foreground tracking-tight">
-              Warehouse Requirements & Technical Specifications
+            <h2 className="text-sm font-bold text-foreground tracking-tight">
+              2. Warehouse Requirements & Commercial Terms
             </h2>
             <p className="text-xs text-foreground-muted mt-0.5">
-              Define required carpet area, corridor location, clear heights, and facility parameters
+              Specify carpet area, corridor location, target budget, and possession timeline
             </p>
           </div>
 
           <div className="space-y-4">
-            {/* Requirement Title / Summary */}
+            {/* Requirement Title */}
             <div id="field-requirement" className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
-                Requirement Posting Title / Summary <span className="text-rose-500 font-bold">*</span>
+                Requirement Summary / Title <span className="text-rose-500 font-bold">*</span>
               </label>
               <input
                 type="text"
-                placeholder="e.g. Grade-A compliant chemical warehousing with fire sprinkler system and multi-dock access"
+                placeholder="e.g. Grade-A compliant warehouse requirement for chemical storage with dock access"
                 value={inquiryData.requirement}
                 onChange={(e) => {
                   setInquiryData({ ...inquiryData, requirement: e.target.value });
@@ -1077,7 +1022,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
                   errors.requirement
                     ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                    : "border-border focus:border-fairway-600"
+                    : "border-border focus:border-foreground"
                 )}
               />
               {errors.requirement && (
@@ -1088,16 +1033,15 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               )}
             </div>
 
-            {/* Area & Corridor & Specific Hub */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Required Area with Quick Presets */}
+            {/* Row 1: Area, Corridor, Location */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
               <div id="field-requiredAreaSqFt" className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-foreground">
                     Required Area (Sq.Ft) <span className="text-rose-500 font-bold">*</span>
                   </label>
-                  <span className="text-[11px] font-mono font-bold text-fairway-600 dark:text-fairway-400">
-                    {inquiryData.requiredAreaSqFt > 0 ? formatSqFt(inquiryData.requiredAreaSqFt) : '—'}
+                  <span className="text-[11px] font-mono font-bold text-foreground">
+                    {inquiryData.requiredAreaSqFt > 0 ? formatSqFt(inquiryData.requiredAreaSqFt) : ''}
                   </span>
                 </div>
                 <input
@@ -1114,7 +1058,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     "w-full bg-surface-muted/40 border rounded-xl text-xs font-bold text-foreground p-2.5 outline-none transition-colors",
                     errors.requiredAreaSqFt
                       ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                      : "border-border focus:border-fairway-600"
+                      : "border-border focus:border-foreground"
                   )}
                 />
                 {errors.requiredAreaSqFt && (
@@ -1125,7 +1069,6 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 )}
               </div>
 
-              {/* Target Corridor */}
               <div id="field-targetCorridor" className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground block">
                   Target Logistics Corridor <span className="text-rose-500 font-bold">*</span>
@@ -1153,8 +1096,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                 )}
               </div>
 
-              {/* Specific Location Hub */}
-              <div id="field-location" className="space-y-1.5">
+              <div id="field-location" className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                 <label className="text-xs font-semibold text-foreground block">
                   Specific Hub / Location <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -1170,7 +1112,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
                     errors.location
                       ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                      : "border-border focus:border-fairway-600"
+                      : "border-border focus:border-foreground"
                   )}
                 />
                 {errors.location && (
@@ -1182,111 +1124,183 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               </div>
             </div>
 
-            {/* Engineering Parameters: Clear Height, Docks, Floor Load */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">
-                  Clear Height (Meters / Ft)
-                </label>
-                <Combobox
-                  options={clearHeightOptions}
-                  value={inquiryData.clearHeightFt ? String(inquiryData.clearHeightFt) : ''}
-                  onChange={(val) => setInquiryData({ ...inquiryData, clearHeightFt: Number(val) || 0 })}
-                  placeholder="Select clear height..."
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">
-                  Dock Openings Count
-                </label>
+            {/* Row 2: Budget, Possession Date, Lease Tenure */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              <div id="field-budgetMonthlyINR" className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground">
+                    Monthly Rental Budget (₹ INR) <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <span className="text-[11px] font-mono font-semibold text-foreground-muted">
+                    {Number(rentPerSqFt) > 0 ? `≈ ₹${rentPerSqFt}/sq.ft` : ''}
+                  </span>
+                </div>
                 <input
                   type="number"
                   min="0"
-                  max="50"
-                  placeholder="e.g. 6"
-                  value={inquiryData.dockRequirements || ''}
-                  onChange={(e) => setInquiryData({ ...inquiryData, dockRequirements: Number(e.target.value) || 0 })}
-                  className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                  step="any"
+                  placeholder="e.g. 500000"
+                  value={inquiryData.budgetMonthlyINR || ''}
+                  onChange={(e) => {
+                    setInquiryData({ ...inquiryData, budgetMonthlyINR: Number(e.target.value) || 0 });
+                    clearError('budgetMonthlyINR');
+                  }}
+                  className={cn(
+                    "w-full bg-surface-muted/40 border rounded-xl text-xs font-bold text-foreground p-2.5 outline-none transition-colors",
+                    errors.budgetMonthlyINR
+                      ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
+                      : "border-border focus:border-foreground"
+                  )}
+                />
+                {errors.budgetMonthlyINR && (
+                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{errors.budgetMonthlyINR}</span>
+                  </p>
+                )}
+              </div>
+
+              <div id="field-possessionDate" className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground block">
+                  Target Possession Date <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <DatePicker
+                  value={inquiryData.possessionDate}
+                  onChange={(val) => {
+                    setInquiryData((prev) => ({ ...prev, possessionDate: val }));
+                    clearError('possessionDate');
+                  }}
+                  placeholder="Select target possession date"
+                  error={errors.possessionDate}
                 />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                 <label className="text-xs font-semibold text-foreground block">
-                  Floor Load Capacity
+                  Lease Duration (Tenure)
                 </label>
                 <Combobox
-                  options={floorLoadOptions}
-                  value={inquiryData.floorLoadCapacity}
-                  onChange={(val) => setInquiryData({ ...inquiryData, floorLoadCapacity: val })}
-                  placeholder="Select floor load capacity..."
+                  options={leaseTenureOptions}
+                  value={inquiryData.leaseDurationMonths ? String(inquiryData.leaseDurationMonths) : ''}
+                  onChange={(val) => setInquiryData({ ...inquiryData, leaseDurationMonths: Number(val) || 36 })}
+                  placeholder="Select lease duration..."
                 />
               </div>
             </div>
 
-            {/* Power & Fire Sprinklers */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">
-                  Connected Power (kVA)
-                </label>
-                <input
-                  type="number"
-                  placeholder="e.g. 500"
-                  value={inquiryData.powerKVA || ''}
-                  onChange={(e) => setInquiryData({ ...inquiryData, powerKVA: Number(e.target.value) || 0 })}
-                  className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
-                />
-              </div>
+            {/* Progressive Disclosure Accordion: Technical & Engineering Specs */}
+            <div className="pt-2 border-t border-border/70">
+              <button
+                type="button"
+                onClick={() => setShowTechnicalSpecs(!showTechnicalSpecs)}
+                className="text-xs font-semibold text-foreground-muted hover:text-foreground flex items-center gap-1.5 transition-colors cursor-pointer py-1"
+              >
+                <ChevronRight className={cn("w-3.5 h-3.5 transition-transform", showTechnicalSpecs && "rotate-90")} />
+                <span>
+                  {showTechnicalSpecs
+                    ? 'Hide technical & engineering specifications'
+                    : '+ Add Technical Specs: Clear Height, Docks, Floor Load, Power, Fire System (Optional)'}
+                </span>
+              </button>
 
-              <div className="space-y-1.5 flex flex-col justify-end">
-                <label className="inline-flex items-center gap-3 p-3 rounded-xl bg-surface-muted/50 border border-border cursor-pointer hover:border-fairway-400/60 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={inquiryData.fireSystemsRequired}
-                    onChange={(e) => setInquiryData({ ...inquiryData, fireSystemsRequired: e.target.checked })}
-                    className="w-4 h-4 rounded text-fairway-600 focus:ring-fairway-500"
-                  />
-                  <div className="text-xs">
-                    <span className="font-semibold text-foreground block">NFPA Compliant Fire Sprinklers & Hydrants</span>
-                    <span className="text-[11px] text-foreground-muted">Mandatory for hazardous / high fire risk cargo</span>
+              {showTechnicalSpecs && (
+                <div className="space-y-4 pt-3.5 animate-fade-in">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground block">Clear Height</label>
+                      <Combobox
+                        options={clearHeightOptions}
+                        value={inquiryData.clearHeightFt ? String(inquiryData.clearHeightFt) : ''}
+                        onChange={(val) => setInquiryData({ ...inquiryData, clearHeightFt: Number(val) || 0 })}
+                        placeholder="Select clear height..."
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground block">Dock Openings Count</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 6"
+                        value={inquiryData.dockRequirements || ''}
+                        onChange={(e) => setInquiryData({ ...inquiryData, dockRequirements: Number(e.target.value) || 0 })}
+                        className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground p-2.5 focus:border-foreground focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                      <label className="text-xs font-semibold text-foreground block">Floor Load Capacity</label>
+                      <Combobox
+                        options={floorLoadOptions}
+                        value={inquiryData.floorLoadCapacity}
+                        onChange={(val) => setInquiryData({ ...inquiryData, floorLoadCapacity: val })}
+                        placeholder="Select floor load..."
+                      />
+                    </div>
                   </div>
-                </label>
-              </div>
-            </div>
 
-            {/* Special Requirements */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground block">
-                Special Operational & Engineering Requirements
-              </label>
-              <textarea
-                rows={2}
-                placeholder="e.g. NFPA compliant fire sprinklers, chemical grade epoxy flooring, 24/7 CCTV & security perimeter."
-                value={inquiryData.specialRequirements}
-                onChange={(e) => setInquiryData({ ...inquiryData, specialRequirements: e.target.value })}
-                className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
-              />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground block">Connected Power (kVA)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 500"
+                        value={inquiryData.powerKVA || ''}
+                        onChange={(e) => setInquiryData({ ...inquiryData, powerKVA: Number(e.target.value) || 0 })}
+                        className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground p-2.5 focus:border-foreground focus:outline-none transition-colors"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 flex flex-col justify-end">
+                      <label className="inline-flex items-center gap-3 p-2.5 rounded-xl bg-surface-muted/40 border border-border cursor-pointer hover:bg-surface-muted transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={inquiryData.fireSystemsRequired}
+                          onChange={(e) => setInquiryData({ ...inquiryData, fireSystemsRequired: e.target.checked })}
+                          className="w-4 h-4 rounded text-primary focus:ring-primary"
+                        />
+                        <div className="text-xs">
+                          <span className="font-semibold text-foreground block">NFPA Compliant Fire Sprinklers & Hydrants</span>
+                          <span className="text-[11px] text-foreground-muted">Mandatory for high fire risk cargo</span>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground block">
+                      Special Operational & Engineering Requirements
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="e.g. Chemical grade epoxy flooring, 24/7 CCTV & security perimeter."
+                      value={inquiryData.specialRequirements}
+                      onChange={(e) => setInquiryData({ ...inquiryData, specialRequirements: e.target.value })}
+                      className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground p-2.5 focus:border-foreground focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* SECTION 3: KEY CONTACT PERSON & PROPOSED FACILITY NODE */}
+        {/* SECTION 3: KEY CONTACT & PIPELINE GOVERNANCE */}
         {/* ========================================================================= */}
-        <div className="bg-surface border border-border rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
+        <div className="bg-surface border border-border rounded-2xl p-4 sm:p-5 md:p-6 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
             <div>
-              <h2 className="text-base font-bold text-foreground tracking-tight">
-                Contact Person & Facility Node
+              <h2 className="text-sm font-bold text-foreground tracking-tight">
+                3. Key Contact & Pipeline Assignment
               </h2>
               <p className="text-xs text-foreground-muted mt-0.5">
-                Attach the designated decision maker and specify the proposed facility node
+                Attach the primary client decision maker and assign salesperson
               </p>
             </div>
 
             {selectedCompanyMode === 'existing' && existingCompanyContacts.length > 0 && (
-              <div className="flex items-center gap-1 p-1 bg-surface-muted rounded-xl border border-border w-full sm:w-auto">
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-1 p-1 bg-surface-muted rounded-xl border border-border w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => {
@@ -1294,16 +1308,13 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     clearError('contactName');
                     clearError('contactPhone');
                   }}
-                  className={`flex-1 sm:flex-initial px-2 sm:px-3.5 py-2 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer text-center whitespace-nowrap flex items-center justify-center ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center whitespace-nowrap flex items-center justify-center ${
                     contactMode === 'existing'
                       ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
                       : 'text-foreground-muted hover:text-foreground'
                   }`}
                 >
-                  <span>
-                    <span className="hidden sm:inline">Select </span>Existing Contact
-                    <span className="ml-1 text-[10px] sm:text-xs font-mono font-medium opacity-80">({existingCompanyContacts.length})</span>
-                  </span>
+                  <span>Existing Contact ({existingCompanyContacts.length})</span>
                 </button>
                 <button
                   type="button"
@@ -1311,16 +1322,14 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                     setContactMode('new');
                     clearError('selectedContactId');
                   }}
-                  className={`flex-1 sm:flex-initial px-2 sm:px-3.5 py-2 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     contactMode === 'new'
                       ? 'bg-surface text-foreground shadow-xs border border-border font-bold'
                       : 'text-foreground-muted hover:text-foreground'
                   }`}
                 >
                   <Plus className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    <span className="hidden sm:inline">Add </span>New Contact
-                  </span>
+                  <span>+ New Contact</span>
                 </button>
               </div>
             )}
@@ -1349,9 +1358,9 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               )}
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div id="field-contactName" className="space-y-1.5">
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div id="field-contactName" className="space-y-1.5 sm:col-span-2 lg:col-span-2">
                   <label className="text-xs font-semibold text-foreground block">
                     Full Name of Decision Maker <span className="text-rose-500 font-bold">*</span>
                   </label>
@@ -1367,7 +1376,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                       "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
                       errors.contactName
                         ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
+                        : "border-border focus:border-foreground"
                     )}
                   />
                   {errors.contactName && (
@@ -1376,34 +1385,6 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                       <span>{errors.contactName}</span>
                     </p>
                   )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground block">
-                    Designation / Role
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. VP - Supply Chain & Infrastructure"
-                    value={contactData.designation}
-                    onChange={(e) => setContactData({ ...contactData, designation: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground block">
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Logistics Operations"
-                    value={contactData.department}
-                    onChange={(e) => setContactData({ ...contactData, department: e.target.value })}
-                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
-                  />
                 </div>
 
                 <div id="field-contactPhone" className="space-y-1.5">
@@ -1422,7 +1403,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                       "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
                       errors.contactPhone
                         ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
+                        : "border-border focus:border-foreground"
                     )}
                   />
                   {errors.contactPhone && (
@@ -1433,166 +1414,41 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   )}
                 </div>
 
-                <div id="field-contactEmail" className="space-y-1.5">
+                <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground block">
-                    Work Email Address
+                    Designation / Role
                   </label>
                   <input
-                    type="email"
-                    placeholder="rajesh.sharma@company.com"
-                    value={contactData.email}
-                    onChange={(e) => {
-                      setContactData({ ...contactData, email: e.target.value });
-                      clearError('contactEmail');
-                    }}
-                    className={cn(
-                      "w-full bg-surface-muted/40 border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 outline-none transition-colors",
-                      errors.contactEmail
-                        ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                        : "border-border focus:border-fairway-600"
-                    )}
+                    type="text"
+                    placeholder="e.g. VP Logistics"
+                    value={contactData.designation}
+                    onChange={(e) => setContactData({ ...contactData, designation: e.target.value })}
+                    className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-foreground focus:outline-none transition-colors"
                   />
-                  {errors.contactEmail && (
-                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      <span>{errors.contactEmail}</span>
-                    </p>
-                  )}
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground block">
+                  Work Email Address
+                </label>
+                <input
+                  type="email"
+                  placeholder="rajesh.sharma@company.com"
+                  value={contactData.email}
+                  onChange={(e) => {
+                    setContactData({ ...contactData, email: e.target.value });
+                    clearError('contactEmail');
+                  }}
+                  className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-foreground focus:outline-none transition-colors"
+                />
               </div>
             </div>
           )}
 
-          {/* Facility Node Setup Toggle */}
-          <div className="pt-4 border-t border-border space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-bold text-foreground">
-                  Create Customer Facility Record
-                </h3>
-                <p className="text-[11px] text-foreground-muted">
-                  Automatically register a facility node under this customer account for GIS mapping
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={createFacility}
-                onChange={(e) => setCreateFacility(e.target.checked)}
-                className="w-4 h-4 rounded text-fairway-600 focus:ring-fairway-500 cursor-pointer"
-              />
-            </div>
-
-            {createFacility && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 bg-surface-muted/50 border border-border rounded-xl">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-foreground">Facility Node Name</label>
-                  <input
-                    type="text"
-                    value={facilityData.name}
-                    onChange={(e) => setFacilityData({ ...facilityData, name: e.target.value })}
-                    className="w-full bg-surface border border-border rounded-lg text-xs text-foreground p-2 focus:border-fairway-600 focus:outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-foreground">Plot / Industrial Estate Address</label>
-                  <input
-                    type="text"
-                    value={facilityData.address}
-                    onChange={(e) => setFacilityData({ ...facilityData, address: e.target.value })}
-                    className="w-full bg-surface border border-border rounded-lg text-xs text-foreground p-2 focus:border-fairway-600 focus:outline-none"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* SECTION 4: COMMERCIAL TERMS & LEAD OWNERSHIP */}
-        {/* ========================================================================= */}
-        <div className="bg-surface border border-border rounded-2xl p-5 sm:p-7 shadow-xs space-y-5">
-          <div className="pb-3 border-b border-border">
-            <h2 className="text-base font-bold text-foreground tracking-tight">
-              Commercial Terms, Timeline & Ownership
-            </h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              Define monthly budget, lease tenure, target possession, and assign the lead owner
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {/* Row 1: Budget, Possession Date, Lease Duration */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Monthly Rental Budget with Live Rate */}
-              <div id="field-budgetMonthlyINR" className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-foreground">
-                    Monthly Rental Budget (₹ INR) <span className="text-rose-500 font-bold">*</span>
-                  </label>
-                  <span className="text-[11px] font-mono font-semibold text-foreground-muted">
-                    {Number(rentPerSqFt) > 0 ? `≈ ₹${rentPerSqFt}/sq.ft` : '—'}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  placeholder="e.g. 500000"
-                  value={inquiryData.budgetMonthlyINR || ''}
-                  onChange={(e) => {
-                    setInquiryData({ ...inquiryData, budgetMonthlyINR: Number(e.target.value) || 0 });
-                    clearError('budgetMonthlyINR');
-                  }}
-                  className={cn(
-                    "w-full bg-surface-muted/40 border rounded-xl text-xs font-bold text-foreground p-2.5 outline-none transition-colors",
-                    errors.budgetMonthlyINR
-                      ? "border-rose-500 focus:border-rose-500 ring-1 ring-rose-500/30"
-                      : "border-border focus:border-fairway-600"
-                  )}
-                />
-                <span className="text-[11px] text-foreground-muted block">
-                  Formatted: <strong>{inquiryData.budgetMonthlyINR > 0 ? `${formatINR(inquiryData.budgetMonthlyINR, true)} / month` : '—'}</strong>
-                </span>
-                {errors.budgetMonthlyINR && (
-                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" />
-                    <span>{errors.budgetMonthlyINR}</span>
-                  </p>
-                )}
-              </div>
-
-              {/* Target Possession Date with DatePicker */}
-              <div id="field-possessionDate" className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">
-                  Target Possession Date <span className="text-rose-500 font-bold">*</span>
-                </label>
-                <DatePicker
-                  value={inquiryData.possessionDate}
-                  onChange={(val) => {
-                    setInquiryData((prev) => ({ ...prev, possessionDate: val }));
-                    clearError('possessionDate');
-                  }}
-                  placeholder="Select target possession date"
-                  error={errors.possessionDate}
-                />
-              </div>
-
-              {/* Lease Duration */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">
-                  Lease Duration (Tenure)
-                </label>
-                <Combobox
-                  options={leaseTenureOptions}
-                  value={inquiryData.leaseDurationMonths ? String(inquiryData.leaseDurationMonths) : ''}
-                  onChange={(val) => setInquiryData({ ...inquiryData, leaseDurationMonths: Number(val) || 36 })}
-                  placeholder="Select lease duration..."
-                />
-              </div>
-            </div>
-
-            {/* Row 2: Priority, Lead Source, Sales Owner */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Deal Governance: Priority, Source, Sales Owner */}
+          <div className="pt-3 border-t border-border/70 space-y-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
               <div id="field-priority" className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground block">
                   Inquiry Priority <span className="text-rose-500 font-bold">*</span>
@@ -1607,12 +1463,6 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   placeholder="Select priority..."
                   triggerClassName={errors.priority ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                 />
-                {errors.priority && (
-                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" />
-                    <span>{errors.priority}</span>
-                  </p>
-                )}
               </div>
 
               <div id="field-source" className="space-y-1.5">
@@ -1629,28 +1479,21 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
                   placeholder="Select lead source..."
                   triggerClassName={errors.source ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                 />
-                {errors.source && (
-                  <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3 shrink-0" />
-                    <span>{errors.source}</span>
-                  </p>
-                )}
               </div>
 
-              <div id="field-assignedSalespersonId" className="space-y-1.5">
-                <UserCombobox
-                  label={
-                    <span>
-                      Assigned Sales Owner <span className="text-rose-500 font-bold">*</span>
-                    </span>
-                  }
-                  users={users}
+              <div id="field-assignedSalespersonId" className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                <label className="text-xs font-semibold text-foreground block">
+                  Assigned Sales Owner <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <Combobox
+                  options={ownerComboboxOptions}
                   value={assignedSalespersonId}
                   onChange={(val) => {
                     setAssignedSalespersonId(val);
                     clearError('assignedSalespersonId');
                   }}
                   placeholder="Select sales owner..."
+                  searchPlaceholder="Search salesperson..."
                   triggerClassName={errors.assignedSalespersonId ? 'border-rose-500 ring-1 ring-rose-500/30' : ''}
                 />
                 {errors.assignedSalespersonId && (
@@ -1662,25 +1505,21 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               </div>
             </div>
 
-            {/* Row 3: Next Action Step & Follow-up Date */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Next Action Step & Follow-up Due Date */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">
-                  Next Action Step
-                </label>
+                <label className="text-xs font-semibold text-foreground block">Next Action Step</label>
                 <input
                   type="text"
                   placeholder="e.g. Share commercial proposal & schedule joint site inspection."
                   value={inquiryData.nextAction}
                   onChange={(e) => setInquiryData({ ...inquiryData, nextAction: e.target.value })}
-                  className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-fairway-600 focus:outline-none transition-colors"
+                  className="w-full bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground placeholder:text-foreground-muted p-2.5 focus:border-foreground focus:outline-none transition-colors"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">
-                  Follow-up Due Date
-                </label>
+                <label className="text-xs font-semibold text-foreground block">Follow-up Due Date</label>
                 <DatePicker
                   value={inquiryData.nextFollowUpDate}
                   onChange={(val) => setInquiryData((prev) => ({ ...prev, nextFollowUpDate: val }))}
@@ -1692,34 +1531,34 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
         </div>
 
         {/* ========================================================================= */}
-        {/* BOTTOM SUBMISSION FOOTER (STICKY) */}
+        {/* BOTTOM ACTION BAR (STATIC / NON-STICKY) */}
         {/* ========================================================================= */}
-        <div className="sticky bottom-2 sm:bottom-4 z-30 bg-surface/95 dark:bg-surface/95 backdrop-blur-md border border-border rounded-2xl p-3.5 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 shadow-lg sm:shadow-xl transition-all">
-          <div className="flex items-center gap-2.5 sm:gap-3 text-xs min-w-0">
+        <div className="bg-surface border border-border rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-xs transition-all">
+          <div className="flex items-center gap-2.5 text-xs min-w-0">
             {Object.keys(errors).length > 0 ? (
-              <span className="flex items-center gap-1.5 text-rose-500 font-semibold truncate">
+              <span className="flex items-center gap-1.5 text-rose-500 font-medium">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-                <span className="truncate">{Object.keys(errors).length} required {Object.keys(errors).length === 1 ? 'field needs' : 'fields need'} your attention</span>
+                <span>{Object.keys(errors).length} required {Object.keys(errors).length === 1 ? 'field needs' : 'fields need'} your attention</span>
               </span>
             ) : isValid ? (
-              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold truncate">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span className="truncate">All mandatory fields verified</span>
+              <span className="flex items-center gap-1.5 text-foreground font-medium">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-primary" />
+                <span>All mandatory fields completed</span>
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-foreground-muted text-[11px] sm:text-xs min-w-0">
-                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
-                <span className="truncate sm:whitespace-normal">Please complete all fields marked with *</span>
+              <span className="flex items-center gap-1.5 text-foreground-muted text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-foreground-muted shrink-0" />
+                <span>Fields marked with * are required</span>
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2.5 sm:gap-3 w-full sm:w-auto shrink-0 justify-end">
+          <div className="flex flex-col-reverse xs:flex-row items-stretch xs:items-center gap-2.5 w-full sm:w-auto shrink-0 justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={onBack}
-              className="text-xs border-border px-4 justify-center flex-1 sm:flex-initial"
+              className="text-xs border-border px-4 justify-center h-10 w-full xs:w-auto"
             >
               Cancel
             </Button>
@@ -1728,7 +1567,7 @@ export const NewInquiryPage: React.FC<NewInquiryPageProps> = ({
               variant="primary"
               isLoading={isSubmitting}
               disabled={isSubmitting}
-              className="bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-xs px-4 sm:px-6 shadow-xs flex items-center justify-center gap-2 cursor-pointer text-center flex-1 sm:flex-initial whitespace-nowrap"
+              className="font-bold text-xs px-5 shadow-xs flex items-center justify-center gap-2 cursor-pointer h-10 w-full xs:w-auto text-center"
             >
               Register Warehouse Inquiry & Match Assets
             </Button>

@@ -4,6 +4,13 @@ import { Modal } from '@/modules/core/components/ui/Modal';
 import { Button } from '@/modules/core/components/ui/Button';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
 import { TimePicker } from '@/modules/core/components/ui/TimePicker';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/modules/core/components/ui/Select';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { CallService } from '@/modules/core/services/callService';
@@ -145,27 +152,35 @@ export const EditCallModal: React.FC<EditCallModalProps> = ({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <label className="font-semibold text-foreground">Call Type</label>
-            <select
+            <Select
               value={formData.callType}
-              onChange={(e) => setFormData({ ...formData, callType: e.target.value as any })}
-              className="w-full bg-surface-muted/50 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:border-fairway-600 focus:outline-none"
+              onValueChange={(val) => setFormData({ ...formData, callType: val as any })}
             >
-              <option value="Outbound">Outbound</option>
-              <option value="Inbound">Inbound</option>
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Outbound">Outbound</SelectItem>
+                <SelectItem value="Inbound">Inbound</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <label className="font-semibold text-foreground">Status</label>
-            <select
+            <Select
               value={formData.callStatus}
-              onChange={(e) => setFormData({ ...formData, callStatus: e.target.value as any })}
-              className="w-full bg-surface-muted/50 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:border-fairway-600 focus:outline-none"
+              onValueChange={(val) => setFormData({ ...formData, callStatus: val as any })}
             >
-              <option value="Scheduled">Scheduled</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="Overdue">Overdue</option>
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Scheduled">Scheduled</SelectItem>
+                <SelectItem value="Completed">Completed</SelectItem>
+                <SelectItem value="Cancelled">Cancelled</SelectItem>
+                <SelectItem value="Overdue">Overdue</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -195,30 +210,34 @@ export const EditCallModal: React.FC<EditCallModalProps> = ({
               type="text"
               value={formData.callDuration}
               onChange={(e) => setFormData({ ...formData, callDuration: e.target.value })}
-              className="w-full bg-surface-muted/50 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:border-fairway-600 focus:outline-none font-mono"
+              className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:border-fairway-600 focus:outline-none font-mono"
               placeholder="e.g. 00:15"
             />
           </div>
           <div className="space-y-1">
             <label className="font-semibold text-foreground">Call Owner</label>
-            <select
+            <Select
               value={formData.callOwnerId}
-              onChange={(e) => {
-                const u = users.find((usr) => usr.id === e.target.value);
+              onValueChange={(val) => {
+                const u = users.find((usr) => usr.id === val);
                 setFormData({
                   ...formData,
-                  callOwnerId: e.target.value,
+                  callOwnerId: val,
                   callOwnerName: u ? u.name : formData.callOwnerName,
                 });
               }}
-              className="w-full bg-surface-muted/50 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:border-fairway-600 focus:outline-none"
             >
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select Owner" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

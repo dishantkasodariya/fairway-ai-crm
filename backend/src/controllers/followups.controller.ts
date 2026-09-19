@@ -209,13 +209,15 @@ export const createFollowUp = async (req: Request, res: Response): Promise<void>
       contactName,
       assignedUserId,
       assignedUserName,
-      followUpDate,
+      followUpDate: rawFollowUpDate,
       followUpTime = '11:00 AM',
       channel = 'Call',
       status = 'Scheduled',
       priority = 'High',
       summary,
     } = req.body;
+
+    const followUpDate = rawFollowUpDate || req.body.dueDate || new Date().toISOString().split('T')[0];
 
     if (!followUpDate) {
       res.status(400).json({ success: false, error: { message: 'followUpDate is required' } });
@@ -378,5 +380,23 @@ export const downloadFollowUpPdf = async (req: Request, res: Response): Promise<
   } catch (error: any) {
     console.error('Error downloading follow-up PDF:', error);
     res.status(500).json({ success: false, error: { message: error.message || 'Failed to generate follow-up PDF' } });
+  }
+};
+
+/**
+ * DELETE /api/follow-ups/:id
+ */
+export const deleteFollowUp = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const result = await query('DELETE FROM follow_ups WHERE id = $1 RETURNING id;', [id]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, error: { message: 'Follow-up not found' } });
+      return;
+    }
+    res.status(200).json({ success: true, message: 'Follow-up deleted successfully.' });
+  } catch (error: any) {
+    console.error('Error deleting follow-up:', error);
+    res.status(500).json({ success: false, error: { message: error.message || 'Failed to delete follow-up' } });
   }
 };

@@ -191,6 +191,15 @@ export const getInquiries = async (req: Request, res: Response): Promise<void> =
       status: row.status || 'Active',
       nextAction: row.next_action || '',
       nextFollowUpDate: row.next_follow_up_date || '',
+      lostReason: row.lost_reason || '',
+      lostComments: row.lost_comments || '',
+      lostDate: row.lost_date || '',
+      closedByUserId: row.closed_by_user_id || '',
+      wonPropertyId: row.won_property_id || '',
+      wonPropertyName: row.won_property_name || '',
+      wonFinalValueMonthlyINR: row.won_final_value_monthly_inr ? parseFloat(row.won_final_value_monthly_inr) : 0,
+      wonComments: row.won_comments || '',
+      wonDate: row.won_date || '',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -266,6 +275,15 @@ export const getInquiryById = async (req: Request, res: Response): Promise<void>
         status: row.status,
         nextAction: row.next_action,
         nextFollowUpDate: row.next_follow_up_date,
+        lostReason: row.lost_reason || '',
+        lostComments: row.lost_comments || '',
+        lostDate: row.lost_date || '',
+        closedByUserId: row.closed_by_user_id || '',
+        wonPropertyId: row.won_property_id || '',
+        wonPropertyName: row.won_property_name || '',
+        wonFinalValueMonthlyINR: row.won_final_value_monthly_inr ? parseFloat(row.won_final_value_monthly_inr) : 0,
+        wonComments: row.won_comments || '',
+        wonDate: row.won_date || '',
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       },
@@ -551,6 +569,15 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
       salespersonName,
       nextAction,
       nextFollowUpDate,
+      lostReason,
+      lostComments,
+      lostDate,
+      closedByUserId,
+      wonPropertyId,
+      wonPropertyName,
+      wonFinalValueMonthlyINR,
+      wonComments,
+      wonDate,
     } = req.body;
 
     const sql = `
@@ -576,8 +603,17 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
         salesperson_name = COALESCE($19, salesperson_name),
         next_action = COALESCE($20, next_action),
         next_follow_up_date = COALESCE($21, next_follow_up_date),
+        lost_reason = COALESCE($22, lost_reason),
+        lost_comments = COALESCE($23, lost_comments),
+        lost_date = COALESCE($24, lost_date),
+        closed_by_user_id = COALESCE($25, closed_by_user_id),
+        won_property_id = COALESCE($26, won_property_id),
+        won_property_name = COALESCE($27, won_property_name),
+        won_final_value_monthly_inr = COALESCE($28, won_final_value_monthly_inr),
+        won_comments = COALESCE($29, won_comments),
+        won_date = COALESCE($30, won_date),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $22 OR LOWER(inquiry_number) = LOWER($22)
+      WHERE id = $31 OR LOWER(inquiry_number) = LOWER($31)
       RETURNING *;
     `;
 
@@ -603,6 +639,15 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
       salespersonName,
       nextAction,
       nextFollowUpDate,
+      lostReason,
+      lostComments,
+      lostDate,
+      closedByUserId,
+      wonPropertyId,
+      wonPropertyName,
+      wonFinalValueMonthlyINR,
+      wonComments,
+      wonDate,
       id,
     ];
 
@@ -616,6 +661,45 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
   } catch (error: any) {
     console.error('Error updating inquiry:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to update inquiry' });
+  }
+};
+
+/**
+ * GET /api/inquiries/lost-reasons
+ * Fetches dynamic lost reasons configured in PostgreSQL database
+ */
+export const getLostReasons = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await query(
+      'SELECT id, reason, category, sort_order as "sortOrder" FROM lost_reasons WHERE is_active = true ORDER BY sort_order ASC, reason ASC;'
+    );
+    res.status(200).json({ success: true, data: result.rows });
+  } catch (error: any) {
+    console.error('Error fetching lost reasons:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch lost reasons' });
+  }
+};
+
+/**
+ * POST /api/inquiries/lost-reasons
+ * Adds a new custom lost reason dynamically to PostgreSQL database
+ */
+export const createLostReason = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { reason, category } = req.body;
+    if (!reason || !reason.trim()) {
+      res.status(400).json({ success: false, error: 'Reason is required' });
+      return;
+    }
+    const id = `lr_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    const result = await query(
+      'INSERT INTO lost_reasons (id, reason, category, sort_order) VALUES ($1, $2, $3, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM lost_reasons)) ON CONFLICT (reason) DO UPDATE SET is_active = true RETURNING id, reason, category;',
+      [id, reason.trim(), category || 'Custom']
+    );
+    res.status(201).json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error('Error creating lost reason:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to create lost reason' });
   }
 };
 

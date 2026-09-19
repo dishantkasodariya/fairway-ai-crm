@@ -23,37 +23,12 @@ import { Badge } from '@/modules/core/components/ui/Badge';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
 import { UserCombobox } from '@/modules/core/components/ui/UserCombobox';
 import { CompanyService } from '@/modules/core/services/companyService';
+import { PropertyService } from '@/modules/core/services/propertyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { Company, PriorityLevel } from '@/modules/core/types';
 import { cn } from '@/modules/core/lib/utils';
 import { PhoneInput } from '@/components/reui/phone-input';
-
-const INDUSTRY_OPTIONS = [
-  'Specialty Chemicals & Polymers',
-  '3PL & Contract Logistics',
-  'Automotive & EV Components',
-  'FMCG & Retail Logistics',
-  'Pharmaceutical & Cold Chain',
-  'Heavy Engineering & Machinery',
-  'Solar & Renewable Energy Equipment',
-  'E-Commerce Fulfillment',
-  'Agri-Logistics & Grains',
-  'General Industrial',
-];
-
-const CITY_OPTIONS = [
-  { value: 'Dahej', label: 'Dahej PCPIR Corridor' },
-  { value: 'Sanand', label: 'Sanand Industrial Corridor' },
-  { value: 'Changodar', label: 'Changodar - Bavla Corridor' },
-  { value: 'Hazira', label: 'Hazira Port Logistics Zone' },
-  { value: 'Ankleshwar', label: 'Ankleshwar GIDC Chemical Zone' },
-  { value: 'Jhagadia', label: 'Jhagadia Mega Industrial Park' },
-  { value: 'Halol', label: 'Halol - Kalol Manufacturing Belt' },
-  { value: 'Vapi', label: 'Vapi - Sarigam Industrial Corridor' },
-  { value: 'Surat', label: 'Surat Ring Road Logistics Zone' },
-  { value: 'Ahmedabad', label: 'Ahmedabad Aslali - Kheda Corridor' },
-];
 
 export interface NewCompanyPageProps {
   onBack: () => void;
@@ -72,6 +47,29 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
   const { success, error } = useToast();
 
   const isEditing = !!companyToEdit || !!companyId;
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [duplicates, setDuplicates] = useState<any[]>([]);
+  const [industryList, setIndustryList] = useState<string[]>([]);
+  const [corridorList, setCorridorList] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    PropertyService.getIndustries().then((res) => {
+      if (res.success && res.data) {
+        setIndustryList(res.data);
+      }
+    });
+    PropertyService.getCorridors().then((res) => {
+      if (res.success && res.data) {
+        setCorridorList(
+          res.data.map((c: any) => ({
+            value: c.corridor || c,
+            label: c.corridor || c,
+          }))
+        );
+      }
+    });
+  }, []);
 
   const [formData, setFormData] = useState({
     name: companyToEdit?.name || '',
@@ -98,8 +96,6 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
     initialNotes: '',
   });
 
-  const [duplicates, setDuplicates] = useState<any[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessView, setShowSuccessView] = useState(false);
   const [createdCompanyId, setCreatedCompanyId] = useState<string>('');
 
@@ -607,7 +603,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                 Industry Sector <span className="text-rose-500">*</span>
               </label>
               <Combobox
-                options={INDUSTRY_OPTIONS.map((ind) => ({ value: ind, label: ind }))}
+                options={industryList.map((ind) => ({ value: ind, label: ind }))}
                 value={formData.industry}
                 onChange={(val) => {
                   setFormData({ ...formData, industry: val });
@@ -630,7 +626,7 @@ export const NewCompanyPage: React.FC<NewCompanyPageProps> = ({
                 Primary Cluster / Hub <span className="text-rose-500">*</span>
               </label>
               <Combobox
-                options={CITY_OPTIONS}
+                options={corridorList}
                 value={formData.city}
                 onChange={(val) => {
                   setFormData({ ...formData, city: val });

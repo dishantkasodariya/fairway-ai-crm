@@ -221,8 +221,8 @@ export const getRolePermissionsForRole = async (req: Request, res: Response): Pr
     );
 
     const permissions = result.rows.map((row) => {
-      let value = 'No';
-      if (normalizedKey === 'admin' || normalizedKey === 'super_admin') {
+      let value = '';
+      if (normalizedKey === 'super_admin') {
         value = 'Yes';
       } else {
         const custom = (row.custom_permissions || {}) as Record<string, string>;
@@ -240,13 +240,25 @@ export const getRolePermissionsForRole = async (req: Request, res: Response): Pr
             }
           }
         }
+        // If not explicitly set in custom_permissions, fall back to built-in role column
+        if (!value) {
+          if (normalizedKey === 'admin' && row.admin) {
+            value = row.admin;
+          } else if (normalizedKey === 'sales' && row.sales) {
+            value = row.sales;
+          } else if (normalizedKey === 'viewer' && row.viewer) {
+            value = row.viewer;
+          } else {
+            value = 'No';
+          }
+        }
       }
 
       return {
         id: row.id,
         capability: row.capability,
         category: row.category,
-        value,
+        value: value || 'No',
         description: row.description,
       };
     });
@@ -280,18 +292,54 @@ export const updatePermissionsForRole = async (req: Request, res: Response): Pro
     }
 
     for (const item of permissions) {
-      if (normalizedKey === 'admin' || normalizedKey === 'super_admin') {
-        await query('UPDATE role_permissions SET admin = $1, super_admin = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [item.value, item.id]);
+      if (normalizedKey === 'super_admin') {
+        await query('UPDATE role_permissions SET super_admin = $1::varchar, updated_at = CURRENT_TIMESTAMP WHERE id = $2::varchar', [item.value, item.id]);
+      } else if (normalizedKey === 'admin') {
+        await query(
+          `UPDATE role_permissions 
+           SET admin = $1::varchar,
+               custom_permissions = COALESCE(custom_permissions, '{}'::jsonb) 
+                   || jsonb_build_object($2::text, $1::varchar) 
+                   || jsonb_build_object($3::text, $1::varchar)
+                   || jsonb_build_object('ADMIN'::text, $1::varchar),
+               updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $4::varchar`,
+          [item.value, roleKey, normalizedKey, item.id]
+        );
+      } else if (normalizedKey === 'sales') {
+        await query(
+          `UPDATE role_permissions 
+           SET sales = $1::varchar,
+               custom_permissions = COALESCE(custom_permissions, '{}'::jsonb) 
+                   || jsonb_build_object($2::text, $1::varchar) 
+                   || jsonb_build_object($3::text, $1::varchar)
+                   || jsonb_build_object('SALES'::text, $1::varchar),
+               updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $4::varchar`,
+          [item.value, roleKey, normalizedKey, item.id]
+        );
+      } else if (normalizedKey === 'viewer') {
+        await query(
+          `UPDATE role_permissions 
+           SET viewer = $1::varchar,
+               custom_permissions = COALESCE(custom_permissions, '{}'::jsonb) 
+                   || jsonb_build_object($2::text, $1::varchar) 
+                   || jsonb_build_object($3::text, $1::varchar)
+                   || jsonb_build_object('VIEWER'::text, $1::varchar),
+               updated_at = CURRENT_TIMESTAMP 
+           WHERE id = $4::varchar`,
+          [item.value, roleKey, normalizedKey, item.id]
+        );
       } else {
         // Any custom or user-created role updates custom_permissions
         await query(
           `UPDATE role_permissions 
            SET custom_permissions = COALESCE(custom_permissions, '{}'::jsonb) 
-               || jsonb_build_object($1::text, $2::text) 
-               || jsonb_build_object($3::text, $2::text) 
-               || jsonb_build_object($4::text, $2::text),
+               || jsonb_build_object($1::text, $2::varchar) 
+               || jsonb_build_object($3::text, $2::varchar) 
+               || jsonb_build_object($4::text, $2::varchar),
                updated_at = CURRENT_TIMESTAMP 
-           WHERE id = $5`,
+           WHERE id = $5::varchar`,
           [roleKey, item.value, roleKey.toUpperCase(), normalizedKey, item.id]
         );
       }

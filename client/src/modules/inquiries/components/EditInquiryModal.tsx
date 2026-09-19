@@ -5,11 +5,11 @@ import { Input, Textarea } from '@/modules/core/components/ui/Input';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
 import { PipelineStageService } from '@/modules/core/services/pipelineStageService';
-import { PIPELINE_STAGES } from '@/modules/core/data/seedData';
+import { PropertyService } from '@/modules/core/services/propertyService';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
-import { Inquiry, PriorityLevel, PipelineStageKey } from '@/modules/core/types';
+import { Inquiry, PriorityLevel, PipelineStageKey, PipelineStageConfig } from '@/modules/core/types';
 import { formatINR, formatSqFt, STAGE_CONFIGS } from '@/modules/core/utils/formatters';
 import { Edit3, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/modules/core/lib/utils';
@@ -20,34 +20,6 @@ export interface EditInquiryModalProps {
   inquiry: Inquiry | null;
   onSuccess: () => void;
 }
-
-const CORRIDOR_OPTIONS = [
-  'Dahej PCPIR Corridor',
-  'Jhagadia GIDC Corridor',
-  'Sanand-Viramgam Corridor',
-  'Changodar-Bavla Corridor',
-  'Chhatral-Kadi Corridor',
-  'Vapi-Sarigam Corridor',
-  'Halol Industrial Corridor',
-  'Ankleshwar GIDC',
-  'United Jhagadia',
-  'Aspee Chikhli',
-  'LPS kosamba',
-  'Universal kosamba',
-  'Ahmedabad',
-  'Surat Hazira',
-];
-
-const INDUSTRY_OPTIONS = [
-  'Specialty Chemicals & Polymers',
-  'Heavy Engineering & Auto Ancillaries',
-  '3PL & Logistics',
-  'E-Commerce & Retail Warehousing',
-  'Pharmaceutical & Cold Chain',
-  'FMCG & Packaging',
-  'Electronics & Renewable Equipment',
-  'Textiles & Apparels',
-];
 
 export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
   isOpen,
@@ -83,12 +55,24 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
     nextFollowUpDate: '',
   });
 
-  const [pipelineStages, setPipelineStages] = useState(PIPELINE_STAGES);
+  const [pipelineStages, setPipelineStages] = useState<PipelineStageConfig[]>([]);
+  const [corridorOptions, setCorridorOptions] = useState<string[]>([]);
+  const [industryOptions, setIndustryOptions] = useState<string[]>([]);
 
   useEffect(() => {
     PipelineStageService.getPipelineStages().then((res) => {
       if (res.success && res.data && res.data.length > 0) {
         setPipelineStages(res.data);
+      }
+    });
+    PropertyService.getCorridors().then((res) => {
+      if (res.success && res.data && res.data.length > 0) {
+        setCorridorOptions(res.data.map((c: any) => c.corridor || c).filter(Boolean));
+      }
+    });
+    PropertyService.getIndustries().then((res) => {
+      if (res.success && res.data && res.data.length > 0) {
+        setIndustryOptions(res.data);
       }
     });
   }, []);
@@ -286,7 +270,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
               Industry / Segment
             </label>
             <Combobox
-              options={INDUSTRY_OPTIONS.map((ind) => ({ value: ind, label: ind }))}
+              options={industryOptions.map((ind) => ({ value: ind, label: ind }))}
               value={formData.industry}
               onChange={(val) => setFormData({ ...formData, industry: val })}
               placeholder="Select industry sector..."
@@ -370,7 +354,7 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
               Target Corridor
             </label>
             <Combobox
-              options={CORRIDOR_OPTIONS.map((c) => ({ value: c, label: c }))}
+              options={corridorOptions.map((c) => ({ value: c, label: c }))}
               value={formData.targetCorridor}
               onChange={(val) => setFormData({ ...formData, targetCorridor: val })}
               placeholder="Select target corridor..."

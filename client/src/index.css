@@ -108,11 +108,28 @@
     @apply border-border;
   }
 
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     background-color: var(--bg-app, #F8FAFC);
     color: var(--text-foreground, #000000);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
     font-variant-numeric: tabular-nums;
+  }
+
+  #root {
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
+    min-height: 100vh;
   }
 
 
@@ -291,8 +308,10 @@
   background: rgba(100, 116, 139, 0.8);
 }
 
-/* Command Palette Input reset */
+/* Command Palette, Popover & Combobox Search Input reset */
+[cmdk-input-wrapper],
 [cmdk-input-wrapper] input,
+[data-radix-popper-content-wrapper] input,
 input[cmdk-input],
 .cmdk-input {
   background-color: transparent !important;
@@ -302,4 +321,214 @@ input[cmdk-input],
   border-radius: 0px !important;
   box-shadow: none !important;
   outline: none !important;
+  ring: 0 !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
 }
+
+[cmdk-input-wrapper] input:focus,
+[cmdk-input-wrapper] input:focus-visible,
+[data-radix-popper-content-wrapper] input:focus,
+[data-radix-popper-content-wrapper] input:focus-visible,
+input[cmdk-input]:focus,
+input[cmdk-input]:focus-visible,
+.cmdk-input:focus,
+.cmdk-input:focus-visible {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  border-width: 0px !important;
+  border-radius: 0px !important;
+  box-shadow: none !important;
+  outline: none !important;
+  ring: 0 !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
+/* Radix Dropdown Popper & Menu zero ring and zero shadow */
+[data-radix-popper-content-wrapper],
+[data-radix-menu-content],
+[role="menu"],
+[role="menu"]:focus,
+[role="menu"]:focus-visible,
+[data-radix-popper-content-wrapper] [role="menu"],
+[data-radix-popper-content-wrapper] [role="menu"]:focus,
+[data-radix-popper-content-wrapper] [role="menu"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  ring: 0 !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+  --tw-shadow: none !important;
+}
+
+[role="menuitem"],
+[role="menuitem"]:focus,
+[role="menuitem"]:focus-visible,
+[role="menuitemcheckbox"],
+[role="menuitemcheckbox"]:focus,
+[role="menuitemcheckbox"]:focus-visible {
+  outline: none !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
+button[data-state="open"],
+button[data-state="open"]:focus,
+button[data-state="open"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
+/* Table Header Column Resizer & Separator line clean styling */
+th div.cursor-col-resize::before {
+  background-color: rgba(226, 232, 240, 0.4) !important;
+}
+.dark th div.cursor-col-resize::before,
+html.dark th div.cursor-col-resize::before {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ==========================================================================
+   Unified Table Styling: Header, Data, Hover, Click, No Underline
+   ========================================================================== */
+
+/* 1. Header background uniformity */
+th,
+th[data-pinned],
+[data-slot="data-grid"] th,
+table thead th {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+.dark th,
+html.dark th,
+.dark th[data-pinned],
+html.dark th[data-pinned],
+.dark [data-slot="data-grid"] th,
+html.dark [data-slot="data-grid"] th,
+.dark table thead th,
+html.dark table thead th {
+  color: #FFFFFF !important;
+  background-color: #161c24 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 2. Body cells background uniformity */
+td,
+td[data-pinned],
+[data-slot="data-grid"] td,
+table tbody td {
+  background-color: #ffffff;
+  color: inherit;
+  border-color: #e2e8f0;
+}
+.dark td,
+html.dark td,
+.dark td[data-pinned],
+html.dark td[data-pinned],
+.dark [data-slot="data-grid"] td,
+html.dark [data-slot="data-grid"] td,
+.dark table tbody td,
+html.dark table tbody td {
+  color: #FFFFFF !important;
+  background-color: #121214 !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* 3. Row Hover - 100% unified across all cells including pinned */
+tr:hover td,
+tr:hover td[data-pinned],
+tr.group\/row:hover td,
+tr.group\/row:hover td[data-pinned],
+table tbody tr:hover > td,
+[data-slot="data-grid"] tbody tr:hover > td {
+  background-color: #f1f5f9 !important;
+}
+.dark tr:hover td,
+html.dark tr:hover td,
+.dark tr:hover td[data-pinned],
+html.dark tr:hover td[data-pinned],
+.dark tr.group\/row:hover td,
+html.dark tr.group\/row:hover td,
+.dark tr.group\/row:hover td[data-pinned],
+html.dark tr.group\/row:hover td[data-pinned],
+.dark table tbody tr:hover > td,
+html.dark table tbody tr:hover > td,
+.dark [data-slot="data-grid"] tbody tr:hover > td,
+html.dark [data-slot="data-grid"] tbody tr:hover > td {
+  background-color: #1c1c20 !important;
+}
+
+/* 4. Row Click / Selection */
+tr:active td,
+tr:active td[data-pinned],
+tr[data-state="selected"] td,
+tr[data-state="selected"] td[data-pinned],
+tr.is-selected td,
+tr.is-selected td[data-pinned] {
+  background-color: #eff6ff !important;
+}
+.dark tr:active td,
+html.dark tr:active td,
+.dark tr:active td[data-pinned],
+html.dark tr:active td[data-pinned],
+.dark tr[data-state="selected"] td,
+html.dark tr[data-state="selected"] td,
+.dark tr[data-state="selected"] td[data-pinned],
+html.dark tr[data-state="selected"] td[data-pinned],
+.dark tr.is-selected td,
+html.dark tr.is-selected td,
+.dark tr.is-selected td[data-pinned],
+html.dark tr.is-selected td[data-pinned] {
+  background-color: #222226 !important;
+}
+
+/* 5. Absolutely No Underline on Table Text Hover */
+table td a,
+table td button,
+table td span,
+table td div,
+[data-slot="data-grid"] td a,
+[data-slot="data-grid"] td button,
+[data-slot="data-grid"] td span,
+[data-slot="data-grid"] td div,
+table tr:hover td *,
+[data-slot="data-grid"] tr:hover td * {
+  text-decoration: none !important;
+}
+
+/* ==========================================================================
+   Smooth, GPU-Accelerated & Synchronous Dark <-> Light Transition
+   Uses Native View Transitions for 100% unified, instant & smooth cross-fade.
+   Whole project transitions at the EXACT same millisecond without lag.
+   ========================================================================== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.18s !important;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Fallback for browsers without View Transitions:
+   Transition ONLY the high-level surface wrappers — NEVER thousands of nested spans/divs/cells! */
+html,
+body,
+#root,
+header,
+aside,
+main,
+.bg-surface,
+.bg-background,
+.bg-surface-muted,
+.border-border {
+  transition: background-color 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+
+

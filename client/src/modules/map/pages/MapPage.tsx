@@ -1,23 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import {
   MapPin,
   Search,
-  Filter,
   Warehouse,
-  Factory,
-  Building2,
   ExternalLink,
-  ChevronRight,
-  Layers,
 } from 'lucide-react';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { FacilityService } from '@/modules/core/services/facilityService';
 import { Facility, Property } from '@/modules/core/types';
-import { formatINR, formatSqFt } from '@/modules/core/utils/formatters';
-import { Button } from '@/modules/core/components/ui/Button';
-import { Badge } from '@/modules/core/components/ui/Badge';
+import { formatSqFt } from '@/modules/core/utils/formatters';
 
 // Fix Leaflet Default Icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -30,18 +23,18 @@ L.Icon.Default.mergeOptions({
 // Custom HTML Icons for Fairway Properties and Client Facilities
 const propertyIcon = L.divIcon({
   className: 'custom-property-marker',
-  html: `<div style="background:var(--fw-600, #EB661F); color:white; width:34px; height:34px; border-radius:8px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 4px 10px rgba(0,0,0,0.3);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/></svg></div>`,
-  iconSize: [34, 34],
-  iconAnchor: [17, 34],
-  popupAnchor: [0, -34],
+  html: `<div style="background:#EB661F; color:white; width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 3px 8px rgba(0,0,0,0.3);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/></svg></div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
 });
 
 const facilityIcon = L.divIcon({
   className: 'custom-facility-marker',
-  html: `<div style="background:var(--accent-500, #6BBF3E); color:var(--fw-950, #052F23); width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 3px 8px rgba(0,0,0,0.25);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg></div>`,
-  iconSize: [30, 30],
-  iconAnchor: [15, 15],
-  popupAnchor: [0, -15],
+  html: `<div style="background:#10B981; color:white; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 6px rgba(0,0,0,0.25);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg></div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -14],
 });
 
 // Map Controller Helper for Pan & Zoom
@@ -116,53 +109,75 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
     }
   };
 
-  const filteredFacilities = facilities.filter((f) => {
-    if (!f.latitude || !f.longitude) return false;
-    const q = searchQuery.toLowerCase().trim();
-    const matchesQuery =
-      !q ||
-      f.name.toLowerCase().includes(q) ||
-      f.companyName.toLowerCase().includes(q) ||
-      f.city.toLowerCase().includes(q);
+  // Deduplicate and filter properties
+  const uniqueProperties = useMemo(() => {
+    const seen = new Set<string>();
+    return properties
+      .filter((p) => {
+        const key = `${p.code || p.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .filter((p) => {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesQuery =
+          !q ||
+          p.name.toLowerCase().includes(q) ||
+          p.code.toLowerCase().includes(q) ||
+          p.city.toLowerCase().includes(q);
 
-    const matchesCorridor =
-      selectedCorridor === 'all' ||
-      (selectedCorridor === 'dahej' && f.city.toLowerCase().includes('dahej')) ||
-      (selectedCorridor === 'sanand' && (f.city.toLowerCase().includes('sanand') || f.city.toLowerCase().includes('ahmedabad'))) ||
-      (selectedCorridor === 'vapi' && (f.city.toLowerCase().includes('vapi') || f.city.toLowerCase().includes('surat'))) ||
-      (selectedCorridor === 'bhiwandi' && f.city.toLowerCase().includes('bhiwandi')) ||
-      (selectedCorridor === 'chakan' && (f.city.toLowerCase().includes('chakan') || f.city.toLowerCase().includes('pune')));
+        const matchesCorridor =
+          selectedCorridor === 'all' ||
+          (selectedCorridor === 'dahej' && p.city.toLowerCase().includes('dahej')) ||
+          (selectedCorridor === 'sanand' && (p.city.toLowerCase().includes('sanand') || p.city.toLowerCase().includes('ahmedabad'))) ||
+          (selectedCorridor === 'vapi' && (p.city.toLowerCase().includes('vapi') || p.city.toLowerCase().includes('surat'))) ||
+          (selectedCorridor === 'bhiwandi' && p.city.toLowerCase().includes('bhiwandi')) ||
+          (selectedCorridor === 'chakan' && (p.city.toLowerCase().includes('chakan') || p.city.toLowerCase().includes('pune')));
 
-    return matchesQuery && matchesCorridor;
-  });
+        return matchesQuery && matchesCorridor;
+      });
+  }, [properties, searchQuery, selectedCorridor]);
 
-  const filteredProperties = properties.filter((p) => {
-    const q = searchQuery.toLowerCase().trim();
-    const matchesQuery =
-      !q ||
-      p.name.toLowerCase().includes(q) ||
-      p.code.toLowerCase().includes(q) ||
-      p.city.toLowerCase().includes(q);
+  // Deduplicate and filter facilities
+  const uniqueFacilities = useMemo(() => {
+    const seen = new Set<string>();
+    return facilities
+      .filter((f) => {
+        if (!f.latitude || !f.longitude) return false;
+        const key = `${f.companyId || ''}-${f.name.trim().toLowerCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .filter((f) => {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesQuery =
+          !q ||
+          f.name.toLowerCase().includes(q) ||
+          f.companyName.toLowerCase().includes(q) ||
+          f.city.toLowerCase().includes(q);
 
-    const matchesCorridor =
-      selectedCorridor === 'all' ||
-      (selectedCorridor === 'dahej' && p.city.toLowerCase().includes('dahej')) ||
-      (selectedCorridor === 'sanand' && (p.city.toLowerCase().includes('sanand') || p.city.toLowerCase().includes('ahmedabad'))) ||
-      (selectedCorridor === 'vapi' && (p.city.toLowerCase().includes('vapi') || p.city.toLowerCase().includes('surat'))) ||
-      (selectedCorridor === 'bhiwandi' && p.city.toLowerCase().includes('bhiwandi')) ||
-      (selectedCorridor === 'chakan' && (p.city.toLowerCase().includes('chakan') || p.city.toLowerCase().includes('pune')));
+        const matchesCorridor =
+          selectedCorridor === 'all' ||
+          (selectedCorridor === 'dahej' && f.city.toLowerCase().includes('dahej')) ||
+          (selectedCorridor === 'sanand' && (f.city.toLowerCase().includes('sanand') || f.city.toLowerCase().includes('ahmedabad'))) ||
+          (selectedCorridor === 'vapi' && (f.city.toLowerCase().includes('vapi') || f.city.toLowerCase().includes('surat'))) ||
+          (selectedCorridor === 'bhiwandi' && f.city.toLowerCase().includes('bhiwandi')) ||
+          (selectedCorridor === 'chakan' && (f.city.toLowerCase().includes('chakan') || f.city.toLowerCase().includes('pune')));
 
-    return matchesQuery && matchesCorridor;
-  });
+        return matchesQuery && matchesCorridor;
+      });
+  }, [facilities, searchQuery, selectedCorridor]);
 
   return (
     <div className="space-y-4 max-w-full text-left h-auto lg:h-[calc(100vh-110px)] flex flex-col">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border shrink-0">
         <div>
-          <span className="text-xs font-semibold text-fairway-800 uppercase tracking-wider">CRM / Industrial Map</span>
+          <span className="text-xs font-semibold text-fairway-600 dark:text-fairway-400 uppercase tracking-wider">CRM / Industrial Map</span>
           <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 mt-0.5">
-            <MapPin className="w-6 h-6 text-fairway-600" />
+            <MapPin className="w-6 h-6 text-fairway-600 dark:text-fairway-400" />
             <span>India Industrial Corridors Map</span>
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
@@ -171,27 +186,27 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
         </div>
 
         {/* Layer Toggles */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-surface p-1.5 rounded-lg border border-border text-xs">
-          <label className="flex items-center gap-1.5 cursor-pointer font-medium text-foreground px-2 py-1 rounded hover:bg-surface-muted">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-surface p-1.5 rounded-xl border border-border text-xs">
+          <label className="flex items-center gap-1.5 cursor-pointer font-medium text-foreground px-2 py-1 rounded-lg hover:bg-surface-muted transition-colors">
             <input
               type="checkbox"
               checked={showProperties}
               onChange={(e) => setShowProperties(e.target.checked)}
               className="rounded text-fairway-600 focus:ring-fairway-600"
             />
-            <span className="w-2.5 h-2.5 rounded bg-fairway-600 inline-block" />
-            <span>Fairway Parks ({properties.length})</span>
+            <span className="w-2.5 h-2.5 rounded bg-fairway-600 inline-block shrink-0" />
+            <span>Fairway Parks ({uniqueProperties.length})</span>
           </label>
 
-          <label className="flex items-center gap-1.5 cursor-pointer font-medium text-foreground px-2 py-1 rounded hover:bg-surface-muted">
+          <label className="flex items-center gap-1.5 cursor-pointer font-medium text-foreground px-2 py-1 rounded-lg hover:bg-surface-muted transition-colors">
             <input
               type="checkbox"
               checked={showFacilities}
               onChange={(e) => setShowFacilities(e.target.checked)}
-              className="rounded text-accent-600 focus:ring-accent-600"
+              className="rounded text-emerald-600 focus:ring-emerald-600"
             />
-            <span className="w-2.5 h-2.5 rounded-full bg-accent-500 inline-block" />
-            <span>Client Plants ({facilities.length})</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shrink-0" />
+            <span>Client Plants ({uniqueFacilities.length})</span>
           </label>
         </div>
       </div>
@@ -199,7 +214,7 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
       {/* Main Split Map Container: Sidebar (Left) + Interactive Leaflet Map (Right) */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
         {/* Left Interactive Sidebar (4 cols) */}
-        <div className="order-2 lg:order-1 lg:col-span-4 bg-surface rounded-card border border-border shadow-subtle p-3 flex flex-col max-h-[380px] lg:max-h-none min-h-0 overflow-hidden">
+        <div className="order-2 lg:order-1 lg:col-span-4 bg-surface rounded-2xl border border-border shadow-xs p-3.5 flex flex-col max-h-[380px] lg:max-h-none min-h-0 overflow-hidden">
           {/* Corridor Selection Pills */}
           <div className="space-y-2 pb-3 border-b border-border shrink-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
@@ -209,11 +224,12 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
               {corridors.map((c) => (
                 <button
                   key={c.id}
+                  type="button"
                   onClick={() => handleSelectCorridor(c.id)}
-                  className={`text-[11px] px-2.5 py-1 rounded-md font-semibold transition-all ${
+                  className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer ${
                     selectedCorridor === c.id
-                      ? 'bg-fairway-600 text-white shadow-subtle'
-                      : 'bg-surface-muted text-foreground-muted hover:text-foreground hover:bg-slate-200'
+                      ? 'bg-fairway-600 text-white shadow-2xs'
+                      : 'bg-surface-muted text-foreground-muted hover:text-foreground hover:bg-surface-muted/80'
                   }`}
                 >
                   {c.label}
@@ -231,7 +247,7 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
                 placeholder="Search pins on map..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 bg-surface-muted/60 border border-border rounded-input text-xs focus:outline-none focus:border-fairway-600"
+                className="w-full pl-9 pr-3 py-1.5 bg-surface-muted/50 border border-border rounded-lg text-xs text-foreground placeholder:text-foreground-muted/60 focus:outline-none focus:border-fairway-600 transition-colors"
               />
             </div>
           </div>
@@ -239,36 +255,36 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
           {/* List of pins */}
           <div className="flex-1 overflow-y-auto pt-2 space-y-2 pr-1 text-xs">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block px-1">
-              Active Map Pins ({filteredProperties.length + filteredFacilities.length})
+              Active Map Pins ({uniqueProperties.length + uniqueFacilities.length})
             </span>
 
             {/* Fairway Properties List */}
-            {showProperties && filteredProperties.map((p) => (
+            {showProperties && uniqueProperties.map((p) => (
               <div
                 key={p.id}
                 onClick={() => {
                   setMapCenter([p.latitude, p.longitude]);
                   setMapZoom(13);
                 }}
-                className="p-2.5 rounded-lg border border-border hover:border-fairway-400 bg-surface hover:bg-fairway-50/40 cursor-pointer transition-all shadow-subtle group"
+                className="p-2.5 rounded-xl border border-border hover:border-fairway-400/80 bg-surface hover:bg-surface-muted/50 cursor-pointer transition-all shadow-2xs group text-left"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="w-2 h-2 rounded bg-fairway-600 shrink-0" />
-                    <span className="font-bold text-foreground group-hover:text-fairway-800">{p.name}</span>
+                    <span className="font-bold text-foreground group-hover:text-fairway-600 transition-colors truncate">{p.name}</span>
                   </div>
-                  <span className="font-mono text-[10px] bg-slate-100 px-1 rounded text-foreground-muted">
+                  <span className="font-mono text-[10px] bg-surface-muted border border-border px-1.5 py-0.5 rounded text-foreground-muted shrink-0">
                     {p.code}
                   </span>
                 </div>
-                <p className="text-[11px] text-foreground-muted mt-1 break-words sm:truncate">
+                <p className="text-[11px] text-foreground-muted mt-1 truncate">
                   {formatSqFt(p.availableAreaSqFt)} avail @ ₹{p.rentPerSqFtINR}/sq.ft · {p.city}
                 </p>
               </div>
             ))}
 
             {/* Client Facilities List */}
-            {showFacilities && filteredFacilities.map((f) => (
+            {showFacilities && uniqueFacilities.map((f) => (
               <div
                 key={f.id}
                 onClick={() => {
@@ -277,16 +293,18 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
                     setMapZoom(13);
                   }
                 }}
-                className="p-2.5 rounded-lg border border-border hover:border-accent-400 bg-surface hover:bg-accent-50/40 cursor-pointer transition-all shadow-subtle group"
+                className="p-2.5 rounded-xl border border-border hover:border-emerald-400/80 bg-surface hover:bg-surface-muted/50 cursor-pointer transition-all shadow-2xs group text-left"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-accent-500 shrink-0" />
-                    <span className="font-bold text-foreground group-hover:text-fairway-900">{f.name}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="font-bold text-foreground group-hover:text-emerald-600 transition-colors truncate">{f.name}</span>
                   </div>
-                  <span className="text-[10px] text-foreground-muted font-medium">{f.type}</span>
+                  <span className="text-[10px] text-foreground-muted bg-surface-muted px-1.5 py-0.5 rounded border border-border font-medium shrink-0">
+                    {f.type}
+                  </span>
                 </div>
-                <p className="text-[11px] text-foreground-muted mt-1 break-words sm:truncate">
+                <p className="text-[11px] text-foreground-muted mt-1 truncate">
                   {f.companyName} · {f.city}, {f.state}
                 </p>
               </div>
@@ -295,7 +313,7 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
         </div>
 
         {/* Right Interactive Leaflet Map (8 cols) */}
-        <div className="order-1 lg:order-2 lg:col-span-8 bg-surface rounded-card border border-border shadow-subtle overflow-hidden relative z-10 min-h-[360px] sm:min-h-[450px] lg:min-h-0 h-[360px] sm:h-[450px] lg:h-full">
+        <div className="order-1 lg:order-2 lg:col-span-8 bg-surface rounded-2xl border border-border shadow-xs overflow-hidden relative z-10 min-h-[360px] sm:min-h-[450px] lg:min-h-0 h-[360px] sm:h-[450px] lg:h-full">
           <MapContainer
             center={mapCenter}
             zoom={mapZoom}
@@ -304,46 +322,48 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
           >
             <MapViewController center={mapCenter} zoom={mapZoom} />
 
-            {/* CartoDB Positron Clean Minimalist Map Tiles */}
+            {/* Clean OpenStreetMap Tiles (Zero Watermarks, No API Key Required) */}
             <TileLayer
-              attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
             {/* Fairway Warehouse Properties Pins */}
             {showProperties &&
-              filteredProperties.map((p) => (
+              uniqueProperties.map((p) => (
                 <Marker key={p.id} position={[p.latitude, p.longitude]} icon={propertyIcon}>
                   <Popup>
-                    <div className="p-3 max-w-xs text-left">
-                      <div className="flex items-center justify-between gap-2 pb-1 border-b border-border">
-                        <span className="font-mono font-bold text-xs text-fairway-900">{p.code}</span>
-                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">
+                    <div className="p-3.5 min-w-[220px] max-w-xs text-left bg-white text-slate-900 rounded-xl">
+                      <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                        <span className="font-mono font-bold text-xs bg-slate-900 text-white px-2 py-0.5 rounded">{p.code}</span>
+                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">
                           {p.status}
                         </span>
                       </div>
-                      <h4 className="text-xs font-bold text-foreground mt-1.5">{p.name}</h4>
-                      <p className="text-[11px] text-foreground-muted mt-0.5">{p.location} · {p.city}</p>
+                      <h4 className="text-sm font-bold text-slate-900 mt-2 leading-snug">{p.name}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-fairway-600 shrink-0" />
+                        <span>{p.location}, {p.city}</span>
+                      </p>
 
-                      <div className="grid grid-cols-2 gap-2 my-2 p-2 bg-slate-50 rounded border border-border text-[11px]">
+                      <div className="grid grid-cols-2 gap-2 my-2.5 p-2 bg-slate-100 rounded-lg border border-slate-200 text-xs">
                         <div>
-                          <span className="text-[9px] text-foreground-muted uppercase block">Available</span>
-                          <strong className="text-fairway-800 font-bold">{formatSqFt(p.availableAreaSqFt)}</strong>
+                          <span className="text-[10px] text-slate-500 uppercase block font-semibold">Available</span>
+                          <strong className="text-slate-900 font-bold text-sm">{formatSqFt(p.availableAreaSqFt)}</strong>
                         </div>
                         <div>
-                          <span className="text-[9px] text-foreground-muted uppercase block">Rent Rate</span>
-                          <strong className="text-foreground font-bold">₹{p.rentPerSqFtINR} / sq.ft</strong>
+                          <span className="text-[10px] text-slate-500 uppercase block font-semibold">Rent Rate</span>
+                          <strong className="text-emerald-700 font-bold text-sm">₹{p.rentPerSqFtINR} <span className="text-[10px] font-normal text-slate-500">/sq.ft</span></strong>
                         </div>
                       </div>
 
-                      <div className="pt-1 flex gap-2">
-                        <button
-                          onClick={() => onNavigateToProperty(p.id)}
-                          className="w-full text-center text-xs font-bold bg-fairway-600 hover:bg-fairway-700 text-white py-1 rounded transition-colors"
-                        >
-                          View Property Specs →
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onNavigateToProperty(p.id)}
+                        className="w-full text-center text-xs font-bold bg-fairway-600 hover:bg-fairway-700 text-white py-2 rounded-lg transition-colors shadow-xs cursor-pointer"
+                      >
+                        View Property Specs →
+                      </button>
                     </div>
                   </Popup>
                 </Marker>
@@ -351,29 +371,33 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
 
             {/* Client Facilities Pins */}
             {showFacilities &&
-              filteredFacilities.map((f) => {
+              uniqueFacilities.map((f) => {
                 if (!f.latitude || !f.longitude) return null;
                 return (
                   <Marker key={f.id} position={[f.latitude, f.longitude]} icon={facilityIcon}>
                     <Popup>
-                      <div className="p-3 max-w-xs text-left">
-                        <div className="flex items-center justify-between gap-2 pb-1 border-b border-border">
-                          <span className="text-[10px] font-bold text-emerald-800 uppercase">{f.type}</span>
-                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded">
-                            {f.status}
+                      <div className="p-3.5 min-w-[220px] max-w-xs text-left bg-white text-slate-900 rounded-xl">
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300 uppercase">
+                            {f.type}
                           </span>
+                          <span className="text-[10px] font-semibold text-slate-500">{f.status}</span>
                         </div>
-                        <h4 className="text-xs font-bold text-foreground mt-1.5">{f.name}</h4>
-                        <p className="text-[11px] text-foreground-muted font-semibold mt-0.5">{f.companyName}</p>
-                        <p className="text-[10px] text-foreground-muted mt-0.5">{f.address} · {f.city}</p>
+                        <h4 className="text-sm font-bold text-slate-900 mt-2 leading-snug">{f.name}</h4>
+                        <p className="text-xs font-semibold text-fairway-700 mt-0.5">{f.companyName}</p>
+                        <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span>{f.city}, {f.state}</span>
+                        </p>
 
-                        <div className="pt-2 mt-2 border-t border-border">
+                        <div className="pt-2.5 mt-2.5 border-t border-slate-200">
                           <button
+                            type="button"
                             onClick={() => onNavigateToCompany(f.companyId)}
-                            className="w-full text-center text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white py-1 rounded transition-colors flex items-center justify-center gap-1"
+                            className="w-full text-center text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                           >
-                            <span>Open Company CRM Profile</span>
-                            <ExternalLink className="w-3 h-3" />
+                            <span>Open Company Profile</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>

@@ -187,6 +187,47 @@ export class InquiryService {
       return { success: false, error: err.message };
     }
   }
+
+  /**
+   * Fetch dynamic lost reasons from backend GET /api/inquiries/lost-reasons
+   */
+  static async getLostReasons(): Promise<{
+    success: boolean;
+    data?: { id: string; reason: string; category?: string; sortOrder?: number }[];
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inquiries/lost-reasons`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Add a new dynamic lost reason to backend POST /api/inquiries/lost-reasons
+   */
+  static async createLostReason(reason: string, category?: string): Promise<{
+    success: boolean;
+    data?: { id: string; reason: string; category?: string };
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inquiries/lost-reasons`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ reason, category }),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
 }
 
 export default InquiryService;

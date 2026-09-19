@@ -7,14 +7,15 @@ import {
   updateCall,
   deleteCall,
 } from '../controllers/calls.controller.js';
+import { requirePermission } from '../middleware/permission.middleware.js';
 
 const router = Router();
 
-router.get('/stats', getCallStats);
-router.get('/', getCalls);
-router.get('/:id', getCallById);
-router.post('/', createCall);
-router.put('/:id', updateCall);
-router.delete('/:id', deleteCall);
+router.get('/stats', requirePermission('communications', 'view'), getCallStats);
+router.get('/', requirePermission('communications', 'view'), getCalls);
+router.get('/:id', requirePermission('communications', 'view'), getCallById);
+router.post('/', requirePermission('communications', 'create'), createCall);
+router.put('/:id', requirePermission('communications', 'edit'), updateCall);
+router.delete('/:id', requirePermission('communications', 'delete'), deleteCall);
 
 export default router;

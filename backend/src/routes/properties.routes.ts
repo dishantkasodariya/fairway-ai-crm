@@ -3,6 +3,7 @@ import {
   getProperties,
   getPropertiesDropdownActive,
   getCorridors,
+  getIndustries,
   getPropertyById,
   createProperty,
   updateProperty,
@@ -14,6 +15,7 @@ const router = Router();
 
 router.get('/dd/active', requirePermission('properties', 'view'), getPropertiesDropdownActive);
 router.get('/corridors', requirePermission('properties', 'view'), getCorridors);
+router.get('/industries', requirePermission('properties', 'view'), getIndustries);
 router.get('/', requirePermission('properties', 'view'), getProperties);
 router.get('/:id', requirePermission('properties', 'view'), getPropertyById);
 router.post('/', requirePermission('properties', 'create'), createProperty);

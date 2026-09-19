@@ -124,6 +124,36 @@ export const ReportsView: React.FC = () => {
   ).length;
   const onTimeFollowupRate = Math.round((completedTasksCount / (tasks.length || 1)) * 100);
 
+  const salesLeaderboard = useMemo(() => {
+    const seenNames = new Set<string>();
+    return users
+      .filter((u) => u.role === 'sales' || u.role === 'admin' || u.role === 'super_admin')
+      .filter((u) => {
+        const baseName = u.name.replace(/\(.*?\)/g, '').trim().toLowerCase();
+        if (seenNames.has(baseName)) return false;
+        seenNames.add(baseName);
+        return true;
+      })
+      .map((u) => {
+        const userInquiries = inquiries.filter(
+          (i) => i.salespersonId === u.id || (i.salespersonName && i.salespersonName.toLowerCase().includes(u.name.toLowerCase()))
+        );
+        const userWon = userInquiries.filter((i) => i.stage === 'won' || i.status === 'Won').length;
+        const userActive = userInquiries.filter((i) => i.status === 'Active').length;
+        const userVal = userInquiries.reduce((acc, curr) => acc + (curr.budgetMonthlyINR || 0), 0);
+
+        return {
+          ...u,
+          displayName: u.name.replace(/\(.*?\)/g, '').trim(),
+          userWon,
+          userActive,
+          userVal,
+        };
+      })
+      .sort((a, b) => b.userVal - a.userVal || b.userActive - a.userActive)
+      .slice(0, 5);
+  }, [users, inquiries]);
+
   // CSV Export
   const handleExportCSV = () => {
     const headers = ['Inquiry Number', 'Company', 'Industry', 'Corridor', 'Area (Sq.Ft)', 'Monthly Budget (INR)', 'Stage', 'Salesperson'];
@@ -154,7 +184,7 @@ export const ReportsView: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4 pb-3 border-b border-border">
         <div>
-          <span className="text-[11px] sm:text-xs font-semibold text-fairway-800 dark:text-fairway-400 uppercase tracking-wider">
+          <span className="text-[11px] sm:text-xs font-semibold text-fairway-600 dark:text-fairway-400 uppercase tracking-wider">
             CRM / Executive Intelligence
           </span>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 mt-0.5">
@@ -215,10 +245,10 @@ export const ReportsView: React.FC = () => {
           <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
             Closed Won Revenue
           </span>
-          <span className="text-2xl font-black text-emerald-800 dark:text-emerald-400 mt-2 block">
+          <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-2 block">
             {formatINR(totalWonValue, true)} / mo
           </span>
-          <span className="text-[10px] text-emerald-700 dark:text-emerald-500 font-semibold mt-1 block">
+          <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 font-semibold mt-1 block">
             {formatINR(totalWonValue * 12, true)} Annualized Run-Rate
           </span>
         </Card>
@@ -227,7 +257,7 @@ export const ReportsView: React.FC = () => {
           <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
             Active Weighted Pipeline
           </span>
-          <span className="text-2xl font-black text-fairway-800 dark:text-fairway-300 mt-2 block">
+          <span className="text-2xl font-black text-fairway-600 dark:text-fairway-400 mt-2 block">
             {formatINR(totalPipelineValue, true)} / mo
           </span>
           <span className="text-[10px] text-foreground-muted mt-1 block">
@@ -251,7 +281,7 @@ export const ReportsView: React.FC = () => {
           <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
             Follow-up Discipline
           </span>
-          <span className="text-2xl font-black text-fairway-800 dark:text-fairway-300 mt-2 block">
+          <span className="text-2xl font-black text-fairway-600 dark:text-fairway-400 mt-2 block">
             {onTimeFollowupRate}%
           </span>
           <span className="text-[10px] text-foreground-muted mt-1 block">
@@ -336,7 +366,7 @@ export const ReportsView: React.FC = () => {
                     <span className="font-semibold text-foreground">
                       {stg.label} ({inqs.length} {inqs.length === 1 ? 'deal' : 'deals'})
                     </span>
-                    <span className="font-mono font-bold text-fairway-900 dark:text-fairway-200">
+                    <span className="font-mono font-bold text-fairway-600 dark:text-fairway-300">
                       {formatINR(val, true)}/mo
                     </span>
                   </div>
@@ -361,45 +391,36 @@ export const ReportsView: React.FC = () => {
                 Sales Team Performance & Conversion
               </CardTitle>
             </div>
-            <p className="text-xs text-foreground-muted">Individual pipeline ownership and win metrics</p>
+            <p className="text-xs text-foreground-muted">Top active pipeline owners and win metrics</p>
           </CardHeader>
 
           <CardContent className="divide-y divide-border text-xs pt-1">
-            {users
-              .filter((u) => u.role === 'sales' || u.role === 'admin' || u.role === 'super_admin')
-              .map((u) => {
-                const userInquiries = inquiries.filter((i) => i.salespersonId === u.id);
-                const userWon = userInquiries.filter((i) => i.stage === 'won' || i.status === 'Won').length;
-                const userActive = userInquiries.filter((i) => i.status === 'Active').length;
-                const userVal = userInquiries.reduce((acc, curr) => acc + (curr.budgetMonthlyINR || 0), 0);
-
-                return (
-                  <div key={u.id} className="py-3 flex flex-col xs:flex-row xs:items-center justify-between gap-3 hover:bg-surface-muted/30 px-2 rounded-lg transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <UserAvatar src={u.avatar} name={u.name} size="sm" />
-                      <div className="min-w-0">
-                        <span className="font-bold text-foreground block break-words">{u.name}</span>
-                        <span className="text-[10px] text-foreground-muted font-mono">{u.role.replace('_', ' ').toUpperCase()}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between xs:justify-end gap-3.5 sm:gap-6 text-right shrink-0">
-                      <div>
-                        <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Active</span>
-                        <span className="font-bold text-foreground">{userActive}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Won</span>
-                        <span className="font-bold text-emerald-700 dark:text-emerald-400">{userWon}</span>
-                      </div>
-                      <div className="min-w-[70px] sm:min-w-[85px]">
-                        <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Pipeline</span>
-                        <span className="font-mono font-bold text-fairway-900 dark:text-fairway-200">{formatINR(userVal, true)}</span>
-                      </div>
-                    </div>
+            {salesLeaderboard.map((u) => (
+              <div key={u.id} className="py-3 flex flex-col xs:flex-row xs:items-center justify-between gap-3 hover:bg-surface-muted/30 px-2 rounded-lg transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <UserAvatar src={u.avatar} name={u.displayName} size="sm" />
+                  <div className="min-w-0">
+                    <span className="font-bold text-foreground block break-words">{u.displayName}</span>
+                    <span className="text-[10px] text-foreground-muted font-mono">{u.role.replace('_', ' ').toUpperCase()}</span>
                   </div>
-                );
-              })}
+                </div>
+
+                <div className="flex items-center justify-between xs:justify-end gap-3.5 sm:gap-6 text-right shrink-0">
+                  <div>
+                    <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Active</span>
+                    <span className="font-bold text-foreground">{u.userActive}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Won</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{u.userWon}</span>
+                  </div>
+                  <div className="min-w-[70px] sm:min-w-[85px]">
+                    <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Pipeline</span>
+                    <span className="font-mono font-bold text-fairway-600 dark:text-fairway-300">{formatINR(u.userVal, true)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       </div>
@@ -408,7 +429,7 @@ export const ReportsView: React.FC = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Warehouse className="w-4 h-4 text-accent-600 dark:text-accent-400" />
+            <Warehouse className="w-4 h-4 text-fairway-600 dark:text-fairway-400" />
             <CardTitle className="text-sm font-bold text-foreground">
               Fairway Warehouse Parks — Inventory & Absorption
             </CardTitle>
@@ -417,18 +438,18 @@ export const ReportsView: React.FC = () => {
         </CardHeader>
 
         <CardContent className="pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {properties.map((prop) => {
               const leasedArea = prop.totalAreaSqFt - prop.availableAreaSqFt;
               const occupancyRate = Math.round((leasedArea / prop.totalAreaSqFt) * 100);
 
               return (
-                <div key={prop.id} className="p-4 bg-surface-muted/40 rounded-card border border-border text-xs space-y-3 shadow-2xs">
+                <div key={prop.id} className="p-4 bg-surface-muted/30 rounded-2xl border border-border text-xs space-y-3 shadow-2xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-fairway-800 dark:text-fairway-300 bg-fairway-50 dark:bg-fairway-950/70 px-2 py-0.5 rounded border border-fairway-200 dark:border-fairway-800/60">
+                    <span className="font-mono font-bold text-foreground-muted bg-surface-muted px-2 py-0.5 rounded border border-border">
                       {prop.code}
                     </span>
-                    <span className="font-bold text-emerald-800 dark:text-emerald-400">{occupancyRate}% Leased</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">{occupancyRate}% Leased</span>
                   </div>
                   <div>
                     <h4 className="font-bold text-foreground leading-snug">{prop.name}</h4>

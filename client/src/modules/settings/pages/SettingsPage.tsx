@@ -32,14 +32,12 @@ export const SettingsView: React.FC = () => {
   // Determine active tab from URL (/setting/user-management, /setting/roles-permissions, etc.)
   const activeTab: SettingsTabId = React.useMemo(() => {
     if (selectedEntityId) {
-      if (['user-management', 'roles-permissions', 'pipeline-stages', 'audit-logs'].includes(selectedEntityId)) {
+      if (['user-management', 'roles-permissions'].includes(selectedEntityId)) {
         return selectedEntityId as SettingsTabId;
       }
     }
     const clean = pathname.toLowerCase();
     if (clean.includes('role') || clean.includes('rbac')) return 'roles-permissions';
-    if (clean.includes('pipeline') || clean.includes('stage')) return 'pipeline-stages';
-    if (clean.includes('audit') || clean.includes('log')) return 'audit-logs';
     return 'user-management';
   }, [pathname, selectedEntityId]);
 
@@ -86,7 +84,7 @@ export const SettingsView: React.FC = () => {
             <span>Settings & Access Control</span>
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Manage users, configure live roles & permissions, pipeline stages, and review system audit trail logs.
+            Manage users and configure live roles & permissions.
           </p>
         </div>
       </div>
@@ -99,8 +97,8 @@ export const SettingsView: React.FC = () => {
         tabs={[
           { id: 'user-management', label: 'User Management', icon: <Users className="w-4 h-4" /> },
           { id: 'roles-permissions', label: 'Roles & Permissions', icon: <Shield className="w-4 h-4" /> },
-          { id: 'pipeline-stages', label: 'Pipeline Stages Config', icon: <Kanban className="w-4 h-4" /> },
-          { id: 'audit-logs', label: 'Audit Trail Logs', icon: <FileText className="w-4 h-4" /> },
+          // { id: 'pipeline-stages', label: 'Pipeline Stages Config', icon: <Kanban className="w-4 h-4" /> },
+          // { id: 'audit-logs', label: 'Audit Trail Logs', icon: <FileText className="w-4 h-4" /> },
         ]}
       />
 
@@ -120,11 +118,11 @@ export const SettingsView: React.FC = () => {
         />
       )}
 
-      {/* ================= TAB 3: PIPELINE STAGES (/setting/pipeline-stages) ================= */}
-      {activeTab === 'pipeline-stages' && <PipelineStagesTab />}
+      {/* ================= TAB 3: PIPELINE STAGES (/setting/pipeline-stages) [HIDDEN] ================= */}
+      {/* {activeTab === 'pipeline-stages' && <PipelineStagesTab />} */}
 
-      {/* ================= TAB 4: AUDIT TRAIL LOGS (/setting/audit-logs) ================= */}
-      {activeTab === 'audit-logs' && <AuditLogsTab />}
+      {/* ================= TAB 4: AUDIT TRAIL LOGS (/setting/audit-logs) [HIDDEN] ================= */}
+      {/* {activeTab === 'audit-logs' && <AuditLogsTab />} */}
     </div>
   );
 };

@@ -1341,7 +1341,7 @@ export class StorageService {
       const duplicateInquiry = existingInquiries.find((inq) => {
         const sameComp = inq.companyId === company!.id || normalizeCompanyName(inq.companyName) === normComp;
         if (!sameComp) return false;
-        const sameAreaAndLoc = inq.requiredAreaSqFt === area && (inq.location.toLowerCase().trim() === city.toLowerCase().trim() || !city);
+        const sameAreaAndLoc = inq.requiredAreaSqFt === area && (Boolean(inq.location && inq.location.toLowerCase().trim() === city.toLowerCase().trim()) || !city);
         const samePhoneAndArea = Boolean(phone && inq.contactPhone && inq.contactPhone.replace(/\D/g, '') === phone.replace(/\D/g, '') && inq.requiredAreaSqFt === area);
         const sameRequirement = Boolean(comments && inq.requirement && inq.requirement.toLowerCase().trim() === comments.toLowerCase().trim());
         return sameAreaAndLoc || samePhoneAndArea || sameRequirement;

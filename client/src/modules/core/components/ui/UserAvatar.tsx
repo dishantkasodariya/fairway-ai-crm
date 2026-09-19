@@ -41,7 +41,6 @@ const sizeStyles = {
 };
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({
-  src,
   name = '',
   className = '',
   size = 'sm',
@@ -50,9 +49,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   const sizeClass = sizeStyles[size] || sizeStyles.sm;
 
   return (
-    <Avatar className={cn(sizeClass, className)}>
-      {src && <AvatarImage src={src} alt={name || 'Avatar'} />}
-      <AvatarFallback className="bg-gradient-to-br from-fairway-500 via-fairway-600 to-fairway-800 text-white font-bold select-none">
+    <Avatar className={cn('rounded-full shrink-0', sizeClass, className)}>
+      <AvatarFallback className="bg-surface-muted text-foreground font-bold select-none border border-border rounded-full flex items-center justify-center text-center">
         {initials}
       </AvatarFallback>
     </Avatar>

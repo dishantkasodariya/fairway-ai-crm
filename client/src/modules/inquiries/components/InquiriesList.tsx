@@ -10,6 +10,7 @@ export interface InquiriesListProps {
   hasFilters: boolean;
   onClearFilters: () => void;
   onNewInquiry: () => void;
+  onRowClick?: (inquiry: Inquiry) => void;
 }
 
 export const InquiriesList: React.FC<InquiriesListProps> = ({
@@ -19,12 +20,14 @@ export const InquiriesList: React.FC<InquiriesListProps> = ({
   hasFilters,
   onClearFilters,
   onNewInquiry,
+  onRowClick,
 }) => {
   return (
     <CommonDataGrid
       table={table}
       recordCount={recordCount}
       isLoading={isLoading}
+      onRowClick={onRowClick}
       emptyState={
         <WarehouseInquiryEmptyState
           hasFilters={hasFilters}

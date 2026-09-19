@@ -1,24 +1,26 @@
 import React from 'react';
 import { Property } from '@/modules/core/types';
-import { DataTable7, ColumnConfig } from '@/modules/core/components/ui/data-table-7';
+import { CommonDataGrid } from '@/modules/core/components/ui/CommonDataGrid';
 
 export interface PropertiesListProps {
-  properties: Property[];
-  columns: ColumnConfig<Property>[];
+  table: any;
+  recordCount: number;
+  isLoading: boolean;
   onSelectProperty: (id: string) => void;
 }
 
 export const PropertiesList: React.FC<PropertiesListProps> = ({
-  properties,
-  columns,
+  table,
+  recordCount,
+  isLoading,
   onSelectProperty,
 }) => {
   return (
-    <DataTable7<Property>
-      data={properties}
-      columns={columns}
-      keyExtractor={(p) => p.id}
-      onRowClick={(p) => onSelectProperty(p.id)}
+    <CommonDataGrid
+      table={table}
+      recordCount={recordCount}
+      isLoading={isLoading}
+      onRowClick={(p: any) => onSelectProperty(p.id)}
     />
   );
 };

@@ -61,7 +61,7 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
   className,
   showCardWrapper = true,
 }) => {
-  const [activeIndex, setActiveIndex] = useState<number>(0);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const { currentTheme, isDark } = useTheme();
 
   const sourceData = useMemo(() => {
@@ -75,22 +75,22 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
   }, [sourceData]);
 
   const computedData = useMemo(() => {
+    // Professional, curated minimal palette with high contrast across light and dark themes
     const palette = [
-      currentTheme.shades[700],
-      currentTheme.shades[500],
-      currentTheme.accentShades[500],
-      currentTheme.accentShades[300],
-      currentTheme.chartColors[2],
-      currentTheme.chartColors[3],
+      currentTheme.shades[600] || '#10B981',
+      '#3B82F6', // Crisp Blue
+      '#6366F1', // Indigo
+      '#F59E0B', // Amber
+      '#06B6D4', // Cyan
+      '#8B5CF6', // Purple
+      '#64748B', // Neutral Slate
     ];
     return sourceData.map((item, idx) => {
       const pct = totalValue > 0 ? Math.round((item.value / totalValue) * 100) : 0;
       return {
         ...item,
         percentage: item.percentage !== undefined ? item.percentage : pct,
-        fill: item.fill && item.fill !== "#16201B" && item.fill !== "#4B5563" && item.fill !== "#9CA3AF" && item.fill !== "#D1D5DB"
-          ? item.fill
-          : palette[idx % palette.length],
+        fill: palette[idx % palette.length],
       };
     });
   }, [sourceData, totalValue, currentTheme]);
@@ -131,7 +131,7 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
     );
   }
 
-  const activeItem = computedData[activeIndex] || computedData[0];
+  const activeItem = hoveredIndex !== null ? computedData[hoveredIndex] : null;
 
   const content = (
     <div className={cn("flex flex-col sm:flex-row items-center justify-between gap-6 p-2", className)}>
@@ -155,7 +155,7 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
                       />
                       <span className="font-semibold text-foreground">{item.payload?.name}:</span>
                       <span className="font-bold text-foreground">
-                        {item.payload?.percentage ?? val}%
+                        {item.payload?.percentage ?? val}% ({val} inquiries)
                       </span>
                     </div>
                   )}
@@ -169,16 +169,17 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
               innerRadius={62}
               outerRadius={88}
               paddingAngle={3}
-              activeIndex={activeIndex}
+              activeIndex={hoveredIndex !== null ? hoveredIndex : undefined}
               activeShape={({ outerRadius = 0, innerRadius = 0, ...props }: PieSectorDataItem) => (
                 <Sector
                   {...props}
                   innerRadius={innerRadius - 2}
-                  outerRadius={outerRadius + 8}
+                  outerRadius={outerRadius + 6}
                   stroke="none"
                 />
               )}
-              onMouseEnter={(_, index) => setActiveIndex(index)}
+              onMouseEnter={(_, index) => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
             >
               {computedData.map((entry, index) => (
                 <Cell
@@ -186,19 +187,13 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
                   fill={entry.fill}
                   className="transition-all duration-300 cursor-pointer outline-none"
                   style={{
-                    opacity: activeIndex === index ? 1 : 0.85,
+                    opacity: hoveredIndex === null || hoveredIndex === index ? 1 : 0.5,
                   }}
                 />
               ))}
               <Label
                 content={({ viewBox }) => {
                   if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                    const fullName = activeItem ? activeItem.name : "Total Share";
-                    const shortName =
-                      fullName.length > 14
-                        ? fullName.slice(0, 12) + "…"
-                        : fullName;
-
                     return (
                       <text
                         x={viewBox.cx}
@@ -211,26 +206,28 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
                           y={(viewBox.cy || 0) - 7}
                           className="font-black tracking-tight"
                           style={{
-                            fill: isDark ? "#F9FAFB" : "#16201B",
+                            fill: isDark ? "#F9FAFB" : "#111827",
                             fontWeight: 800,
                             fontSize: "1.75rem",
                             fontFamily: "inherit",
                           }}
                         >
-                          {activeItem ? `${activeItem.percentage}%` : "0%"}
+                          {activeItem ? `${activeItem.percentage}%` : `${totalValue}`}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy || 0) + 16}
                           className="text-[11px] font-bold"
                           style={{
-                            fill: isDark ? "#9CA3AF" : "#66736C",
-                            fontSize: "0.7rem",
+                            fill: isDark ? "#9CA3AF" : "#6B7280",
+                            fontSize: "0.75rem",
                             fontWeight: 600,
                             letterSpacing: "0.02em",
                           }}
                         >
-                          {shortName}
+                          {activeItem
+                            ? (activeItem.name.length > 14 ? activeItem.name.slice(0, 12) + "…" : activeItem.name)
+                            : "Total Inquiries"}
                         </tspan>
                       </text>
                     );
@@ -252,11 +249,12 @@ export const ChartPieDonutActive: React.FC<ChartPieDonutActiveProps> = ({
         )}
       >
         {computedData.map((item, idx) => {
-          const isActive = activeIndex === idx;
+          const isActive = hoveredIndex === idx;
           return (
             <div
               key={item.name}
-              onMouseEnter={() => setActiveIndex(idx)}
+              onMouseEnter={() => setHoveredIndex(idx)}
+              onMouseLeave={() => setHoveredIndex(null)}
               className={cn(
                 "flex items-center justify-between py-1.5 px-2.5 rounded-lg transition-all duration-150 cursor-pointer select-none group",
                 isActive

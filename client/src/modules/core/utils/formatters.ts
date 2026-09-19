@@ -119,83 +119,83 @@ export function getPriorityBadge(priority: any) {
 export function getCompanyStatusBadge(status: any) {
   const s = (status || '').toString().trim().toLowerCase();
   if (s === 'active') {
-    return { label: 'Active', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
+    return { label: 'Active', bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' };
   }
   if (s === 'prospect') {
-    return { label: 'Prospect', bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800/60' };
+    return { label: 'Prospect', bg: 'bg-surface-muted text-foreground border-border' };
   }
   if (s === 'inactive') {
-    return { label: 'Inactive', bg: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
+    return { label: 'Inactive', bg: 'bg-surface-muted text-foreground-muted border-border' };
   }
   if (s === 'archived') {
-    return { label: 'Archived', bg: 'bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800/80 dark:text-zinc-400 dark:border-zinc-700' };
+    return { label: 'Archived', bg: 'bg-surface-muted text-foreground-muted border-border' };
   }
-  return { label: status || 'Active', bg: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
+  return { label: status || 'Active', bg: 'bg-surface-muted text-foreground border-border' };
 }
 
 export function getFacilityStatusBadge(status: any) {
   const s = (status || '').toString().trim().toLowerCase();
   if (s === 'active') {
-    return { label: 'Active Facility', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
+    return { label: 'Active Facility', bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' };
   }
   if (s.includes('construction')) {
-    return { label: 'Under Construction', bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60' };
+    return { label: 'Under Construction', bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
   }
   if (s === 'planned') {
-    return { label: 'Planned', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/70 dark:text-indigo-300 dark:border-indigo-800/60' };
+    return { label: 'Planned', bg: 'bg-surface-muted text-foreground border-border' };
   }
-  return { label: status || 'Active', bg: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
+  return { label: status || 'Active', bg: 'bg-surface-muted text-foreground border-border' };
 }
 
 export function getTaskStatusBadge(status: any) {
   const s = (status || '').toString().trim().toLowerCase();
   if (s === 'completed') {
-    return { label: 'Completed', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
+    return { label: 'Completed', bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' };
   }
   if (s === 'cancelled') {
-    return { label: 'Cancelled', bg: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/80 dark:text-slate-400 dark:border-slate-700' };
+    return { label: 'Cancelled', bg: 'bg-surface-muted text-foreground-muted border-border' };
   }
-  return { label: status || 'Pending', bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60' };
+  return { label: status || 'Pending', bg: 'bg-surface-muted text-foreground border-border' };
 }
 
 export function getProposalStatusBadge(status: any) {
   const s = (status || '').toString().trim().toLowerCase();
   if (s === 'accepted') {
-    return { label: 'Accepted', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60' };
+    return { label: 'Accepted', bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' };
   }
   if (s === 'sent') {
-    return { label: 'Sent', bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/70 dark:text-blue-300 dark:border-blue-800/60' };
+    return { label: 'Sent', bg: 'bg-surface-muted text-foreground border-border' };
   }
   if (s === 'viewed') {
-    return { label: 'Viewed', bg: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-800/60' };
+    return { label: 'Viewed', bg: 'bg-surface-muted text-foreground border-border' };
   }
   if (s === 'negotiation') {
-    return { label: 'Negotiation', bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-800/60' };
+    return { label: 'Negotiation', bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' };
   }
   if (s === 'rejected') {
-    return { label: 'Rejected', bg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800/60' };
+    return { label: 'Rejected', bg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' };
   }
-  return { label: status || 'Draft', bg: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700' };
+  return { label: status || 'Draft', bg: 'bg-surface-muted text-foreground border-border' };
 }
 
 export const STAGE_CONFIGS: Record<PipelineStageKey, { label: string; order: number; bg: string; text: string; border: string }> = {
-  new: { label: 'New', order: 1, bg: 'bg-slate-100 dark:bg-slate-800/90', text: 'text-slate-700 dark:text-slate-300', border: 'border-slate-300 dark:border-slate-700' },
-  contacted: { label: 'Contacted', order: 2, bg: 'bg-sky-50 dark:bg-sky-950/70', text: 'text-sky-700 dark:text-sky-300', border: 'border-sky-300 dark:border-sky-800/60' },
-  requirement_confirmed: { label: 'Req Confirmed', order: 3, bg: 'bg-indigo-50 dark:bg-indigo-950/70', text: 'text-indigo-700 dark:text-indigo-300', border: 'border-indigo-300 dark:border-indigo-800/60' },
-  property_matched: { label: 'Property Matched', order: 4, bg: 'bg-emerald-50 dark:bg-emerald-950/70', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-300 dark:border-emerald-800/60' },
-  property_shared: { label: 'Property Shared', order: 5, bg: 'bg-teal-50 dark:bg-teal-950/70', text: 'text-teal-700 dark:text-teal-300', border: 'border-teal-300 dark:border-teal-800/60' },
-  proposal: { label: 'Proposal', order: 6, bg: 'bg-purple-50 dark:bg-purple-950/70', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-300 dark:border-purple-800/60' },
-  site_visit: { label: 'Site Visit', order: 7, bg: 'bg-orange-50 dark:bg-orange-950/70', text: 'text-orange-700 dark:text-orange-300', border: 'border-orange-300 dark:border-orange-800/60' },
-  negotiation: { label: 'Negotiation', order: 8, bg: 'bg-amber-50 dark:bg-amber-950/70', text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-300 dark:border-amber-800/60' },
-  won: { label: 'Won', order: 9, bg: 'bg-emerald-100 dark:bg-emerald-950/70', text: 'text-emerald-800 dark:text-emerald-300', border: 'border-emerald-400 dark:border-emerald-800/60' },
-  lost: { label: 'Lost', order: 10, bg: 'bg-rose-50 dark:bg-rose-950/70', text: 'text-rose-700 dark:text-rose-300', border: 'border-rose-300 dark:border-rose-800/60' },
+  new: { label: 'New', order: 1, bg: 'bg-surface-muted', text: 'text-foreground', border: 'border-border' },
+  contacted: { label: 'Contacted', order: 2, bg: 'bg-surface-muted', text: 'text-foreground', border: 'border-border' },
+  requirement_confirmed: { label: 'Req Confirmed', order: 3, bg: 'bg-surface-muted', text: 'text-foreground', border: 'border-border' },
+  property_matched: { label: 'Property Matched', order: 4, bg: 'bg-surface-muted', text: 'text-foreground', border: 'border-border' },
+  property_shared: { label: 'Property Shared', order: 5, bg: 'bg-surface-muted', text: 'text-foreground', border: 'border-border' },
+  proposal: { label: 'Proposal', order: 6, bg: 'bg-surface-muted', text: 'text-foreground', border: 'border-border' },
+  site_visit: { label: 'Site Visit', order: 7, bg: 'bg-surface-muted', text: 'text-foreground', border: 'border-border' },
+  negotiation: { label: 'Negotiation', order: 8, bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/20' },
+  won: { label: 'Won', order: 9, bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-500/20' },
+  lost: { label: 'Lost', order: 10, bg: 'bg-surface-muted', text: 'text-foreground-muted', border: 'border-border' },
 };
 
 export function getPipelineStageBadge(stageKey: string) {
   const config = STAGE_CONFIGS[stageKey as PipelineStageKey];
   if (!config) {
     return {
-      className: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+      className: 'bg-surface-muted text-foreground border-border',
       label: stageKey,
     };
   }

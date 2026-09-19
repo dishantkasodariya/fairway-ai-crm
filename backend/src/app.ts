@@ -63,21 +63,16 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:3000',
+  'http://127.0.0.1:3000',
   'http://localhost:5000',
+  'http://127.0.0.1:5000',
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps, curl, server-to-server)
-      if (!origin) {
-        return callback(null, true);
-      }
-      if (
-        allowedOrigins.includes(origin) ||
-        origin.startsWith('http://localhost:') ||
-        origin.startsWith('http://127.0.0.1:')
-      ) {
+      if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
       return callback(new Error('Cross-Origin Request Blocked by CORS policy'));

@@ -565,17 +565,124 @@ export async function runAllSchemaFixes() {
       ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
       ALTER TABLE site_visits ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
-
-    const legacyCols = ['updatedAt', 'visitDate', 'followUpRequired', 'createdAt', 'contactId', 'salespersonId', 'feedback', 'clientAttendees', 'inquiryId', 'propertyId', 'companyId'];
-    for (const col of legacyCols) {
-      try {
-        await pool.query(`ALTER TABLE site_visits ALTER COLUMN "${col}" DROP NOT NULL;`);
-      } catch {
-        // column may not exist or already nullable
-      }
-    }
   } catch (err: any) {
     console.warn('site_visits table alignment note:', err.message);
+  }
+
+  // 18. properties table alignment
+  try {
+    await pool.query(`
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS location VARCHAR(255);
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS pincode VARCHAR(50);
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS corridor VARCHAR(255);
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS total_area_sq_ft NUMERIC;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS available_area_sq_ft NUMERIC;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS rent_per_sq_ft_inr NUMERIC;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS deposit_months INT DEFAULT 3;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS lease_terms_years INT DEFAULT 5;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS clear_height_ft NUMERIC DEFAULT 12;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS docks_count INT DEFAULT 8;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS fire_systems VARCHAR(255);
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS power_kva NUMERIC DEFAULT 1000;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS parking_slots INT DEFAULT 20;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS truck_access VARCHAR(255);
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS flooring_capacity_mt NUMERIC DEFAULT 6;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS cctv_security BOOLEAN DEFAULT true;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS green_building_cert VARCHAR(100);
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS photos JSONB DEFAULT '[]';
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS brochure_url TEXT;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS amenities JSONB DEFAULT '[]';
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS suitable_industries JSONB DEFAULT '[]';
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `);
+
+    // Sync location from address or corridor if empty
+    await pool.query(`
+      UPDATE properties 
+      SET location = COALESCE(NULLIF(location, ''), NULLIF(address, ''), NULLIF(corridor, ''), city)
+      WHERE location IS NULL OR location = '';
+    `);
+
+    const propLegacyCols = ['propertyCode', 'developer', 'address', 'zone', 'possessionStatus', 'type', 'remarks', 'askingRentPerSqFt', 'totalAreaSqFt', 'availableAreaSqFt', 'clearHeightFt', 'floorLoadCapacityTons', 'dockCount', 'fireNoc', 'leedCertified', 'maintenancePerSqFt', 'powerHp', 'createdAt', 'updatedAt'];
+    for (const col of propLegacyCols) {
+      try {
+        await pool.query(`ALTER TABLE properties ALTER COLUMN "${col}" DROP NOT NULL;`);
+      } catch {}
+    }
+  } catch (err: any) {
+    console.warn('properties table alignment note:', err.message);
+  }
+
+  // 19. proposals table alignment
+  try {
+    await pool.query(`
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contact_id VARCHAR(255);
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255);
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS total_deposit_inr NUMERIC;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS lock_in_months INT DEFAULT 36;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS possession_date VARCHAR(50);
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS commercial_terms TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS proposal_date VARCHAR(50);
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS expiry_date VARCHAR(50);
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS document_name VARCHAR(255);
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS document_size VARCHAR(50) DEFAULT '1.4 MB';
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS notes TEXT;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(255);
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS created_by_user_name VARCHAR(255);
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE proposals ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+    `);
+
+    const propCols = ['contactId', 'companyId', 'inquiryId', 'propertyId', 'proposalNumber', 'validUntil', 'sentAt', 'proposedAreaSqFt', 'proposedRentPerSqFt', 'depositMonths', 'leaseTenureYears', 'lockInPeriodMonths', 'escalationPercent', 'specialTerms', 'createdById', 'createdAt', 'updatedAt'];
+    for (const col of propCols) {
+      try {
+        await pool.query(`ALTER TABLE proposals ALTER COLUMN "${col}" DROP NOT NULL;`);
+      } catch {}
+    }
+    // 25. Align inquiries won / lost columns and lost_reasons table
+    await pool.query(`
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS lost_reason VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS lost_comments TEXT;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS lost_date VARCHAR(50);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS closed_by_user_id VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS won_property_id VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS won_property_name VARCHAR(255);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS won_final_value_monthly_inr NUMERIC(12, 2);
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS won_comments TEXT;
+      ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS won_date VARCHAR(50);
+
+      CREATE TABLE IF NOT EXISTS lost_reasons (
+        id VARCHAR(100) PRIMARY KEY,
+        reason VARCHAR(255) NOT NULL UNIQUE,
+        category VARCHAR(100) DEFAULT 'General',
+        sort_order INT DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    const initialReasons = [
+      ['lr_1', 'Budget / Pricing Misalignment', 'Financial', 1],
+      ['lr_2', 'Location / Corridor Mismatch', 'Location', 2],
+      ['lr_3', 'Required Clear Height / Tech Spec Unavailable', 'Specifications', 3],
+      ['lr_4', 'Timeline / Possession Date Delayed', 'Timeline', 4],
+      ['lr_5', 'Competitor Warehouse Selected', 'Competition', 5],
+      ['lr_6', 'Project Postponed / Shelved by Client', 'Client Strategy', 6],
+      ['lr_7', 'Client Decided to Buy Land / Self-Build', 'Client Strategy', 7],
+      ['lr_8', 'Regulatory / Pollution Clearance Issue', 'Regulatory', 8],
+      ['lr_9', 'Other / Unspecified', 'Other', 9],
+    ];
+
+    for (const [id, reason, category, order] of initialReasons) {
+      await pool.query(
+        'INSERT INTO lost_reasons (id, reason, category, sort_order) VALUES ($1, $2, $3, $4) ON CONFLICT (reason) DO NOTHING;',
+        [id, reason, category, order]
+      );
+    }
+  } catch (err: any) {
+    console.warn('alignment note:', err.message);
   }
 
   console.log('✓ All database schemas successfully aligned and verified.');

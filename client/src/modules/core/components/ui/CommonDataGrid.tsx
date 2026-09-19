@@ -37,12 +37,15 @@ export interface CommonDataGridProps<TData extends object> {
   paginationSizes?: number[];
   scrollMaxHeight?: string;
   cardClassName?: string;
+  onRowClick?: (row: TData) => void;
   tableLayout?: {
     columnsPinnable?: boolean;
     columnsResizable?: boolean;
     columnsMovable?: boolean;
     columnsVisibility?: boolean;
     headerSticky?: boolean;
+    rowBorder?: boolean;
+    cellBorder?: boolean;
   };
   className?: string;
 }
@@ -67,14 +70,19 @@ export function CommonDataGrid<TData extends object>({
   paginationSizes = [5, 10, 20, 50, 100],
   scrollMaxHeight = 'max-h-[calc(100vh-280px)]',
   cardClassName,
-  tableLayout = {
-    columnsPinnable: true,
-    columnsResizable: true,
-    headerSticky: true,
-  },
+  onRowClick,
+  tableLayout,
   className,
 }: CommonDataGridProps<TData>) {
   const isTableEmpty = recordCount === 0 && !isLoading;
+
+  const mergedTableLayout = {
+    columnsPinnable: false,
+    columnsResizable: true,
+    headerSticky: true,
+    rowBorder: false, // Clean modern CRM look: remove heavy horizontal line borders
+    ...tableLayout,
+  };
 
   return (
     <DataGrid
@@ -82,7 +90,8 @@ export function CommonDataGrid<TData extends object>({
       recordCount={recordCount}
       isLoading={isLoading}
       loadingMode={loadingMode}
-      tableLayout={tableLayout}
+      onRowClick={onRowClick}
+      tableLayout={mergedTableLayout}
     >
       <div className={cn('w-full space-y-2.5', className)}>
         {isTableEmpty && emptyState ? (
@@ -139,8 +148,9 @@ export function DataGridColumnVisibilityMenu<TData extends object>({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
+              style={{ boxShadow: 'none', outline: 'none' }}
               className={cn(
-                'size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs',
+                'size-9 rounded-button border border-border dark:border-white/[0.08] bg-white dark:bg-[#161c24] hover:bg-surface-muted dark:hover:bg-zinc-800/60 flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 !shadow-none !ring-0 !ring-offset-0 !outline-none focus:!outline-none focus:!ring-0 focus-visible:!outline-none focus-visible:!ring-0 active:!ring-0 active:!outline-none',
                 className
               )}
             >
@@ -152,19 +162,21 @@ export function DataGridColumnVisibilityMenu<TData extends object>({
       </Tooltip>
       <DropdownMenuContent
         align="end"
-        className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50"
+        style={{ boxShadow: 'none', outline: 'none' }}
+        className="w-48 bg-surface dark:bg-[#161c24] border border-border dark:border-white/[0.12] !shadow-none !ring-0 !ring-offset-0 !outline-none focus:!outline-none focus:!ring-0 focus-visible:!outline-none focus-visible:!ring-0 p-1 rounded-card z-50 select-none"
       >
         <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
           Toggle Columns
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="dark:border-white/[0.08]" />
         {leafColumns.map((col) => (
           <DropdownMenuCheckboxItem
             key={col.id}
             checked={col.getIsVisible()}
             onSelect={(e) => e.preventDefault()}
             onCheckedChange={(val) => col.toggleVisibility(!!val)}
-            className="text-xs cursor-pointer capitalize"
+            style={{ outline: 'none' }}
+            className="text-xs cursor-pointer capitalize !outline-none focus:!outline-none !ring-0 focus:!ring-0"
           >
             {getColumnHeaderLabel(col)}
           </DropdownMenuCheckboxItem>

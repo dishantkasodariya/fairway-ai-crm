@@ -29,6 +29,13 @@ import {
   DropdownMenuSeparator,
 } from '@/modules/core/components/ui/dropdown-menu';
 import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/modules/core/components/ui/Select';
+import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
@@ -308,88 +315,65 @@ export const CallsPage: React.FC<CallsPageProps> = ({
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 2. KPI METRIC CARDS (INQUIRIES MODULE AESTHETIC WITH SPARKLINES) */}
-      {/* ========================================================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* KPI METRIC CARDS (Clean, Responsive & Wave Graph Removed) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {/* Card 1: Total Calls */}
-        <div className="bg-surface border border-border p-4 sm:p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-fairway-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight block">
+        <div className="bg-surface dark:bg-[#121214] border border-border dark:border-white/[0.08] p-4 sm:p-5 rounded-xl sm:rounded-2xl shadow-2xs hover:shadow-xs transition-all hover:border-fairway-500/40 flex flex-col justify-between group">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight">
               Total Recorded Calls
             </span>
-            <span className="text-xs text-foreground-muted mt-3 block font-medium">
-              {stats.inbound} Inbound · {stats.outbound} Outbound
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+            <div className="size-9 rounded-xl bg-fairway-500/10 text-fairway-600 dark:text-fairway-400 flex items-center justify-center shrink-0">
+              <PhoneCall className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block">
               {stats.total}
             </span>
-          </div>
-          <div className="shrink-0 pb-1">
-            <svg className="w-24 sm:w-28 h-10 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="callWave1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4 L 120 40 L 0 40 Z" fill="url(#callWave1)" />
-              <path d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4" fill="none" stroke="var(--fw-600, #0084FF)" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
+            <span className="text-xs text-foreground-muted mt-1 block font-medium">
+              {stats.inbound} Inbound · {stats.outbound} Outbound
+            </span>
           </div>
         </div>
 
         {/* Card 2: Scheduled Calls */}
-        <div className="bg-surface border border-border p-4 sm:p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-blue-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight block">
+        <div className="bg-surface dark:bg-[#121214] border border-border dark:border-white/[0.08] p-4 sm:p-5 rounded-xl sm:rounded-2xl shadow-2xs hover:shadow-xs transition-all hover:border-blue-500/40 flex flex-col justify-between group">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight">
               Upcoming Scheduled Calls
             </span>
-            <span className="text-xs text-foreground-muted mt-3 block font-medium">
-              Awaiting follow-up
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight block mt-0.5">
+            <div className="size-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <Calendar className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight block">
               {stats.scheduled}
             </span>
-          </div>
-          <div className="shrink-0 pb-1">
-            <svg className="w-24 sm:w-28 h-10 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="callWave2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path d="M 0 32 Q 20 22, 40 26 T 80 16 T 120 8 L 120 40 L 0 40 Z" fill="url(#callWave2)" />
-              <path d="M 0 32 Q 20 22, 40 26 T 80 16 T 120 8" fill="none" stroke="#3B82F6" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
+            <span className="text-xs text-foreground-muted mt-1 block font-medium">
+              Awaiting follow-up
+            </span>
           </div>
         </div>
 
         {/* Card 3: Completed / Logged */}
-        <div className="bg-surface border border-border p-4 sm:p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-emerald-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight block">
+        <div className="bg-surface dark:bg-[#121214] border border-border dark:border-white/[0.08] p-4 sm:p-5 rounded-xl sm:rounded-2xl shadow-2xs hover:shadow-xs transition-all hover:border-emerald-500/40 flex flex-col justify-between group sm:col-span-2 lg:col-span-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight">
               Completed Conversations
             </span>
-            <span className="text-xs text-foreground-muted mt-3 block font-medium">
-              Documented outcomes
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight block mt-0.5">
+            <div className="size-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight block">
               {stats.completed}
             </span>
-          </div>
-          <div className="shrink-0 pb-1">
-            <svg className="w-24 sm:w-28 h-10 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="callWave3" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10B981" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#10B981" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6 L 120 40 L 0 40 Z" fill="url(#callWave3)" />
-              <path d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
+            <span className="text-xs text-foreground-muted mt-1 block font-medium">
+              Documented outcomes
+            </span>
           </div>
         </div>
       </div>
@@ -640,48 +624,51 @@ export const CallsPage: React.FC<CallsPageProps> = ({
               {/* Call Type */}
               <div className="space-y-1.5">
                 <label className="font-semibold text-foreground">Call Type</label>
-                <select
-                  value={callTypeFilter}
-                  onChange={(e) => setCallTypeFilter(e.target.value)}
-                  className="w-full bg-surface-muted/50 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:border-fairway-600 focus:outline-none"
-                >
-                  <option value="all">All Types (Inbound & Outbound)</option>
-                  <option value="Inbound">Inbound Calls</option>
-                  <option value="Outbound">Outbound Calls</option>
-                </select>
+                <Select value={callTypeFilter} onValueChange={setCallTypeFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types (Inbound & Outbound)</SelectItem>
+                    <SelectItem value="Inbound">Inbound Calls</SelectItem>
+                    <SelectItem value="Outbound">Outbound Calls</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Call Status */}
               <div className="space-y-1.5">
                 <label className="font-semibold text-foreground">Call Status</label>
-                <select
-                  value={callStatusFilter}
-                  onChange={(e) => setCallStatusFilter(e.target.value)}
-                  className="w-full bg-surface-muted/50 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:border-fairway-600 focus:outline-none"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="Scheduled">Scheduled</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
-                  <option value="Overdue">Overdue</option>
-                </select>
+                <Select value={callStatusFilter} onValueChange={setCallStatusFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="Scheduled">Scheduled</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                    <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    <SelectItem value="Overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Call Owner */}
               <div className="space-y-1.5">
                 <label className="font-semibold text-foreground">Call Owner</label>
-                <select
-                  value={ownerFilter}
-                  onChange={(e) => setOwnerFilter(e.target.value)}
-                  className="w-full bg-surface-muted/50 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:border-fairway-600 focus:outline-none"
-                >
-                  <option value="all">All Team Members</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="All Team Members" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Team Members</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

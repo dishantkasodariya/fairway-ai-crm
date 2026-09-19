@@ -970,7 +970,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         background-color: #09090B !important;
         color: #FFFFFF !important;
       }
-      html.dark .bg-surface, html.dark .bg-white, html.dark .bg-surface-card {
+      html.dark .bg-surface, html.dark .bg-white, html.dark .bg-card, html.dark .bg-surface-card {
         background-color: #121214 !important;
       }
       html.dark .bg-background {
@@ -1031,12 +1031,128 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       html.dark label {
         color: #F4F4F5 !important;
       }
-      html.dark th {
-        color: #FFFFFF !important;
-        background-color: #1C1C1F !important;
+      /* Unified Table Header Styling - Consistent across pinned and unpinned */
+      th,
+      th[data-pinned],
+      [data-slot="data-grid"] th,
+      table thead th {
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+        border-color: #e2e8f0 !important;
       }
-      html.dark td {
+      html.dark th,
+      html.dark th[data-pinned],
+      html.dark [data-slot="data-grid"] th,
+      html.dark table thead th {
         color: #FFFFFF !important;
+        background-color: #161c24 !important;
+        border-color: rgba(255, 255, 255, 0.08) !important;
+      }
+
+      /* Unified Table Body Cell Styling - Consistent across pinned and unpinned */
+      td,
+      td[data-pinned],
+      [data-slot="data-grid"] td,
+      table tbody td {
+        background-color: #ffffff !important;
+        color: inherit !important;
+        border-color: #e2e8f0 !important;
+      }
+      html.dark td,
+      html.dark td[data-pinned],
+      html.dark [data-slot="data-grid"] td,
+      html.dark table tbody td {
+        color: #FFFFFF !important;
+        background-color: #121214 !important;
+        border-color: rgba(255, 255, 255, 0.06) !important;
+      }
+
+      /* Unified Row Hover State - Exactly identical color on ALL cells */
+      tr:hover td,
+      tr:hover td[data-pinned],
+      tr.group\/row:hover td,
+      tr.group\/row:hover td[data-pinned],
+      table tbody tr:hover > td,
+      [data-slot="data-grid"] tbody tr:hover > td {
+        background-color: #f1f5f9 !important;
+      }
+      html.dark tr:hover td,
+      html.dark tr:hover td[data-pinned],
+      html.dark tr.group\/row:hover td,
+      html.dark tr.group\/row:hover td[data-pinned],
+      html.dark table tbody tr:hover > td,
+      html.dark [data-slot="data-grid"] tbody tr:hover > td {
+        background-color: #1c1c20 !important;
+      }
+
+      /* Unified Row Active/Click & Selected State */
+      tr:active td,
+      tr:active td[data-pinned],
+      tr[data-state="selected"] td,
+      tr[data-state="selected"] td[data-pinned],
+      tr.is-selected td,
+      tr.is-selected td[data-pinned] {
+        background-color: #eff6ff !important;
+      }
+      html.dark tr:active td,
+      html.dark tr:active td[data-pinned],
+      html.dark tr[data-state="selected"] td,
+      html.dark tr[data-state="selected"] td[data-pinned],
+      html.dark tr.is-selected td,
+      html.dark tr.is-selected td[data-pinned] {
+        background-color: #222226 !important;
+      }
+
+      /* Prevent any underline on table cell text hover throughout the project */
+      table td a,
+      table td button,
+      table td span,
+      table td div,
+      [data-slot="data-grid"] td a,
+      [data-slot="data-grid"] td button,
+      [data-slot="data-grid"] td span,
+      [data-slot="data-grid"] td div {
+        text-decoration: none !important;
+      }
+      table tr:hover td a,
+      table tr:hover td button,
+      table tr:hover td span,
+      table tr:hover td div,
+      table td a:hover,
+      table td button:hover,
+      table td span:hover {
+        text-decoration: none !important;
+      }
+
+      /* Pinned column dividers */
+      [data-pinned][data-last-col="start"],
+      th[data-pinned][data-last-col="start"],
+      td[data-pinned][data-last-col="start"] {
+        box-shadow: inset -1px 0 0 0 rgba(0, 0, 0, 0.06) !important;
+      }
+      html.dark [data-pinned][data-last-col="start"],
+      html.dark th[data-pinned][data-last-col="start"],
+      html.dark td[data-pinned][data-last-col="start"] {
+        box-shadow: inset -1px 0 0 0 rgba(255, 255, 255, 0.08) !important;
+      }
+      [data-pinned][data-last-col="end"],
+      th[data-pinned][data-last-col="end"],
+      td[data-pinned][data-last-col="end"] {
+        box-shadow: inset 1px 0 0 0 rgba(0, 0, 0, 0.06) !important;
+      }
+      html.dark [data-pinned][data-last-col="end"],
+      html.dark th[data-pinned][data-last-col="end"],
+      html.dark td[data-pinned][data-last-col="end"] {
+        box-shadow: inset 1px 0 0 0 rgba(255, 255, 255, 0.08) !important;
+      }
+      html.dark th div.cursor-col-resize::before {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+      }
+      html.dark table,
+      html.dark thead,
+      html.dark tbody,
+      html.dark tr {
+        border-color: rgba(255, 255, 255, 0.06) !important;
       }
       html.dark input:not([cmdk-input]):not(.cmdk-input):not([data-transparent]):not(.bg-transparent),
       html.dark select,
@@ -1058,6 +1174,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       html.dark input::placeholder, html.dark textarea::placeholder {
         color: #71717A !important;
+      }
+      /* Dropdown Menu & Popper outline, ring, glow shadow removal */
+      [data-radix-popper-content-wrapper],
+      [data-radix-popper-content-wrapper] [role="menu"],
+      [data-radix-menu-content] {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+      [data-radix-popper-content-wrapper] [role="menu"] *,
+      [data-radix-menu-content] * {
+        outline: none !important;
+      }
+      button[data-state="open"] {
+        outline: none !important;
+        box-shadow: none !important;
       }
     `;
 
@@ -1128,7 +1259,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         --radius-card: ${rXl}px !important;
         --radius-panel: ${r2Xl}px !important;
       }
-      .dark, html.dark {
+      .dark, html.dark, html.dark body, body.dark {
         ${darkVars}
       }
       ${lightClassOverrides}
@@ -1163,6 +1294,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       textarea:not(.rounded-full):not([class*="rounded-full"]):not([class*="rounded-none"]):not(.rounded-none) {
         border-radius: ${currentRadius}px !important;
       }
+
+      /* GPU-Accelerated View Transition & Surface Fallback */
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation-duration: 0.18s !important;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      html, body, #root, header, aside, main, .bg-surface, .bg-background, .bg-surface-muted, .border-border {
+        transition: background-color 0.18s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      }
     `;
 
     if (styleTag.dataset.themeKey !== `${theme.id}_${currentRadius}`) {
@@ -1185,11 +1326,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const setColorMode = (newMode: ColorMode) => {
-    setColorModeState(newMode);
-    try {
-      localStorage.setItem(MODE_STORAGE_KEY, newMode);
-    } catch (e) {
-      console.error('Failed to save color mode in localStorage', e);
+    const applyMode = () => {
+      setColorModeState(newMode);
+      try {
+        localStorage.setItem(MODE_STORAGE_KEY, newMode);
+      } catch (e) {
+        console.error('Failed to save color mode in localStorage', e);
+      }
+    };
+
+    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+      (document as any).startViewTransition(() => {
+        applyMode();
+      });
+    } else {
+      applyMode();
     }
   };
 
@@ -1242,19 +1393,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (isInputElement) return;
 
-      // Shift + D -> Toggle Dark / Light mode
+      // Shift + D -> Toggle Dark / Light mode (Instant, GPU-accelerated & synchronized)
       if (e.shiftKey && (e.key === 'D' || e.key === 'd') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        setColorModeState((prev) => {
-          const currentIsDark = prev === 'dark' || (prev === 'system' && systemIsDark);
-          const nextMode: ColorMode = currentIsDark ? 'light' : 'dark';
-          try {
-            localStorage.setItem(MODE_STORAGE_KEY, nextMode);
-          } catch (err) {
-            console.error('Failed to save color mode in localStorage', err);
-          }
-          return nextMode;
-        });
+        const currentIsDark = colorMode === 'dark' || (colorMode === 'system' && systemIsDark);
+        const nextMode: ColorMode = currentIsDark ? 'light' : 'dark';
+        setColorMode(nextMode);
         return;
       }
 
@@ -1268,7 +1412,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [systemIsDark]);
+  }, [systemIsDark, colorMode]);
 
   const resetTheme = () => {
     setThemeId('fairway');

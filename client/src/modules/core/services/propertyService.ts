@@ -36,8 +36,34 @@ export class PropertyService {
   /**
    * Fetch unique corridors with counts
    */
-  static async getCorridors(): Promise<ApiResponse<any[]>> {
-    return api.get<any[]>('/properties/corridors');
+  static async getCorridors(): Promise<ApiResponse<{ corridor: string; count: number }[]>> {
+    return api.get<{ corridor: string; count: number }[]>('/properties/corridors');
+  }
+
+  /**
+   * Fetch active properties dropdown options GET /api/properties/dd/active
+   */
+  static async getActivePropertiesDropdown(): Promise<ApiResponse<{
+    id: string;
+    value: string;
+    label: string;
+    code: string;
+    name: string;
+    location: string;
+    corridor: string;
+    city: string;
+    availableAreaSqFt: number;
+    rentPerSqFtINR: number;
+    status: string;
+  }[]>> {
+    return api.get('/properties/dd/active');
+  }
+
+  /**
+   * Fetch unique industries from backend GET /api/properties/industries
+   */
+  static async getIndustries(): Promise<ApiResponse<string[]>> {
+    return api.get<string[]>('/properties/industries');
   }
 
   /**

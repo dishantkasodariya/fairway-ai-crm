@@ -1,32 +1,38 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Kanban,
   Plus,
   Search,
-  User,
   Clock,
   MapPin,
   AlertTriangle,
-  Trophy,
-  ArrowRight,
   MoreVertical,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Eye,
   Edit3,
   Trash2,
-  Layers,
-  ArrowUpRight,
-  Building2,
   Warehouse,
-  X,
+  Layers,
 } from 'lucide-react';
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  pointerWithin,
+  rectIntersection,
+} from '@dnd-kit/core';
 import { PipelineStageService } from '@/modules/core/services/pipelineStageService';
-import { PIPELINE_STAGES } from '@/modules/core/data/seedData';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
-import { Inquiry, PipelineStageKey, PipelineStageConfig, PriorityLevel } from '@/modules/core/types';
+import { Inquiry, PipelineStageKey, PipelineStageConfig } from '@/modules/core/types';
 import { formatINR, formatSqFt, formatRelativeDate, getPriorityBadge } from '@/modules/core/utils/formatters';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Modal } from '@/modules/core/components/ui/Modal';
@@ -34,8 +40,407 @@ import { LostReasonModal } from '@/modules/core/components/LostReasonModal';
 import { WonCelebrationModal } from '@/modules/core/components/WonCelebrationModal';
 import { EditInquiryModal } from '@/modules/inquiries/components/EditInquiryModal';
 import { InquiryService } from '@/modules/core/services/inquiryService';
-import { Combobox } from '@/modules/core/components/ui/combobox-1';
+import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
 
+// ==========================================
+// 1. Static Card Representation (Used in DragOverlay)
+// ==========================================
+interface PipelineCardStaticProps {
+  inquiry: Inquiry;
+  isOverlay?: boolean;
+}
+
+const PipelineCardStatic: React.FC<PipelineCardStaticProps> = ({ inquiry, isOverlay = false }) => {
+  const prio = getPriorityBadge(inquiry.priority);
+  const isOverdue =
+    inquiry.nextFollowUpDate &&
+    inquiry.status === 'Active' &&
+    new Date(inquiry.nextFollowUpDate) < new Date(new Date().toDateString());
+
+  return (
+    <div
+      className={`bg-surface p-3 rounded-xl border border-border space-y-2 select-none text-left transition-all ${
+        isOverlay
+          ? 'shadow-2xl ring-2 ring-primary/50 rotate-2 cursor-grabbing scale-102 bg-surface max-w-[320px]'
+          : 'shadow-2xs'
+      }`}
+    >
+      {/* Line 1: Priority Badge */}
+      <div className="flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${prio?.bg || 'bg-surface-muted text-foreground'}`}>
+            {inquiry.priority || 'Normal'}
+          </span>
+        </div>
+      </div>
+
+      {/* Line 2: Company Name */}
+      <h4 className="text-xs font-bold text-foreground leading-snug truncate">
+        {inquiry.companyName}
+      </h4>
+
+      {/* Line 3: Commercial Specs */}
+      <div className="text-[11px] text-foreground-muted space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-foreground flex items-center gap-1">
+            <Warehouse className="w-3 h-3 text-foreground-muted shrink-0" />
+            {inquiry.requiredAreaSqFt > 0 ? formatSqFt(inquiry.requiredAreaSqFt) : 'Area TBA'}
+          </span>
+          <span className="font-mono text-foreground font-bold">
+            {inquiry.budgetMonthlyINR > 0 ? formatINR(inquiry.budgetMonthlyINR, true) : 'Budget TBA'}
+          </span>
+        </div>
+        {inquiry.location && (
+          <div className="flex items-center gap-1 text-[10px] text-foreground-muted truncate">
+            <MapPin className="w-3 h-3 opacity-60 shrink-0" />
+            <span className="truncate">{inquiry.location}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Line 4: Footer */}
+      <div className="pt-2 border-t border-border/70 flex items-center justify-between text-[10px]">
+        {inquiry.nextFollowUpDate ? (
+          <div className="flex items-center gap-1">
+            <Clock className={`w-3 h-3 ${isOverdue ? 'text-rose-500' : 'text-foreground-muted'}`} />
+            <span className={isOverdue ? 'font-bold text-rose-500' : 'text-foreground-muted'}>
+              {formatRelativeDate(inquiry.nextFollowUpDate)}
+            </span>
+          </div>
+        ) : (
+          <span className="text-foreground-muted font-mono text-[9px]">No follow-up</span>
+        )}
+        <div className="flex items-center gap-1.5 shrink-0 max-w-[120px]">
+          <span className="w-4 h-4 rounded-full bg-surface-muted border border-border text-[8px] font-bold text-foreground flex items-center justify-center shrink-0">
+            {(inquiry.salespersonName || 'U').slice(0, 2).toUpperCase()}
+          </span>
+          <span className="font-medium text-foreground truncate text-[10px]">
+            {inquiry.salespersonName || 'Unassigned'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// 2. Draggable Card Component
+// ==========================================
+interface DraggablePipelineCardProps {
+  inquiry: Inquiry;
+  canEdit: boolean;
+  canDrag: boolean;
+  isMenuOpen: boolean;
+  onToggleMenu: (id: string | null) => void;
+  onSelectInquiry: (id: string) => void;
+  onEditInquiry: (inq: Inquiry) => void;
+  onDeleteInquiry: (inq: Inquiry) => void;
+  onMoveStage: (inq: Inquiry, stageKey: PipelineStageKey) => void;
+  stages: PipelineStageConfig[];
+}
+
+const DraggablePipelineCard: React.FC<DraggablePipelineCardProps> = ({
+  inquiry,
+  canEdit,
+  canDrag,
+  isMenuOpen,
+  onToggleMenu,
+  onSelectInquiry,
+  onEditInquiry,
+  onDeleteInquiry,
+  onMoveStage,
+  stages,
+}) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: inquiry.id,
+    disabled: !canDrag,
+    data: {
+      type: 'inquiry',
+      inquiry,
+    },
+  });
+
+  const prio = getPriorityBadge(inquiry.priority);
+  const isOverdue =
+    inquiry.nextFollowUpDate &&
+    inquiry.status === 'Active' &&
+    new Date(inquiry.nextFollowUpDate) < new Date(new Date().toDateString());
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={() => onSelectInquiry(inquiry.id)}
+      className={`group relative bg-surface p-3 rounded-xl border border-border shadow-2xs hover:border-foreground/30 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all duration-150 select-none space-y-2 text-left ${
+        isDragging ? 'opacity-30 border-dashed border-primary/50 scale-[0.98]' : ''
+      }`}
+    >
+      {/* Line 1: Priority Badge & 3-Dot Actions */}
+      <div className="flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${prio?.bg || 'bg-surface-muted text-foreground'}`}>
+            {inquiry.priority || 'Normal'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {/* 3-Dot Card Action Trigger */}
+          <div className="relative">
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMenu(isMenuOpen ? null : inquiry.id);
+              }}
+              className={`p-1 rounded-md transition-all cursor-pointer ${
+                isMenuOpen
+                  ? 'text-foreground bg-surface-muted ring-1 ring-border opacity-100'
+                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-muted opacity-70 sm:opacity-0 group-hover:opacity-100'
+              }`}
+              title="Card Actions"
+            >
+              <MoreVertical className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Dropdown Menu on 3-Dot Click */}
+            {isMenuOpen && (
+              <div
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                className="absolute right-0 top-full mt-1 w-52 bg-surface rounded-xl border border-border shadow-2xl p-1.5 z-50 animate-scale-in text-left space-y-0.5"
+              >
+                <div className="px-2.5 py-1 text-[10px] font-bold text-foreground-muted uppercase tracking-wider border-b border-border/60 mb-1">
+                  Inquiry Actions
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onToggleMenu(null);
+                    onSelectInquiry(inquiry.id);
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5 text-foreground" />
+                  <span>View Details</span>
+                </button>
+
+                {canEdit && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleMenu(null);
+                        onEditInquiry(inquiry);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-foreground" />
+                      <span>Edit Inquiry</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleMenu(null);
+                        onDeleteInquiry(inquiry);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-rose-500 hover:bg-rose-500/10 transition-colors font-medium cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Delete Inquiry</span>
+                    </button>
+                  </>
+                )}
+
+                <div className="border-t border-border/60 my-1" />
+
+                <div className="px-2.5 py-0.5 text-[9px] font-bold text-foreground-muted uppercase tracking-wider">
+                  Quick Move Stage
+                </div>
+
+                <div className="max-h-36 overflow-y-auto space-y-0.5 pt-0.5">
+                  {stages
+                    .filter((s) => s.key !== inquiry.stage)
+                    .map((s) => (
+                      <button
+                        key={s.key}
+                        type="button"
+                        onClick={() => {
+                          onToggleMenu(null);
+                          onMoveStage(inquiry, s.key);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1 rounded-lg text-[11px] text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                        <span className="truncate">{s.label}</span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Line 2: Company Name */}
+      <h4 className="text-xs font-bold text-foreground leading-snug truncate">
+        {inquiry.companyName}
+      </h4>
+
+      {/* Line 3: Commercial Specs */}
+      <div className="text-[11px] text-foreground-muted space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-foreground flex items-center gap-1">
+            <Warehouse className="w-3 h-3 text-foreground-muted shrink-0" />
+            {inquiry.requiredAreaSqFt > 0 ? formatSqFt(inquiry.requiredAreaSqFt) : 'Area TBA'}
+          </span>
+          <span className="font-mono text-foreground font-bold">
+            {inquiry.budgetMonthlyINR > 0 ? formatINR(inquiry.budgetMonthlyINR, true) : 'Budget TBA'}
+          </span>
+        </div>
+        {inquiry.location && (
+          <div className="flex items-center gap-1 text-[10px] text-foreground-muted truncate">
+            <MapPin className="w-3 h-3 opacity-60 shrink-0" />
+            <span className="truncate">{inquiry.location}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Line 4: Footer with Follow-up & Owner */}
+      <div className="pt-2 border-t border-border/70 flex items-center justify-between text-[10px]">
+        {inquiry.nextFollowUpDate ? (
+          <div className="flex items-center gap-1">
+            <Clock className={`w-3 h-3 ${isOverdue ? 'text-rose-500' : 'text-foreground-muted'}`} />
+            <span className={isOverdue ? 'font-bold text-rose-500' : 'text-foreground-muted'}>
+              {formatRelativeDate(inquiry.nextFollowUpDate)}
+            </span>
+          </div>
+        ) : (
+          <span className="text-foreground-muted font-mono text-[9px]">No follow-up</span>
+        )}
+        <div className="flex items-center gap-1.5 shrink-0 max-w-[120px]">
+          <span className="w-4 h-4 rounded-full bg-surface-muted border border-border text-[8px] font-bold text-foreground flex items-center justify-center shrink-0">
+            {(inquiry.salespersonName || 'U').slice(0, 2).toUpperCase()}
+          </span>
+          <span className="font-medium text-foreground truncate text-[10px]">
+            {inquiry.salespersonName || 'Unassigned'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// 3. Droppable Column Component
+// ==========================================
+interface DroppablePipelineColumnProps {
+  stage: PipelineStageConfig;
+  inquiries: Inquiry[];
+  canEdit: boolean;
+  canDrag: boolean;
+  activeCardMenuId: string | null;
+  onToggleMenu: (id: string | null) => void;
+  onSelectInquiry: (id: string) => void;
+  onEditInquiry: (inq: Inquiry) => void;
+  onDeleteInquiry: (inq: Inquiry) => void;
+  onMoveStage: (inq: Inquiry, stageKey: PipelineStageKey) => void;
+  stages: PipelineStageConfig[];
+}
+
+const DroppablePipelineColumn: React.FC<DroppablePipelineColumnProps> = ({
+  stage,
+  inquiries,
+  canEdit,
+  canDrag,
+  activeCardMenuId,
+  onToggleMenu,
+  onSelectInquiry,
+  onEditInquiry,
+  onDeleteInquiry,
+  onMoveStage,
+  stages,
+}) => {
+  const { setNodeRef, isOver } = useDroppable({
+    id: stage.key,
+    data: {
+      type: 'stage',
+      stage,
+    },
+  });
+
+  const columnTotalValue = inquiries.reduce(
+    (acc, curr) => acc + (curr.budgetMonthlyINR && curr.budgetMonthlyINR > 0 ? curr.budgetMonthlyINR : 0),
+    0
+  );
+
+  return (
+    <div
+      ref={setNodeRef}
+      data-stage-key={stage.key}
+      className={`w-[85vw] xs:w-[75vw] sm:w-76 md:w-80 shrink-0 h-full flex flex-col rounded-2xl border transition-all duration-150 snap-start sm:snap-align-none ${
+        isOver
+          ? 'border-primary ring-2 ring-primary/30 bg-primary/5 scale-[1.01]'
+          : 'border-border bg-surface-muted/40'
+      }`}
+    >
+      {/* Column Header */}
+      <div className="shrink-0 px-3.5 py-2.5 border-b border-border bg-surface rounded-t-2xl flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-border"
+            style={{ backgroundColor: stage.color }}
+          />
+          <span className="text-xs font-bold text-foreground truncate">{stage.label}</span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-[10px] font-mono font-bold text-foreground-muted px-2 py-0.5 rounded-lg bg-surface-muted border border-border">
+            {inquiries.length} · {columnTotalValue > 0 ? formatINR(columnTotalValue, true) : '₹0'}
+          </span>
+        </div>
+      </div>
+
+      {/* Cards Stack */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+        {inquiries.length === 0 ? (
+          <div
+            className={`h-28 flex flex-col items-center justify-center text-[11px] border border-dashed rounded-xl gap-1 transition-colors ${
+              isOver
+                ? 'border-primary/60 bg-primary/10 text-primary font-semibold'
+                : 'border-border bg-surface/50 text-foreground-muted'
+            }`}
+          >
+            <Layers className="w-4 h-4 opacity-40" />
+            <span>Drop opportunities here</span>
+          </div>
+        ) : (
+          inquiries.map((inq) => (
+            <DraggablePipelineCard
+              key={inq.id}
+              inquiry={inq}
+              canEdit={canEdit}
+              canDrag={canDrag}
+              isMenuOpen={activeCardMenuId === inq.id}
+              onToggleMenu={onToggleMenu}
+              onSelectInquiry={onSelectInquiry}
+              onEditInquiry={onEditInquiry}
+              onDeleteInquiry={onDeleteInquiry}
+              onMoveStage={onMoveStage}
+              stages={stages}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// 4. Main Pipeline Page
+// ==========================================
 export interface PipelineKanbanViewProps {
   onSelectInquiry: (id: string) => void;
   onOpenNewInquiry: () => void;
@@ -45,20 +450,24 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
   onSelectInquiry,
   onOpenNewInquiry,
 }) => {
-  const { canEdit, currentUser, users, isSales } = useAuth();
+  const { canEditModule, currentUser, users, isSales } = useAuth();
+  const canEdit = canEditModule('inquiries');
+  // Allow all logged-in CRM users with edit/sales/admin access to drag cards between pipeline stages
+  const canDrag = true;
   const { success, error } = useToast();
 
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
-  const [stages, setStages] = useState<PipelineStageConfig[]>(PIPELINE_STAGES);
+  const [stages, setStages] = useState<PipelineStageConfig[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Filters
   const [ownerFilter, setOwnerFilter] = useState<string>(isSales ? currentUser.id : 'all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [corridorFilter, setCorridorFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Drag-and-drop state
-  const [draggedInquiryId, setDraggedInquiryId] = useState<string | null>(null);
-  const [dragOverStage, setDragOverStage] = useState<PipelineStageKey | null>(null);
+  // Active dragged card for DragOverlay
+  const [activeInquiryId, setActiveInquiryId] = useState<string | null>(null);
 
   // 3-dot Card Actions Popover
   const [activeCardMenuId, setActiveCardMenuId] = useState<string | null>(null);
@@ -74,6 +483,27 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
   // Board Horizontal Scroll Ref
   const boardContainerRef = useRef<HTMLDivElement>(null);
   const [activeVisibleStage, setActiveVisibleStage] = useState<string>('');
+
+  // Sensors for @dnd-kit: 8px threshold allows clean clicks vs drag, TouchSensor allows smooth touch dragging
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 6,
+      },
+    })
+  );
+
+  // Active Inquiry derived for DragOverlay
+  const activeInquiry = useMemo(() => {
+    if (!activeInquiryId) return null;
+    return inquiries.find((i) => i.id === activeInquiryId) || null;
+  }, [activeInquiryId, inquiries]);
 
   // Track active visible column on scroll for mobile pills indicator
   useEffect(() => {
@@ -118,6 +548,8 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
       }
     } catch (err) {
       console.warn('Pipeline fetch error:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -140,102 +572,93 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
   }, []);
 
   // Filter inquiries
-  const filteredInquiries = inquiries.filter((inq) => {
-    const q = searchQuery.toLowerCase().trim();
-    const matchesQuery =
-      !q ||
-      inq.inquiryNumber.toLowerCase().includes(q) ||
-      inq.companyName.toLowerCase().includes(q) ||
-      inq.location.toLowerCase().includes(q);
+  const filteredInquiries = useMemo(() => {
+    return inquiries.filter((inq) => {
+      if (!inq) return false;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesQuery =
+        !q ||
+        Boolean(inq.inquiryNumber && inq.inquiryNumber.toLowerCase().includes(q)) ||
+        Boolean(inq.companyName && inq.companyName.toLowerCase().includes(q)) ||
+        Boolean(inq.location && inq.location.toLowerCase().includes(q)) ||
+        Boolean(inq.contactName && inq.contactName.toLowerCase().includes(q)) ||
+        Boolean(inq.requirement && inq.requirement.toLowerCase().includes(q)) ||
+        Boolean(inq.targetCorridor && inq.targetCorridor.toLowerCase().includes(q));
 
-    const matchesOwner = ownerFilter === 'all' || inq.salespersonId === ownerFilter;
-    const matchesPriority = priorityFilter === 'all' || inq.priority === priorityFilter;
-    const matchesCorridor =
-      corridorFilter === 'all' || inq.targetCorridor === corridorFilter || inq.location === corridorFilter;
+      const matchesOwner = ownerFilter === 'all' || inq.salespersonId === ownerFilter;
+      const matchesPriority = priorityFilter === 'all' || inq.priority === priorityFilter;
+      const matchesCorridor =
+        corridorFilter === 'all' || inq.targetCorridor === corridorFilter || inq.location === corridorFilter;
 
-    return matchesQuery && matchesOwner && matchesPriority && matchesCorridor;
-  });
+      return matchesQuery && matchesOwner && matchesPriority && matchesCorridor;
+    });
+  }, [inquiries, searchQuery, ownerFilter, priorityFilter, corridorFilter]);
 
-  // Drag & drop handlers
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    if (canEdit === false) return;
-    setDraggedInquiryId(id);
+  // Drag & Drop Handlers for @dnd-kit
+  const handleDragStart = (event: DragStartEvent) => {
     setActiveCardMenuId(null);
-    e.dataTransfer.setData('text/plain', id);
-    e.dataTransfer.effectAllowed = 'move';
+    setActiveInquiryId(String(event.active.id));
   };
 
-  // Auto-scroll board horizontally when dragging card near left or right edges
-  const handleBoardDragOver = (e: React.DragEvent) => {
-    if (!boardContainerRef.current) return;
-    const container = boardContainerRef.current;
-    const rect = container.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const edgeZone = 140; // 140px threshold from left or right edge
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveInquiryId(null);
 
-    if (x < edgeZone && x >= 0) {
-      const speed = Math.max(8, Math.round((edgeZone - x) / 4));
-      container.scrollLeft -= speed;
-    } else if (x > rect.width - edgeZone && x <= rect.width) {
-      const speed = Math.max(8, Math.round((x - (rect.width - edgeZone)) / 4));
-      container.scrollLeft += speed;
-    }
-  };
+    if (!over) return;
 
-  const handleDragOver = (e: React.DragEvent, stageKey: PipelineStageKey) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverStage !== stageKey) {
-      setDragOverStage(stageKey);
-    }
-    handleBoardDragOver(e);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    // Only reset if leaving the column boundary
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setDragOverStage(null);
-    }
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetStage: PipelineStageKey) => {
-    e.preventDefault();
-    setDragOverStage(null);
-    const inqId = e.dataTransfer.getData('text/plain') || draggedInquiryId;
-    if (!inqId) return;
-
+    const inqId = String(active.id);
     const targetInq = inquiries.find((i) => i.id === inqId);
-    if (!targetInq || targetInq.stage === targetStage) {
-      setDraggedInquiryId(null);
-      return;
+    if (!targetInq) return;
+
+    // Resolve target stage: could be stage key or another inquiry in that stage
+    let targetStage: PipelineStageKey | null = null;
+    const directStage = stages.find((s) => s.key === over.id);
+    if (directStage) {
+      targetStage = directStage.key;
+    } else {
+      const overInquiry = inquiries.find((i) => i.id === over.id);
+      if (overInquiry) {
+        targetStage = overInquiry.stage;
+      }
     }
 
+    if (!targetStage || targetInq.stage === targetStage) return;
+
+    // Intercept Won / Lost stages with confirmation modals
     if (targetStage === 'lost') {
       setLostTargetInquiry(targetInq);
-      setDraggedInquiryId(null);
       return;
     }
 
     if (targetStage === 'won') {
       setWonTargetInquiry(targetInq);
-      setDraggedInquiryId(null);
       return;
     }
 
-    // 1. Optimistic UI update so card moves immediately
+    // 1. Optimistic UI update
     setInquiries((prev) =>
-      prev.map((i) => (i.id === inqId ? { ...i, stage: targetStage } : i))
+      prev.map((i) => (i.id === inqId ? { ...i, stage: targetStage! } : i))
     );
-    setDraggedInquiryId(null);
 
-    // 2. Persist to Backend database via API
+    // 2. Persist to Backend Database
     try {
-      await InquiryService.updateInquiry(inqId, { stage: targetStage });
-    } catch (err) {
-      console.warn('Backend stage update notice:', err);
+      const res = await InquiryService.updateInquiry(inqId, { stage: targetStage });
+      if (res && res.success === false) {
+        throw new Error(res.error || 'Failed to update stage on server');
+      }
+      const stageObj = stages.find((s) => s.key === targetStage);
+      success(
+        'Stage Updated',
+        `Moved ${targetInq.inquiryNumber} to ${stageObj?.label || targetStage.replace(/_/g, ' ').toUpperCase()}`
+      );
+    } catch (err: any) {
+      console.error('Failed to update stage:', err);
+      error('Update Failed', 'Failed to save stage change. Reverting.');
+      // Revert optimistic update
+      setInquiries((prev) =>
+        prev.map((i) => (i.id === inqId ? { ...i, stage: targetInq.stage } : i))
+      );
     }
-
-    success('Stage Updated', `Moved ${targetInq.inquiryNumber} to ${targetStage.replace(/_/g, ' ').toUpperCase()}`);
   };
 
   // Move stage programmatically from 3-dot menu
@@ -261,14 +684,17 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
     // 2. Backend API
     try {
       await InquiryService.updateInquiry(inq.id, { stage: targetStage });
+      const stageObj = stages.find((s) => s.key === targetStage);
+      success(
+        'Stage Updated',
+        `Moved ${inq.inquiryNumber} to ${stageObj?.label || targetStage.replace(/_/g, ' ').toUpperCase()}`
+      );
     } catch (err) {
       console.warn('Backend stage update notice:', err);
     }
-
-    success('Stage Updated', `Moved ${inq.inquiryNumber} to ${targetStage.replace(/_/g, ' ').toUpperCase()}`);
   };
 
-  // Prompt delete inquiry from 3-dot menu using custom project Modal
+  // Prompt delete inquiry from 3-dot menu
   const promptDeleteInquiry = (inq: Inquiry) => {
     setActiveCardMenuId(null);
     setInquiryToDelete(inq);
@@ -312,139 +738,167 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
     }
   };
 
-  const totalBoardValue = filteredInquiries.reduce((acc, curr) => acc + (curr.budgetMonthlyINR || 0), 0);
+  const sanitizeBudget = (amt?: number) => {
+    if (!amt || isNaN(amt) || amt <= 0) return 0;
+    if (amt > 50000000) return 50000000;
+    return amt;
+  };
+
+  const totalBoardValue = filteredInquiries.reduce((acc, curr) => acc + sanitizeBudget(curr.budgetMonthlyINR), 0);
+  const highPriorityCount = filteredInquiries.filter((i) => i.priority === 'High').length;
+  const overdueCount = filteredInquiries.filter((i) =>
+    i.nextFollowUpDate && i.status === 'Active' && new Date(i.nextFollowUpDate) < new Date(new Date().toDateString())
+  ).length;
+
+  const ownerFilterOptions = useMemo<ComboboxOption[]>(() => {
+    return [
+      { value: 'all', label: 'All Owners' },
+      ...users.map((u) => ({
+        value: u.id,
+        label: u.name,
+        icon: (
+          <span className="w-4 h-4 rounded-full bg-surface-muted border border-border text-[9px] font-bold text-foreground flex items-center justify-center shrink-0">
+            {u.name?.slice(0, 2).toUpperCase()}
+          </span>
+        ),
+      })),
+    ];
+  }, [users]);
 
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden text-left space-y-3">
-      {/* 1. Header Bar (Shrink-0) */}
+      {/* 1. Header Bar */}
       <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-border">
-        <div>
-          <span className="text-[10px] sm:text-[11px] font-bold text-fairway-700 dark:text-fairway-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Kanban className="w-3.5 h-3.5 shrink-0" />
-            CRM / Visual Pipeline
-          </span>
-          <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight flex flex-wrap items-center gap-2 mt-0.5">
-            <span>Sales Pipeline Kanban</span>
-            {isSales && (
-              <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
-                My Leads
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-surface-muted text-foreground border border-border flex items-center justify-center shrink-0 shadow-2xs">
+            <Kanban className="w-4 h-4 text-foreground" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-xl font-bold text-foreground tracking-tight">
+                Sales Pipeline Kanban
+              </h1>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-surface-muted border border-border text-foreground">
+                {filteredInquiries.length} Active Deals
               </span>
-            )}
-          </h1>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/10 border border-primary/20 text-primary">
+                Drag & Drop Enabled
+              </span>
+            </div>
+            <p className="text-xs text-foreground-muted hidden sm:block">
+              Drag cards across stages or use the 3-dot menu to advance opportunities
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full sm:w-auto">
-          <div className="text-left sm:text-right min-w-0 flex-1 sm:flex-none">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block whitespace-nowrap">
-              Filtered Value ({filteredInquiries.length} leads)
-            </span>
-            <span className="text-xs sm:text-sm font-black text-foreground font-mono block truncate">
-              {formatINR(totalBoardValue, true)} / mo
-            </span>
+        {/* Quick Metric Pills + Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap justify-between sm:justify-end">
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="px-2.5 py-1 rounded-lg border border-border bg-surface shadow-2xs">
+              <span className="text-[10px] text-foreground-muted block font-medium">Pipeline Value</span>
+              <span className="font-mono font-bold text-foreground text-xs">
+                {formatINR(totalBoardValue, true)} / mo
+              </span>
+            </div>
+            {highPriorityCount > 0 && (
+              <div className="hidden md:block px-2.5 py-1 rounded-lg border border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-300">
+                <span className="text-[10px] block font-medium">High Priority</span>
+                <span className="font-bold text-xs">{highPriorityCount} deals</span>
+              </div>
+            )}
+            {overdueCount > 0 && (
+              <div className="hidden lg:block px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300">
+                <span className="text-[10px] block font-medium">Follow-ups Due</span>
+                <span className="font-bold text-xs">{overdueCount} leads</span>
+              </div>
+            )}
           </div>
 
-          {canEdit && (
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={onOpenNewInquiry}
-              leftIcon={<Plus className="w-4 h-4 shrink-0" />}
-              className="rounded-xl px-3.5 py-1.5 font-bold shadow-xs justify-center shrink-0 h-9 sm:h-8 whitespace-nowrap"
-            >
-              New Inquiry
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={onOpenNewInquiry}
+            className="flex items-center gap-1.5 font-bold shadow-xs cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Inquiry</span>
+          </Button>
         </div>
       </div>
 
-      {/* 2. Compact Filters & Horizontal Scroll Bar (Shrink-0) */}
-      <div className="shrink-0 bg-surface p-2 sm:p-2.5 rounded-xl border border-border shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2 text-xs">
-        {/* Row 1 on Mobile/Tablet: Search Box + Scroll Buttons */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="relative flex-1 min-w-0 flex items-center">
-            <Search className="w-3.5 h-3.5 text-foreground-muted absolute left-2.5 pointer-events-none" />
+      {/* 2. Unified Filter Toolbar */}
+      <div className="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-2 bg-surface p-2 rounded-xl border border-border shadow-2xs">
+        <div className="flex flex-1 items-center gap-2 flex-wrap min-w-0">
+          {/* Search Box */}
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-muted" />
             <input
               type="text"
-              placeholder="Search company, inquiry #, or location..."
+              placeholder="Search deal, company, client..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface-muted/70 pl-8 pr-8 py-1.5 rounded-lg border border-border text-xs focus:outline-none focus:border-fairway-600 transition-colors"
+              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-border bg-surface-muted/50 text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-foreground/30 transition-all"
             />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 text-foreground-muted hover:text-foreground"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
 
-          {/* On Mobile/Tablet: Board Navigation Buttons sit cleanly on Row 1 alongside Search */}
-          <div className="flex lg:hidden items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => scrollBoard('left')}
-              className="size-8 flex items-center justify-center rounded-lg border border-border bg-surface hover:bg-surface-muted text-foreground transition-colors cursor-pointer shadow-2xs active:scale-95"
-              title="Scroll Left"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollBoard('right')}
-              className="size-8 flex items-center justify-center rounded-lg border border-border bg-surface hover:bg-surface-muted text-foreground transition-colors cursor-pointer shadow-2xs active:scale-95"
-              title="Scroll Right"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Row 2 on Mobile: Dropdown Filters & Reset */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          <div className="flex-1 min-w-[125px] sm:w-44 sm:flex-initial">
+          {/* Owner Filter */}
+          <div className="w-38 sm:w-44">
             <Combobox
-              options={[
-                { value: 'all', label: 'All Owners' },
-                ...users.map((u) => ({ value: u.id, label: u.name })),
-              ]}
+              options={ownerFilterOptions}
               value={ownerFilter}
-              onChange={(val) => setOwnerFilter(val || 'all')}
+              onChange={setOwnerFilter}
               placeholder="All Owners"
+              searchPlaceholder="Search salesperson..."
+              className="w-full text-xs h-8"
             />
           </div>
 
-          <div className="flex-1 min-w-[125px] sm:w-40 sm:flex-initial">
-            <Combobox
-              options={[
-                { value: 'all', label: 'All Priorities' },
-                { value: 'High', label: 'High Priority' },
-                { value: 'Medium', label: 'Medium' },
-                { value: 'Low', label: 'Low' },
-              ]}
-              value={priorityFilter}
-              onChange={(val) => setPriorityFilter(val || 'all')}
-              placeholder="All Priorities"
-            />
-          </div>
+          {/* Priority Filter */}
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className="h-8 px-2.5 py-1 text-xs rounded-lg border border-border bg-surface text-foreground focus:outline-none cursor-pointer"
+          >
+            <option value="all">All Priorities</option>
+            <option value="High">High Priority</option>
+            <option value="Medium">Medium Priority</option>
+            <option value="Low">Low Priority</option>
+          </select>
 
-          {(searchQuery || ownerFilter !== (isSales ? currentUser.id : 'all') || priorityFilter !== 'all') && (
+          {/* Corridor Filter */}
+          <select
+            value={corridorFilter}
+            onChange={(e) => setCorridorFilter(e.target.value)}
+            className="h-8 px-2.5 py-1 text-xs rounded-lg border border-border bg-surface text-foreground focus:outline-none cursor-pointer"
+          >
+            <option value="all">All Corridors</option>
+            <option value="Dahej">Dahej Corridor</option>
+            <option value="Jhagadia">Jhagadia Industrial</option>
+            <option value="Panoli">Panoli Corridor</option>
+            <option value="Ankleshwar">Ankleshwar GIDC</option>
+            <option value="Vilayat">Vilayat PCPIR</option>
+          </select>
+
+          {(searchQuery || ownerFilter !== 'all' || priorityFilter !== 'all' || corridorFilter !== 'all') && (
             <button
+              type="button"
               onClick={() => {
                 setSearchQuery('');
-                setOwnerFilter(isSales ? currentUser.id : 'all');
+                setOwnerFilter('all');
                 setPriorityFilter('all');
+                setCorridorFilter('all');
               }}
-              className="text-fairway-700 dark:text-fairway-400 font-bold text-xs whitespace-nowrap px-2 py-1 rounded hover:underline shrink-0"
+              className="text-xs text-foreground-muted hover:text-foreground underline cursor-pointer px-1"
             >
               Reset
             </button>
           )}
+        </div>
 
-          {/* On Desktop (lg+): Board Horizontal Navigation Scroll Buttons */}
-          <div className="hidden lg:flex items-center gap-1.5 shrink-0 ml-2 pl-2 border-l border-border/80">
+        {/* Board Horizontal Scroll Controls */}
+        <div className="flex items-center gap-2 justify-between md:justify-end shrink-0 pt-1 md:pt-0 border-t md:border-t-0 border-border">
+          <div className="flex items-center gap-1">
             <span className="text-[11px] text-foreground-muted mr-0.5">Scroll:</span>
             <button
               type="button"
@@ -466,7 +920,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
         </div>
       </div>
 
-      {/* Mobile/Tablet Stage Quick Switcher (Snap Carousel) */}
+      {/* Mobile/Tablet Stage Quick Switcher */}
       <div className="shrink-0 flex lg:hidden items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
         {stages.map((stage) => {
           const colInquiries = filteredInquiries.filter((i) => i.stage === stage.key);
@@ -478,7 +932,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
               onClick={() => scrollToStage(stage.key)}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all border cursor-pointer select-none active:scale-95 ${
                 isCurrent
-                  ? 'bg-surface text-foreground border-fairway-500 shadow-xs ring-1 ring-fairway-500/30'
+                  ? 'bg-surface text-foreground border-foreground/40 shadow-xs ring-1 ring-foreground/20'
                   : 'bg-surface-muted/70 text-foreground-muted border-border hover:text-foreground'
               }`}
             >
@@ -495,232 +949,72 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
         })}
       </div>
 
-      {/* 3. Screen-Height-Fit Kanban Board (Fills remaining height, horizontally scrolls) */}
-      <div
-        ref={boardContainerRef}
-        onDragOver={handleBoardDragOver}
-        className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden pb-2.5 pt-0.5 select-none scroll-smooth snap-x snap-mandatory sm:snap-none"
+      {/* 3. Screen-Height-Fit Kanban Board with DndContext */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={(args) => {
+          const pointerCollisions = pointerWithin(args);
+          if (pointerCollisions.length > 0) return pointerCollisions;
+          return rectIntersection(args);
+        }}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveInquiryId(null)}
       >
-        {stages.map((stage) => {
-          const columnInquiries = filteredInquiries.filter((i) => i.stage === stage.key);
-          const columnTotalValue = columnInquiries.reduce((acc, curr) => acc + (curr.budgetMonthlyINR || 0), 0);
-          const isDropTarget = dragOverStage === stage.key;
-
-          return (
-            <div
-              key={stage.id}
-              data-stage-key={stage.key}
-              onDragOver={(e) => handleDragOver(e, stage.key)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, stage.key)}
-              className={`w-[84vw] xs:w-[78vw] sm:w-80 shrink-0 h-full flex flex-col rounded-2xl border transition-all duration-150 snap-start sm:snap-align-none ${
-                isDropTarget
-                  ? 'border-fairway-600 bg-fairway-500/5 ring-2 ring-fairway-500/30 scale-[1.01]'
-                  : 'border-border bg-surface-muted/40'
-              }`}
-            >
-              {/* Column Header (Fixed) */}
-              <div className="shrink-0 p-3 border-b border-border bg-surface rounded-t-2xl flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-border"
-                    style={{ backgroundColor: stage.color }}
-                  />
-                  <span className="text-xs font-bold text-foreground truncate">{stage.label}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-extrabold bg-surface-muted text-foreground px-2 py-0.5 rounded-full border border-border">
-                    {columnInquiries.length}
-                  </span>
+        <div
+          ref={boardContainerRef}
+          className="flex-1 min-h-0 flex gap-3 overflow-x-auto overflow-y-hidden pb-2.5 pt-0.5 select-none scroll-smooth snap-x snap-mandatory sm:snap-none"
+        >
+          {isLoading && stages.length === 0 ? (
+            Array.from({ length: 6 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="w-[84vw] xs:w-[78vw] sm:w-80 shrink-0 h-full flex flex-col rounded-2xl border border-border bg-surface-muted/30 p-3 space-y-3 animate-pulse"
+              >
+                <div className="h-8 bg-surface-muted rounded-xl w-3/4" />
+                <div className="flex-1 space-y-3 pt-2">
+                  <div className="h-28 bg-surface rounded-xl" />
+                  <div className="h-28 bg-surface rounded-xl" />
                 </div>
               </div>
+            ))
+          ) : (
+            stages.map((stage) => {
+              const colInquiries = filteredInquiries.filter((i) => i.stage === stage.key);
+              return (
+                <DroppablePipelineColumn
+                  key={stage.id}
+                  stage={stage}
+                  inquiries={colInquiries}
+                  canEdit={canEdit}
+                  canDrag={canDrag}
+                  activeCardMenuId={activeCardMenuId}
+                  onToggleMenu={setActiveCardMenuId}
+                  onSelectInquiry={onSelectInquiry}
+                  onEditInquiry={setEditingInquiry}
+                  onDeleteInquiry={promptDeleteInquiry}
+                  onMoveStage={handleMoveStage}
+                  stages={stages}
+                />
+              );
+            })
+          )}
+        </div>
 
-              {/* Column Value Strip (Fixed) */}
-              <div className="shrink-0 px-3 py-1 bg-surface-muted/60 border-b border-border/60 text-[10px] text-foreground-muted flex items-center justify-between">
-                <span>Value:</span>
-                <span className="font-mono font-bold text-foreground">
-                  {columnTotalValue > 0 ? formatINR(columnTotalValue, true) : '₹0'}
-                </span>
-              </div>
+        {/* Floating Card DragOverlay during active drag */}
+        <DragOverlay
+          dropAnimation={{
+            duration: 200,
+            easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+          }}
+        >
+          {activeInquiry ? (
+            <PipelineCardStatic inquiry={activeInquiry} isOverlay />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
-              {/* Inquiries Cards Stack (Vertical Scroll inside column only!) */}
-              <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2.5">
-                {columnInquiries.length === 0 ? (
-                  <div className="h-28 flex flex-col items-center justify-center text-[11px] text-foreground-muted border border-dashed border-border rounded-xl bg-surface/50 gap-1">
-                    <Layers className="w-4 h-4 opacity-40" />
-                    <span>Drop opportunities here</span>
-                  </div>
-                ) : (
-                  columnInquiries.map((inq) => {
-                    const prio = getPriorityBadge(inq.priority);
-                    const isOverdue =
-                      inq.nextFollowUpDate &&
-                      inq.status === 'Active' &&
-                      new Date(inq.nextFollowUpDate) < new Date(new Date().toDateString());
-
-                    const isMenuOpen = activeCardMenuId === inq.id;
-
-                    return (
-                      <div
-                        key={inq.id}
-                        draggable={canEdit !== false}
-                        onDragStart={(e) => handleDragStart(e, inq.id)}
-                        onClick={() => {
-                          onSelectInquiry(inq.id);
-                        }}
-                        className={`group relative bg-surface p-3.5 rounded-xl border border-border shadow-2xs hover:border-fairway-500/60 hover:shadow-md cursor-pointer transition-all duration-150 select-none ${
-                          draggedInquiryId === inq.id ? 'opacity-40 scale-95 ring-2 ring-fairway-400' : ''
-                        }`}
-                      >
-                        {/* Top: Inquiry Number, Priority, and Vertical 3-Dot Actions */}
-                        <div className="flex items-center justify-between gap-1.5 pb-1.5">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40 shrink-0">
-                              {inq.inquiryNumber}
-                            </span>
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold border shrink-0 ${prio?.bg || 'bg-slate-100 text-slate-700'}`}>
-                              {inq.priority || 'Normal'}
-                            </span>
-                          </div>
-
-                          {/* 3-Dot Card Action Trigger */}
-                          <div className="relative shrink-0">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveCardMenuId(isMenuOpen ? null : inq.id);
-                              }}
-                              className={`p-1 rounded-md transition-all cursor-pointer ${
-                                isMenuOpen
-                                  ? 'text-foreground bg-surface-muted ring-1 ring-border opacity-100'
-                                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-muted opacity-70 sm:opacity-0 group-hover:opacity-100'
-                              }`}
-                              title="Card Actions"
-                            >
-                              <MoreVertical className="w-3.5 h-3.5" />
-                            </button>
-
-                            {/* Dropdown Menu on 3-Dot Click */}
-                            {isMenuOpen && (
-                              <div
-                                onClick={(e) => e.stopPropagation()}
-                                className="absolute right-0 top-full mt-1 w-52 bg-surface rounded-xl border border-border shadow-2xl p-1.5 z-50 animate-scale-in text-left space-y-0.5"
-                              >
-                                <div className="px-2.5 py-1 text-[10px] font-bold text-foreground-muted uppercase tracking-wider border-b border-border/60 mb-1">
-                                  Inquiry Actions
-                                </div>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveCardMenuId(null);
-                                    onSelectInquiry(inq.id);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-foreground hover:bg-surface-muted transition-colors"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-fairway-600" />
-                                  <span>View Details</span>
-                                </button>
-
-                                {canEdit && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveCardMenuId(null);
-                                        setEditingInquiry(inq);
-                                      }}
-                                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
-                                    >
-                                      <Edit3 className="w-3.5 h-3.5 text-blue-600" />
-                                      <span>Edit Inquiry</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => promptDeleteInquiry(inq)}
-                                      className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors font-medium cursor-pointer"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                      <span>Delete Inquiry</span>
-                                    </button>
-                                  </>
-                                )}
-
-                                <div className="border-t border-border/60 my-1" />
-
-                                <div className="px-2.5 py-0.5 text-[9px] font-bold text-foreground-muted uppercase tracking-wider">
-                                  Quick Move Stage
-                                </div>
-
-                                <div className="max-h-36 overflow-y-auto space-y-0.5 pt-0.5">
-                                  {stages
-                                    .filter((s) => s.key !== inq.stage)
-                                    .map((s) => (
-                                      <button
-                                        key={s.key}
-                                        type="button"
-                                        onClick={() => handleMoveStage(inq, s.key)}
-                                        className="w-full flex items-center gap-2 px-2.5 py-1 rounded-lg text-[11px] text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
-                                      >
-                                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                                        <span className="truncate">{s.label}</span>
-                                      </button>
-                                    ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Company Name */}
-                        <h4 className="text-xs font-bold text-foreground hover:text-fairway-700 dark:hover:text-fairway-400 leading-tight truncate">
-                          {inq.companyName}
-                        </h4>
-
-                        {/* Specs */}
-                        <div className="text-[11px] text-foreground-muted mt-1.5 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold text-foreground flex items-center gap-1">
-                              <Warehouse className="w-3 h-3 text-foreground-muted shrink-0" />
-                              {formatSqFt(inq.requiredAreaSqFt)}
-                            </span>
-                            <span className="font-mono text-foreground font-bold">
-                              {formatINR(inq.budgetMonthlyINR, true)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 text-[10px] truncate">
-                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate">{inq.location}</span>
-                          </div>
-                        </div>
-
-                        {/* Follow-up & Owner Footer */}
-                        <div className="pt-2 mt-2 border-t border-border/70 flex items-center justify-between text-[10px]">
-                          {inq.nextFollowUpDate ? (
-                            <div className="flex items-center gap-1">
-                              <Clock className={`w-3 h-3 ${isOverdue ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400'}`} />
-                              <span className={isOverdue ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-foreground-muted'}>
-                                {formatRelativeDate(inq.nextFollowUpDate)}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-foreground-muted font-mono text-[9px]">No follow-up</span>
-                          )}
-                          <span className="font-semibold text-foreground truncate max-w-[90px]">{inq.salespersonName}</span>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Backdrop for 3-Dot Card Menu (dismisses popover when clicking anywhere outside) */}
+      {/* Backdrop for 3-Dot Card Menu */}
       {activeCardMenuId && (
         <div
           className="fixed inset-0 z-40 bg-transparent cursor-default"
@@ -744,7 +1038,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
         />
       )}
 
-      {/* Lost Reason Modal (Enforces mandatory lost reason on drag) */}
+      {/* Lost Reason Modal */}
       {lostTargetInquiry && (
         <LostReasonModal
           isOpen={!!lostTargetInquiry}
@@ -778,7 +1072,8 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
           onClose={() => setWonTargetInquiry(null)}
           inquiryNumber={wonTargetInquiry.inquiryNumber}
           companyName={wonTargetInquiry.companyName}
-          defaultMonthlyRent={wonTargetInquiry.budgetMonthlyINR}
+          defaultPropertyId={wonTargetInquiry.wonPropertyId || wonTargetInquiry.matchedPropertyIds?.[0]}
+          defaultMonthlyRent={wonTargetInquiry.wonFinalValueMonthlyINR || wonTargetInquiry.budgetMonthlyINR}
           onConfirm={async (data) => {
             try {
               await InquiryService.updateInquiry(wonTargetInquiry.id, {
@@ -800,7 +1095,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
         />
       )}
 
-      {/* Delete Confirmation Modal (Custom Project UI Modal) */}
+      {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && inquiryToDelete && (
         <Modal
           isOpen={isDeleteModalOpen}
@@ -861,4 +1156,3 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
 
 export const PipelinePage = PipelineKanbanView;
 export default PipelinePage;
-

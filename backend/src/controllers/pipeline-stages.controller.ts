@@ -73,7 +73,7 @@ export const createPipelineStage = async (req: AuthenticatedRequest, res: Respon
       INSERT INTO pipeline_stages (
         id, key, label, color, bg_color, text_color, border_color, description, stage_order, is_system,
         name, code, "orderIndex", "createdAt", "updatedAt"
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $3, UPPER($2), $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10, $11, $12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *;
     `;
 
@@ -86,6 +86,9 @@ export const createPipelineStage = async (req: AuthenticatedRequest, res: Respon
       textColor || 'text-slate-700',
       borderColor || 'border-slate-300',
       description || '',
+      stageOrder,
+      label,
+      cleanKey.toUpperCase(),
       stageOrder,
     ]);
 

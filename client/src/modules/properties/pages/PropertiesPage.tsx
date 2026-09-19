@@ -18,11 +18,20 @@ import {
   SlidersHorizontal,
   RotateCcw,
   CheckCircle2,
+  Building2,
+  Maximize2,
+  TrendingUp,
+  MoreHorizontal,
+  Eye,
+  Edit3,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -35,11 +44,31 @@ import {
 } from '@/modules/core/components/ui/tooltip';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
+import { useToast } from '@/modules/core/providers/ToastContext';
+import { Modal, ModalFooter } from '@/modules/core/components/ui/Modal';
+import { NewPropertyPage } from './NewPropertyPage';
 import { Property, PropertyStatus } from '@/modules/core/types';
 import { formatINR, formatSqFt, formatDate } from '@/modules/core/utils/formatters';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
-import { DataTable7, ColumnConfig } from '@/modules/core/components/ui/data-table-7';
+import {
+  dataGridFeatures,
+  type DataGridFeatures,
+} from '@/components/reui/data-grid/data-grid';
+import { DataGridColumnHeader } from '@/components/reui/data-grid/data-grid-column-header';
+import { DataGridColumnVisibilityMenu } from '@/modules/core/components/ui/CommonDataGrid';
+import {
+  ColumnDef,
+  PaginationState,
+  SortingState,
+  useTable,
+} from '@tanstack/react-table';
+
+type ColumnVisibilityMap = Record<string, boolean>;
+type ColumnPinningMap = {
+  start: string[];
+  end: string[];
+};
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
 import { PropertiesList } from '../components/PropertiesList';
 import { PropertiesCard } from '../components/PropertiesCard';
@@ -51,16 +80,59 @@ export interface PropertyListViewProps {
   onOpenNewProperty?: () => void;
 }
 
+const TABLE_STATE_STORAGE_KEY = 'properties_table_state_v2';
+const VIEW_MODE_STORAGE_KEY = 'properties_view_mode_v2';
+
+const getStoredTableState = () => {
+  try {
+    const saved = localStorage.getItem(TABLE_STATE_STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.error('Failed to parse stored properties table state', e);
+  }
+  return {};
+};
+
+const getStoredViewMode = (): 'table' | 'grid' => {
+  try {
+    const saved = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    if (saved === 'table' || saved === 'grid') return saved;
+  } catch (e) {
+    console.error('Failed to parse stored view mode', e);
+  }
+  return 'table';
+};
+
 export const PropertyListView: React.FC<PropertyListViewProps> = ({
   onSelectProperty,
   onNavigateToMap,
   onOpenNewProperty,
 }) => {
-  const { canEdit, canCreate } = useAuth();
+  const { canCreate, canDeleteModule, canEditModule } = useAuth();
+  const canDelete = canDeleteModule('properties');
+  const canEditProp = canEditModule('properties');
+  const { toast } = useToast();
+  const initialTableState = useMemo(() => getStoredTableState(), []);
+
+  // Page mode: 'list' or 'form' (for Edit / New)
+  const [pageMode, setPageMode] = useState<'list' | 'form'>('list');
+  const [propertyToEdit, setPropertyToEdit] = useState<Property | null>(null);
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Search & View Mode
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>(() => getStoredViewMode());
+
+  // Persist View Mode
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch (e) {
+      console.error('Failed to persist view mode', e);
+    }
+  }, [viewMode]);
 
   // Active Filters
   const [corridorFilter, setCorridorFilter] = useState('all');
@@ -75,17 +147,41 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
   const [draftIndustryFilter, setDraftIndustryFilter] = useState('all');
   const [draftHeightFilter, setDraftHeightFilter] = useState('all');
 
-  // Column Visibility Config
-  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
-    actions: true,
-    code: true,
-    name: true,
-    availableAreaSqFt: true,
-    rentPerSqFtINR: true,
-    docksCount: true,
-    clearHeightFt: true,
-    status: true,
+  // Controlled Table Grid State (Persisted)
+  const [pagination, setPagination] = useState<PaginationState>(() => initialTableState.pagination || {
+    pageIndex: 0,
+    pageSize: 10,
   });
+  const [sorting, setSorting] = useState<SortingState>(() => initialTableState.sorting || []);
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityMap>(() => initialTableState.columnVisibility || {});
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningMap>(() => {
+    const savedStart = (initialTableState.columnPinning?.start || []).filter((col: string) => col !== 'select');
+    return {
+      start: savedStart.length > 0 ? savedStart : ['actions', 'srNo'],
+      end: Array.isArray(initialTableState.columnPinning?.end) ? initialTableState.columnPinning.end : [],
+    };
+  });
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => initialTableState.columnOrder || []);
+  const [columnSizing, setColumnSizing] = useState<Record<string, number>>(() => initialTableState.columnSizing || {});
+
+  // Persist Table Grid State
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        TABLE_STATE_STORAGE_KEY,
+        JSON.stringify({
+          pagination,
+          sorting,
+          columnVisibility,
+          columnPinning,
+          columnOrder,
+          columnSizing,
+        })
+      );
+    } catch (e) {
+      console.error('Failed to persist properties table state', e);
+    }
+  }, [pagination, sorting, columnVisibility, columnPinning, columnOrder, columnSizing]);
 
   // State
   const [properties, setProperties] = useState<Property[]>([]);
@@ -131,6 +227,32 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
       }
     });
     return Array.from(set);
+  }, [properties]);
+
+  // Summary KPI Stats for client clarity
+  const stats = useMemo(() => {
+    const totalCount = properties.length;
+    const totalAvailableSqFt = properties.reduce(
+      (acc, p) => acc + (Number(p.availableAreaSqFt) || 0),
+      0
+    );
+    const availableCount = properties.filter(
+      (p) => p.status?.toLowerCase() === 'available'
+    ).length;
+    const rents = properties
+      .map((p) => Number(p.rentPerSqFtINR))
+      .filter((r) => !isNaN(r) && r > 0);
+    const avgRent =
+      rents.length > 0
+        ? (rents.reduce((a, b) => a + b, 0) / rents.length).toFixed(1)
+        : '0';
+
+    return {
+      totalCount,
+      totalAvailableSqFt,
+      availableCount,
+      avgRent,
+    };
   }, [properties]);
 
   // Drawer open/apply/reset
@@ -201,89 +323,287 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
     });
   }, [properties, searchQuery, corridorFilter, statusFilter, industryFilter, heightFilter]);
 
-  const allColumns: ColumnConfig<Property>[] = [
-    {
-      key: 'actions',
-      label: 'Action',
-      width: 70,
-      render: (p) => (
-        <button
-          type="button"
-          onClick={() => onSelectProperty(p.id)}
-          className="size-7 rounded-md inline-flex items-center justify-center text-foreground-muted hover:text-fairway-700 hover:bg-fairway-50 dark:hover:bg-fairway-950/60 transition-colors cursor-pointer"
-          title="View warehouse details"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      ),
-    },
-    {
-      key: 'code',
-      label: 'Code',
-      width: 130,
-      render: (p) => <span className="font-mono text-xs font-bold text-fairway-700 dark:text-fairway-400">{p.code}</span>,
-    },
-    {
-      key: 'name',
-      label: 'Warehouse / Park',
-      width: 260,
-      render: (p) => (
-        <div className="text-left py-0.5">
-          <div className="font-semibold text-foreground text-xs">{p.name}</div>
-          <div className="text-[11px] text-foreground-muted">
-            {p.city || 'Gujarat'}{p.state ? `, ${p.state}` : ''}{p.corridor ? ` • ${p.corridor}` : ''}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'availableAreaSqFt',
-      label: 'Available Space',
-      width: 160,
-      render: (p) => <span className="font-bold text-fairway-900 dark:text-fairway-300">{formatSqFt(p.availableAreaSqFt)}</span>,
-    },
-    {
-      key: 'rentPerSqFtINR',
-      label: 'Base Rent',
-      width: 130,
-      render: (p) => <span className="font-mono font-semibold">₹{p.rentPerSqFtINR} / sq.ft</span>,
-    },
-    {
-      key: 'docksCount',
-      label: 'Docks',
-      width: 100,
-      render: (p) => <span>{p.docksCount || 0} Docks</span>,
-    },
-    {
-      key: 'clearHeightFt',
-      label: 'Height',
-      width: 100,
-      render: (p) => <span>{p.clearHeightFt || 0}m</span>,
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      width: 140,
-      render: (p) => {
-        const isAvail = p.status?.toLowerCase() === 'available';
-        return (
-          <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-              isAvail
-                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
-            }`}
-          >
-            {p.status}
-          </span>
-        );
-      },
-    },
-  ];
+  const handleOpenEditProperty = (prop: Property) => {
+    setPropertyToEdit(prop);
+    setPageMode('form');
+  };
 
-  const visibleColumns = useMemo(() => {
-    return allColumns.filter((col) => columnVisibility[col.key] !== false);
-  }, [allColumns, columnVisibility]);
+  const handleDeletePropertyConfirm = (prop: Property) => {
+    setPropertyToDelete(prop);
+    setIsDeleteModalOpen(true);
+  };
+
+  const executeDeleteProperty = async () => {
+    if (!propertyToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await PropertyService.deleteProperty(propertyToDelete.id);
+      if (res.success) {
+        toast('Warehouse Deleted', {
+          message: `${propertyToDelete.name} has been removed from backend inventory.`,
+          type: 'success',
+        });
+        setIsDeleteModalOpen(false);
+        setPropertyToDelete(null);
+        loadProperties();
+      } else {
+        const msg = typeof res.error === 'string' ? res.error : res.error?.message || 'Failed to delete warehouse.';
+        toast('Delete Failed', {
+          message: msg,
+          type: 'error',
+        });
+      }
+    } catch (err: any) {
+      toast('Error', {
+        message: err.message || 'Cannot delete warehouse.',
+        type: 'error',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const propertyColumns = useMemo<ColumnDef<DataGridFeatures, Property>[]>(
+    () => [
+      {
+        id: 'actions',
+        header: () => <span className="text-[11px] font-semibold text-foreground-muted pl-1">Action</span>,
+        cell: ({ row }) => {
+          const prop = row.original;
+          return (
+            <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                    title="Actions"
+                    aria-label="Actions"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44 bg-surface border border-border shadow-dialog z-50">
+                  <DropdownMenuItem
+                    onClick={() => onSelectProperty(prop.id)}
+                    className="flex items-center gap-2 text-xs cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-foreground-muted" />
+                    <span>View Warehouse</span>
+                  </DropdownMenuItem>
+                  {canEditProp && (
+                    <DropdownMenuItem
+                      onClick={() => handleOpenEditProperty(prop)}
+                      className="flex items-center gap-2 text-xs cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-foreground-muted" />
+                      <span>Edit Warehouse</span>
+                    </DropdownMenuItem>
+                  )}
+                  {canDelete && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => handleDeletePropertyConfirm(prop)}
+                        className="flex items-center gap-2 text-xs text-destructive focus:text-destructive cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Warehouse</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+        size: 70,
+        minSize: 60,
+        maxSize: 80,
+        enableSorting: false,
+        enableResizing: false,
+        enablePinning: true,
+      },
+      {
+        accessorKey: 'srNo',
+        id: 'srNo',
+        meta: { headerTitle: 'Sr. No.' },
+        header: ({ column }) => <DataGridColumnHeader title="Sr. No." column={column} />,
+        cell: ({ row }) => {
+          const serialNo = pagination.pageIndex * pagination.pageSize + row.index + 1;
+          return (
+            <span className="font-medium text-foreground-muted tabular-nums text-xs pl-2">
+              {serialNo}
+            </span>
+          );
+        },
+        size: 85,
+        minSize: 75,
+        maxSize: 95,
+        enableSorting: true,
+        enablePinning: true,
+      },
+      {
+        id: 'name',
+        accessorKey: 'name',
+        meta: { headerTitle: 'Warehouse / Park' },
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Warehouse / Park" />,
+        cell: ({ row }) => (
+          <div className="text-left py-0.5">
+            <button
+              type="button"
+              onClick={() => onSelectProperty(row.original.id)}
+              className="font-bold text-foreground hover:text-primary transition-colors text-xs text-left cursor-pointer truncate block"
+            >
+              {row.original.name}
+            </button>
+            <div className="text-[11px] text-foreground-muted truncate">
+              {row.original.city || 'Gujarat'}{row.original.state ? `, ${row.original.state}` : ''}{row.original.corridor ? ` • ${row.original.corridor}` : ''}
+            </div>
+          </div>
+        ),
+        size: 260,
+        minSize: 200,
+        enableSorting: true,
+      },
+      {
+        id: 'availableAreaSqFt',
+        accessorKey: 'availableAreaSqFt',
+        meta: { headerTitle: 'Available Space' },
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Available Space" />,
+        cell: ({ row }) => (
+          <span className="font-bold text-foreground text-xs">
+            {formatSqFt(row.original.availableAreaSqFt)}
+          </span>
+        ),
+        size: 150,
+        minSize: 120,
+        enableSorting: true,
+      },
+      {
+        id: 'rentPerSqFtINR',
+        accessorKey: 'rentPerSqFtINR',
+        meta: { headerTitle: 'Base Rent' },
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Base Rent" />,
+        cell: ({ row }) => (
+          <span className="font-mono font-semibold text-xs text-foreground">
+            ₹{row.original.rentPerSqFtINR} / sq.ft
+          </span>
+        ),
+        size: 130,
+        minSize: 110,
+        enableSorting: true,
+      },
+      {
+        id: 'docksCount',
+        accessorKey: 'docksCount',
+        meta: { headerTitle: 'Docks' },
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Docks" />,
+        cell: ({ row }) => (
+          <span className="text-xs text-foreground font-medium">
+            {row.original.docksCount || 0} Docks
+          </span>
+        ),
+        size: 100,
+        minSize: 85,
+        enableSorting: true,
+      },
+      {
+        id: 'clearHeightFt',
+        accessorKey: 'clearHeightFt',
+        meta: { headerTitle: 'Height' },
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Height" />,
+        cell: ({ row }) => (
+          <span className="text-xs text-foreground font-medium">
+            {row.original.clearHeightFt || 0}m
+          </span>
+        ),
+        size: 90,
+        minSize: 80,
+        enableSorting: true,
+      },
+      {
+        id: 'status',
+        accessorKey: 'status',
+        meta: { headerTitle: 'Status' },
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => {
+          const isAvail = row.original.status?.toLowerCase() === 'available';
+          return (
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                isAvail
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                  : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20'
+              }`}
+            >
+              {row.original.status}
+            </span>
+          );
+        },
+        size: 130,
+        minSize: 100,
+        enableSorting: true,
+      },
+    ],
+    [onSelectProperty, pagination.pageIndex, pagination.pageSize]
+  );
+
+  const sortedAndFilteredProps = useMemo(() => {
+    let result = [...filteredProps];
+    if (sorting.length > 0) {
+      const activeSort = sorting[0];
+      const { id, desc } = activeSort;
+      result.sort((a: any, b: any) => {
+        let valA = a[id];
+        let valB = b[id];
+        if (id === 'srNo') {
+          return 0;
+        }
+        if (typeof valA === 'string') {
+          valA = valA.toLowerCase();
+          valB = (valB || '').toLowerCase();
+          return desc ? valB.localeCompare(valA) : valA.localeCompare(valB);
+        }
+        if (typeof valA === 'number' || typeof valB === 'number') {
+          valA = Number(valA) || 0;
+          valB = Number(valB) || 0;
+          return desc ? valB - valA : valA - valB;
+        }
+        return 0;
+      });
+    }
+    return result;
+  }, [filteredProps, sorting]);
+
+  const pagedProperties = useMemo(() => {
+    const start = pagination.pageIndex * pagination.pageSize;
+    return sortedAndFilteredProps.slice(start, start + pagination.pageSize);
+  }, [sortedAndFilteredProps, pagination.pageIndex, pagination.pageSize]);
+
+  const table = useTable({
+    features: dataGridFeatures,
+    columns: propertyColumns,
+    data: pagedProperties,
+    pageCount: Math.max(1, Math.ceil(filteredProps.length / (pagination.pageSize || 10))),
+    manualPagination: true,
+    manualSorting: true,
+    getRowId: (row: Property) => row.id,
+    state: {
+      pagination,
+      sorting,
+      columnVisibility,
+      columnPinning,
+      columnOrder,
+      columnSizing,
+    },
+    onPaginationChange: setPagination,
+    onSortingChange: setSorting,
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnPinningChange: setColumnPinning,
+    onColumnOrderChange: setColumnOrder,
+    onColumnSizingChange: setColumnSizing,
+  });
 
   // Combobox Options for Filter Drawer
   const corridorOptions: ComboboxOption[] = useMemo(() => {
@@ -315,18 +635,37 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
     { value: 'under10', label: 'Under 10m (Compact/Mid)' },
   ];
 
+  if (pageMode === 'form') {
+    return (
+      <NewPropertyPage
+        initialProperty={propertyToEdit}
+        onBack={() => {
+          setPageMode('list');
+          setPropertyToEdit(null);
+        }}
+        onSuccess={() => {
+          setPageMode('list');
+          setPropertyToEdit(null);
+          loadProperties();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4 max-w-7xl mx-auto text-left">
       {/* Top Header Pattern */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border">
         <div>
-          <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">
-            Industrial Real Estate / Property Master
-          </span>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2 mt-0.5">
-            <Warehouse className="w-6 h-6 text-foreground" />
-            <span>Warehouse Property Master</span>
-          </h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Warehouse className="w-5 h-5 sm:w-6 sm:h-6 text-foreground" />
+              <span>Warehouse Property Master</span>
+            </h1>
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-surface-muted text-foreground-muted border border-border">
+              {stats.totalCount} Parks
+            </span>
+          </div>
           <p className="text-xs text-foreground-muted mt-1">
             Browse verified Grade-A logistics parks, chemical warehousing zones, and PEB industrial assets across Gujarat.
           </p>
@@ -343,17 +682,82 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
             <span>View Map</span>
           </Button>
 
-          {canCreate('properties') && onOpenNewProperty && (
+          {canCreate('properties') && (
             <Button
               size="sm"
               variant="primary"
-              onClick={onOpenNewProperty}
+              onClick={() => {
+                if (onOpenNewProperty) {
+                  onOpenNewProperty();
+                } else {
+                  setPropertyToEdit(null);
+                  setPageMode('form');
+                }
+              }}
               leftIcon={<Plus className="w-3.5 h-3.5 shrink-0" />}
               className="flex-1 sm:flex-initial bg-fairway-600 hover:bg-fairway-700 text-white font-semibold text-[11px] sm:text-xs px-2 sm:px-3 justify-center whitespace-nowrap shadow-xs h-8.5"
             >
               <span>Add Warehouse</span>
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* Client-Friendly Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        {/* Card 1: Total Warehouses */}
+        <div className="bg-surface rounded-card border border-border p-3.5 sm:p-4 flex items-center gap-3.5 shadow-2xs hover:border-fairway-500/40 transition-colors">
+          <div className="size-10 rounded-xl bg-surface-muted text-foreground border border-border flex items-center justify-center shrink-0">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
+              Total Warehouses
+            </span>
+            <div className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+              {stats.totalCount} <span className="text-xs font-semibold text-foreground-muted">Parks</span>
+            </div>
+            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+              <CheckCircle2 className="w-3 h-3 shrink-0" />
+              {stats.availableCount} Ready to Lease
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: Total Available Capacity */}
+        <div className="bg-surface rounded-card border border-border p-3.5 sm:p-4 flex items-center gap-3.5 shadow-2xs hover:border-fairway-500/40 transition-colors">
+          <div className="size-10 rounded-xl bg-surface-muted text-foreground border border-border flex items-center justify-center shrink-0">
+            <Maximize2 className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
+              Total Available Space
+            </span>
+            <div className="text-xl sm:text-2xl font-black text-foreground tracking-tight truncate">
+              {formatSqFt(stats.totalAvailableSqFt)}
+            </div>
+            <span className="text-[11px] text-foreground-muted font-medium block mt-0.5">
+              Verified Grade-A facilities
+            </span>
+          </div>
+        </div>
+
+        {/* Card 3: Avg Base Rental */}
+        <div className="bg-surface rounded-card border border-border p-3.5 sm:p-4 flex items-center gap-3.5 shadow-2xs hover:border-fairway-500/40 transition-colors">
+          <div className="size-10 rounded-xl bg-surface-muted text-foreground border border-border flex items-center justify-center shrink-0">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
+              Average Base Rent
+            </span>
+            <div className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+              ₹{stats.avgRent} <span className="text-xs font-semibold text-foreground-muted">/ sq.ft / mo</span>
+            </div>
+            <span className="text-[11px] text-foreground-muted font-medium block mt-0.5">
+              Gujarat Industrial Corridors
+            </span>
+          </div>
         </div>
       </div>
 
@@ -408,42 +812,9 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Column Settings Dropdown (Desktop Only) */}
+            {/* Column Visibility Customizer Menu (Desktop Only) */}
             <div className="hidden sm:block">
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
-                      >
-                        <Settings className="w-4 h-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Column
-                  </TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
-                  <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
-                    Toggle Columns
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {allColumns.filter((c) => c.key !== 'actions').map((col) => (
-                    <DropdownMenuCheckboxItem
-                      key={col.key}
-                      checked={columnVisibility[col.key] !== false}
-                      onSelect={(e) => e.preventDefault()}
-                      onCheckedChange={(val) => setColumnVisibility((prev) => ({ ...prev, [col.key]: !!val }))}
-                      className="text-xs cursor-pointer"
-                    >
-                      {col.label}
-                    </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <DataGridColumnVisibilityMenu table={table} excludeColumns={['actions', 'srNo']} />
             </div>
 
             {/* Refresh Button */}
@@ -514,6 +885,80 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
         </TooltipProvider>
       </div>
 
+      {/* Quick Filter Pills (1-Click Selection for Client) */}
+      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 text-xs">
+        <span className="text-[11px] font-semibold text-foreground-muted shrink-0 mr-1 hidden sm:inline-block">
+          Quick Filters:
+        </span>
+        
+        {/* All Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setCorridorFilter('all');
+            setStatusFilter('all');
+          }}
+          className={cn(
+            "px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border",
+            corridorFilter === 'all' && statusFilter === 'all'
+              ? "bg-fairway-600 text-white border-fairway-600 shadow-2xs"
+              : "bg-surface text-foreground-muted border-border hover:bg-surface-muted hover:text-foreground"
+          )}
+        >
+          All ({properties.length})
+        </button>
+
+        {/* Available Only */}
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter((prev) => (prev.toLowerCase() === 'available' ? 'all' : 'Available'));
+          }}
+          className={cn(
+            "px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border flex items-center gap-1.5",
+            statusFilter.toLowerCase() === 'available'
+              ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+              : "bg-surface text-foreground-muted border-border hover:bg-surface-muted hover:text-foreground"
+          )}
+        >
+          <span className="size-1.5 rounded-full bg-emerald-500 inline-block" />
+          Available ({stats.availableCount})
+        </button>
+
+        {/* Corridors Pills */}
+        {uniqueCorridors.map((corr) => {
+          const count = properties.filter((p) => p.corridor === corr).length;
+          const isSelected = corridorFilter === corr;
+          return (
+            <button
+              key={corr}
+              type="button"
+              onClick={() => {
+                setCorridorFilter((prev) => (prev === corr ? 'all' : corr));
+              }}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer border",
+                isSelected
+                  ? "bg-fairway-600 text-white border-fairway-600 shadow-2xs"
+                  : "bg-surface text-foreground-muted border-border hover:bg-surface-muted hover:text-foreground"
+              )}
+            >
+              {corr} ({count})
+            </button>
+          );
+        })}
+
+        {(corridorFilter !== 'all' || statusFilter !== 'all' || activeFiltersCount > 0 || searchQuery) && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="text-[11px] font-semibold text-fairway-700 dark:text-fairway-400 hover:underline px-2 py-1 shrink-0 cursor-pointer ml-auto"
+          >
+            Clear All
+          </button>
+        )}
+      </div>
+
       {/* Content Area */}
       {isLoading ? (
         <div className="py-20 sm:py-24 text-center space-y-3 bg-surface rounded-card border border-border">
@@ -552,8 +997,10 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
           {/* Mobile view: ONLY Card View show, NOT list page show */}
           <div className="block sm:hidden">
             <PropertiesCard
-              properties={filteredProps}
+              properties={pagedProperties}
               onSelectProperty={onSelectProperty}
+              onEditProperty={canEditProp ? handleOpenEditProperty : undefined}
+              onDeleteProperty={canDelete ? handleDeletePropertyConfirm : undefined}
             />
           </div>
 
@@ -561,14 +1008,17 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
           <div className="hidden sm:block">
             {viewMode === 'table' ? (
               <PropertiesList
-                properties={filteredProps}
-                columns={visibleColumns}
+                table={table}
+                recordCount={filteredProps.length}
+                isLoading={isLoading}
                 onSelectProperty={onSelectProperty}
               />
             ) : (
               <PropertiesCard
-                properties={filteredProps}
+                properties={pagedProperties}
                 onSelectProperty={onSelectProperty}
+                onEditProperty={canEditProp ? handleOpenEditProperty : undefined}
+                onDeleteProperty={canDelete ? handleDeletePropertyConfirm : undefined}
               />
             )}
           </div>
@@ -677,6 +1127,59 @@ export const PropertyListView: React.FC<PropertyListViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && propertyToDelete && (
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            setIsDeleteModalOpen(false);
+            setPropertyToDelete(null);
+          }}
+          title={
+            <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
+              <AlertTriangle className="w-5 h-5" />
+              <span className="font-bold">Delete Warehouse</span>
+            </div>
+          }
+          description="Are you sure you want to permanently delete this warehouse asset from backend inventory?"
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 rounded-xl space-y-1.5 text-foreground">
+              <p className="font-semibold text-rose-900 dark:text-rose-200">
+                You are deleting: <span className="font-bold underline">{propertyToDelete.name}</span> ({propertyToDelete.code})
+              </p>
+              <p className="text-[11px] text-rose-700 dark:text-rose-300/80">
+                This will remove the warehouse and its specifications from the backend database.
+              </p>
+            </div>
+            <ModalFooter>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isDeleting}
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setPropertyToDelete(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                isLoading={isDeleting}
+                onClick={executeDeleteProperty}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+              >
+                Delete Warehouse
+              </Button>
+            </ModalFooter>
+          </div>
+        </Modal>
       )}
     </div>
   );

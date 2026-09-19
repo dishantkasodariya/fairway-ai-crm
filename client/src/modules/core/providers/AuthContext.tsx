@@ -75,10 +75,10 @@ const saveCurrentUserLocal = (user: User) => {
 export const normalizeModuleCategory = (mod: string): string => {
   const m = (mod || '').toLowerCase().trim();
   if (m.includes('inquir') || m.includes('lead') || m.includes('pipeline')) return 'Inquiries & Leads';
-  if (m.includes('prop_quote') || m.includes('proposal') || m.includes('financial') || m.includes('quote')) return 'Proposals & Financials';
+  if (m.includes('prop_quote') || m.includes('proposal') || m.includes('quote')) return 'Proposals & Financials';
   if (m.includes('prop') || m.includes('warehouse')) return 'Properties & Warehouses';
   if (m.includes('comp') || m.includes('account') || m.includes('contact')) return 'Companies & Accounts';
-  if (m.includes('task') || m.includes('follow') || m.includes('site_visit')) return 'Tasks & Follow-ups';
+  if (m.includes('task') || m.includes('follow') || m.includes('site')) return 'Tasks & Follow-ups';
   if (m.includes('comm') || m.includes('mail') || m.includes('call')) return 'Communications';
   if (m.includes('rep') || m.includes('analytics')) return 'Reports & Analytics';
   if (m.includes('adm') || m.includes('setting') || m.includes('role') || m.includes('user')) return 'Administration';
@@ -96,6 +96,61 @@ export type PermissionActionType =
   | 'assign'
   | 'manage'
   | 'special';
+
+export const isAccessGrantedForAction = (
+  val: string,
+  actionKey: PermissionActionType
+): boolean => {
+  const v = (val || '').trim().toLowerCase();
+  if (!v || v === 'no') return false;
+
+  // View action is satisfied by any positive access level
+  if (actionKey === 'view') {
+    return v !== 'no' && v !== '';
+  }
+
+  // Edit action requires actual edit access - NEVER 'view' or 'no'
+  if (actionKey === 'edit') {
+    return v === 'yes' || v === 'assigned / all' || v === 'restricted' || v === 'limited' || v === 'configurable';
+  }
+
+  // Delete action requires explicit delete capability - NEVER 'view', 'no'
+  if (actionKey === 'delete') {
+    return v === 'yes' || v === 'restricted' || v === 'configurable' || v === 'assigned / all';
+  }
+
+  // Create action - NEVER 'view', 'no'
+  if (actionKey === 'create') {
+    return v === 'yes' || v === 'assigned / all' || v === 'configurable';
+  }
+
+  // Export action - NEVER 'view', 'no'
+  if (actionKey === 'export') {
+    return v === 'yes' || v === 'assigned / all' || v === 'restricted' || v === 'configurable';
+  }
+
+  // Import action - NEVER 'view', 'no'
+  if (actionKey === 'import') {
+    return v === 'yes' || v === 'restricted' || v === 'configurable';
+  }
+
+  // Approve / Stage change
+  if (actionKey === 'approve') {
+    return v === 'yes' || v === 'assigned / all' || v === 'configurable';
+  }
+
+  // Assign action
+  if (actionKey === 'assign') {
+    return v === 'yes' || v === 'assigned / all' || v === 'configurable';
+  }
+
+  // Manage / Admin action
+  if (actionKey === 'manage') {
+    return v === 'yes' || v === 'configurable';
+  }
+
+  return v !== 'no' && v !== '';
+};
 
 export const matchPermissionAction = (
   perm: RolePermissionDetail,
@@ -131,7 +186,8 @@ export const matchPermissionAction = (
         cap.includes('register') ||
         cap.includes('generate') ||
         id.includes('call')) &&
-      !id.includes('quote_edit')
+      !id.includes('quote_edit') &&
+      !id.includes('assign')
     );
   }
   if (actionKey === 'edit') {
@@ -338,6 +394,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         saveCurrentUserLocal(user);
         setCurrentUserState(user);
         setIsAuthenticated(true);
+        await refreshRolePermissions(user.role);
         await refreshUsers(user.id, user.email);
 
         return { success: true, message: `Signed in as ${user.name}` };
@@ -477,9 +534,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
 
+    const handleStorageUpdate = (e: StorageEvent) => {
+      if (e.key === 'fw_role_permissions_timestamp') {
+        refreshRolePermissions(currentUser?.role);
+      }
+    };
+
     window.addEventListener('fw_role_permissions_updated', handlePermUpdate);
+    window.addEventListener('storage', handleStorageUpdate);
     return () => {
       window.removeEventListener('fw_role_permissions_updated', handlePermUpdate);
+      window.removeEventListener('storage', handleStorageUpdate);
     };
   }, [currentUser?.role]);
 
@@ -497,12 +562,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchUser = (userId: string) => {
-    const target = users.find((u) => u.id === userId);
-    if (target) {
-      saveCurrentUserLocal(target);
-      setCurrentUserState(target);
-      refreshRolePermissions(target.role);
-    }
+    const targetUser = users.find((u) => u.id === userId);
+    if (!targetUser) return;
+    saveCurrentUserLocal(targetUser);
+    setCurrentUserState(targetUser);
+    refreshRolePermissions(targetUser.role);
+    try {
+      localStorage.setItem('fw_role_permissions_timestamp', Date.now().toString());
+    } catch {}
   };
 
   const updateRole = async (userId: string, newRole: UserRole) => {
@@ -535,8 +602,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (res.success && res.data) {
       setUsers((prev) => prev.map((u) => (u.id === userId ? res.data! : u)));
       if (currentUser.id === userId) {
-        setCurrentUserState(res.data);
-        saveCurrentUserLocal(res.data);
+        const updated = { ...currentUser, ...res.data };
+        setCurrentUserState(updated);
+        saveCurrentUserLocal(updated);
       }
       return { success: true, data: res.data };
     }
@@ -552,11 +620,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: false, error: res.error || 'Failed to delete user' };
   };
 
-  const toggleUserStatus = async (userId: string) => {
-    const res = await UserService.toggleUserStatus(userId);
-    if (res.success && res.data) {
+  const toggleUserStatus = async (
+    id: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const target = users.find((u) => u.id === id);
+    if (!target) return { success: false, error: 'User not found' };
+    const newStatus = target.status === 'Active' ? 'Inactive' : 'Active';
+    const res = await UserService.updateUser(id, { status: newStatus });
+    if (res.success) {
       setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, status: res.data!.status } : u))
+        prev.map((u) => (u.id === id ? { ...u, status: newStatus } : u))
       );
       return { success: true };
     }
@@ -573,8 +646,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     moduleName: string,
     actionKey: PermissionActionType
   ): boolean => {
-    // Admin has full platform authority across all modules and actions
-    if (isAdmin) return true;
+    // Only Super Admin has unconditional platform root bypass
+    if (isSuperAdmin) return true;
 
     const targetCategory = normalizeModuleCategory(moduleName).toLowerCase();
 
@@ -595,16 +668,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (actionPerms.length > 0) {
           return actionPerms.some((p) => {
-            const val = (p.value || '').trim().toLowerCase();
-            return val !== '' && val !== 'no';
+            const val = (p.value || '').trim();
+            return isAccessGrantedForAction(val, actionKey);
           });
         }
 
         // If checking 'view' and no explicit 'view' capability matched, check if ANY capability in category is granted
         if (actionKey === 'view') {
           return categoryPerms.some((p) => {
-            const val = (p.value || '').trim().toLowerCase();
-            return val !== '' && val !== 'no';
+            const val = (p.value || '').trim();
+            return isAccessGrantedForAction(val, 'view');
           });
         }
 
@@ -612,36 +685,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    // Baseline fallback if rolePermissions not yet loaded
+    if (isAdmin && (!rolePermissions || rolePermissions.length === 0)) {
+      return true;
+    }
+
     return false;
   };
 
   const hasCapability = (capabilityId: string): boolean => {
-    if (isAdmin) return true;
+    if (isSuperAdmin) return true;
     const targetId = capabilityId.toLowerCase().trim();
     const found = rolePermissions.find((p) => (p.id || '').toLowerCase().trim() === targetId);
     if (found) {
       const val = (found.value || '').trim().toLowerCase();
       return val !== '' && val !== 'no';
     }
+    if (isAdmin && (!rolePermissions || rolePermissions.length === 0)) {
+      return true;
+    }
     return false;
   };
 
   const canView = (module: string) => checkPermission(module, 'view');
   const canCreate = (module: string) => checkPermission(module, 'create');
-  const canEdit = isAdmin || (rolePermissions && rolePermissions.length > 0
-    ? rolePermissions.some((p) => matchPermissionAction(p, 'edit') && (p.value || '').trim().toLowerCase() !== 'no' && (p.value || '').trim() !== '')
-    : false);
-
-  const canDelete = isAdmin || (rolePermissions && rolePermissions.length > 0
-    ? rolePermissions.some((p) => matchPermissionAction(p, 'delete') && (p.value || '').trim().toLowerCase() !== 'no' && (p.value || '').trim() !== '')
-    : false);
+  
+  // Scoped strictly: respect checkPermission if module is provided
+  const canEdit = isSuperAdmin || isAdmin;
+  const canDelete = isSuperAdmin || isAdmin;
 
   const canEditModule = (module?: string) => {
-    if (!module) return canEdit;
+    if (!module) return isSuperAdmin || isAdmin;
     return checkPermission(module, 'edit');
   };
   const canDeleteModule = (module?: string) => {
-    if (!module) return canDelete;
+    if (!module) return isSuperAdmin || isAdmin;
     return checkPermission(module, 'delete');
   };
   const canExport = (module: string) => checkPermission(module, 'export');
@@ -650,9 +728,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canAssign = (module: string) => checkPermission(module, 'assign');
   const canManage = (module: string) => checkPermission(module, 'manage');
 
-  const canManageUsers = isAdmin || hasCapability('perm_adm_users');
-  const canConfigureStages = isAdmin || hasCapability('perm_adm_stages') || hasCapability('perm_inq_stage');
-  const canViewAuditLogs = isAdmin || hasCapability('perm_adm_audit');
+  const canManageUsers = isSuperAdmin || hasCapability('perm_adm_users');
+  const canConfigureStages = isSuperAdmin || hasCapability('perm_adm_stages') || hasCapability('perm_inq_stage');
+  const canViewAuditLogs = isSuperAdmin || hasCapability('perm_adm_audit');
 
   return (
     <AuthContext.Provider

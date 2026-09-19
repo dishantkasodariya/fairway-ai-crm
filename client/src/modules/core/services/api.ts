@@ -58,6 +58,61 @@ export interface ApiResponse<T = any> {
   };
 }
 
+// Setup clean DevTools console logger for all Fairway CRM API traffic
+if (typeof window !== 'undefined' && !(window as any).__FW_API_LOGGER_INSTALLED__) {
+  (window as any).__FW_API_LOGGER_INSTALLED__ = true;
+  const originalFetch = window.fetch;
+  window.fetch = async function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+    const isApiCall = urlStr.includes('/api/') || urlStr.endsWith('/api') || urlStr.includes('localhost:5000') || urlStr.includes('onrender.com');
+
+    if (isApiCall) {
+      const method = (init?.method || 'GET').toUpperCase();
+      let bodyData: any = undefined;
+      if (init?.body) {
+        try {
+          bodyData = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
+        } catch {
+          bodyData = init.body;
+        }
+      }
+
+      console.groupCollapsed(`%c[API REQ] ${method} ${urlStr}`, 'color: #3b82f6; font-weight: bold;');
+      if (bodyData !== undefined) console.log('Payload:', bodyData);
+      console.log('Headers:', init?.headers);
+      console.groupEnd();
+
+      try {
+        const response = await originalFetch.apply(this, [input, init]);
+        const clone = response.clone();
+        clone.json().then((json) => {
+          if (response.ok) {
+            console.groupCollapsed(`%c[API RES] ${response.status} ${method} ${urlStr}`, 'color: #10b981; font-weight: bold;');
+            console.log('Data:', json);
+            console.groupEnd();
+          } else {
+            console.group(`%c[API ERR] ${response.status} ${method} ${urlStr}`, 'color: #ef4444; font-weight: bold;');
+            console.error('Error Details:', json);
+            console.groupEnd();
+          }
+        }).catch(() => {
+          if (!response.ok) {
+            console.warn(`%c[API RES] ${response.status} ${method} ${urlStr}`, 'color: #f59e0b; font-weight: bold;');
+          }
+        });
+        return response;
+      } catch (err: any) {
+        console.group(`%c[API NETWORK FAILURE] ${method} ${urlStr}`, 'color: #dc2626; font-weight: bold;');
+        console.error('Network Error:', err.message);
+        console.groupEnd();
+        throw err;
+      }
+    }
+
+    return originalFetch.apply(this, [input, init]);
+  };
+}
+
 class ApiClient {
   private getToken(): string | null {
     try {
@@ -153,3 +208,4 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
+

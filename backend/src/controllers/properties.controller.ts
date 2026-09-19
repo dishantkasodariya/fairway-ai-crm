@@ -50,7 +50,7 @@ export const getPropertiesDropdownActive = async (_req: Request, res: Response):
     const result = await query(
       `SELECT id, code, name, location, corridor, city, available_area_sq_ft, rent_per_sq_ft_inr, status
        FROM properties
-       WHERE status = 'Available' OR status = 'Under Negotiation' OR status IS NULL
+       WHERE UPPER(status) IN ('AVAILABLE', 'UNDER NEGOTIATION') OR status IS NULL
        ORDER BY name ASC;`
     );
 
@@ -125,22 +125,49 @@ export const getProperties = async (req: Request, res: Response): Promise<void> 
 
 /**
  * GET /api/properties/corridors
- * Returns unique corridors and property counts
+ * Returns unique corridors and property counts across database
  */
 export const getCorridors = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await query(`
       SELECT corridor, COUNT(*)::int as count
-      FROM properties
-      WHERE corridor IS NOT NULL AND corridor != ''
+      FROM (
+        SELECT corridor FROM properties WHERE corridor IS NOT NULL AND corridor != ''
+        UNION ALL
+        SELECT target_corridor AS corridor FROM inquiries WHERE target_corridor IS NOT NULL AND target_corridor != ''
+      ) c
       GROUP BY corridor
-      ORDER BY count DESC;
+      ORDER BY count DESC, corridor ASC;
     `);
 
     res.status(200).json({ success: true, data: result.rows });
   } catch (error: any) {
     console.error('Error fetching corridors:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to fetch corridors.' });
+  }
+};
+
+/**
+ * GET /api/properties/industries
+ * Returns distinct industries across inquiries and companies from live database
+ */
+export const getIndustries = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await query(`
+      SELECT DISTINCT industry
+      FROM (
+        SELECT industry FROM inquiries WHERE industry IS NOT NULL AND industry != ''
+        UNION
+        SELECT industry FROM companies WHERE industry IS NOT NULL AND industry != ''
+      ) ind
+      ORDER BY industry ASC;
+    `);
+
+    const industries = result.rows.map((r) => r.industry);
+    res.status(200).json({ success: true, data: industries });
+  } catch (error: any) {
+    console.error('Error fetching industries:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch industries.' });
   }
 };
 
@@ -203,13 +230,17 @@ export const createProperty = async (req: Request, res: Response): Promise<void>
       description,
     } = req.body;
 
-    if (!name || !location || !totalAreaSqFt || !rentPerSqFtINR) {
-      res.status(400).json({ success: false, error: 'Name, location, totalAreaSqFt, and rentPerSqFtINR are required.' });
+    const finalLocation = location || req.body.address || corridor || city || 'Gujarat Industrial Belt';
+    const finalCorridor = corridor || finalLocation;
+    const finalCity = city || 'Ahmedabad';
+
+    if (!name || !totalAreaSqFt || !rentPerSqFtINR) {
+      res.status(400).json({ success: false, error: 'Name, totalAreaSqFt, and rentPerSqFtINR are required.' });
       return;
     }
 
     const propId = `prop_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
-    const propCode = code || `FW-${city ? city.slice(0, 3).toUpperCase() : 'GUJ'}-${Math.floor(10 + Math.random() * 90)}`;
+    const propCode = code || `FW-${finalCity ? finalCity.slice(0, 3).toUpperCase() : 'GUJ'}-${Math.floor(10 + Math.random() * 90)}`;
 
     const sql = `
       INSERT INTO properties (
@@ -233,9 +264,9 @@ export const createProperty = async (req: Request, res: Response): Promise<void>
       propId,
       propCode,
       name.trim(),
-      location.trim(),
-      corridor || `${city || 'Dahej'} Corridor`,
-      city || 'Dahej',
+      finalLocation,
+      finalCorridor,
+      finalCity,
       state || 'Gujarat',
       pincode || '392130',
       totalAreaSqFt,
@@ -335,11 +366,11 @@ export const updateProperty = async (req: Request, res: Response): Promise<void>
         green_building_cert = COALESCE($21, green_building_cert),
         latitude = COALESCE($22, latitude),
         longitude = COALESCE($23, longitude),
-        photos = CASE WHEN $24::text IS NOT NULL THEN $24::jsonb ELSE photos END,
+        photos = COALESCE($24, photos),
         brochure_url = COALESCE($25, brochure_url),
         status = COALESCE($26, status),
-        amenities = CASE WHEN $27::text IS NOT NULL THEN $27::jsonb ELSE amenities END,
-        suitable_industries = CASE WHEN $28::text IS NOT NULL THEN $28::jsonb ELSE suitable_industries END,
+        amenities = COALESCE($27, amenities),
+        suitable_industries = COALESCE($28, suitable_industries),
         description = COALESCE($29, description),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $30

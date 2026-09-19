@@ -68,6 +68,13 @@ import {
   TooltipProvider,
 } from '@/modules/core/components/ui/tooltip';
 import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/modules/core/components/ui/Select';
+import {
   DataGrid,
   DataGridContainer,
   dataGridFeatures,
@@ -178,7 +185,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
   const { success, error } = useToast();
 
   // Primary view modes: 'matrix' (List), 'cards' (Cards), 'modules' (Role & Module Toggle Matrix)
-  const [rbacViewMode, setRbacViewMode] = useState<'matrix' | 'cards' | 'modules'>('modules');
+  const [rbacViewMode, setRbacViewMode] = useState<'matrix' | 'cards' | 'modules'>('matrix');
   const [previousRolesView, setPreviousRolesView] = useState<'matrix' | 'cards'>('matrix');
   const [expandedModuleRows, setExpandedModuleRows] = useState<Record<string, boolean>>({});
   const [selectedRoleKey, setSelectedRoleKey] = useState<string>(() => roles[0]?.key || 'admin');
@@ -195,7 +202,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
   const [roleSorting, setRoleSorting] = useState<SortingState>([]);
   const [roleColumnVisibility, setRoleColumnVisibility] = useState<Record<string, boolean>>({});
   const [roleColumnPinning, setRoleColumnPinning] = useState<{ start: string[]; end: string[] }>({
-    start: ['actions'],
+    start: ['srNo'],
     end: [],
   });
   const [roleColumnOrder, setRoleColumnOrder] = useState<string[]>([]);
@@ -270,12 +277,16 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
   // Helper to extract access level for a specific role
   const getRolePermissionValue = (perm: RolePermissionItem, roleKey: string): string => {
     const k = (roleKey || '').toLowerCase();
-    if (k === 'admin' || k === 'super_admin') return 'Yes';
+    if (k === 'super_admin') return 'Yes';
     const custom = (perm.customPermissions || {}) as Record<string, string>;
     if (custom[roleKey] !== undefined) return custom[roleKey];
     for (const [ck, cv] of Object.entries(custom)) {
       if (ck.toLowerCase() === k) return cv;
     }
+    // Fallback to built-in system role columns
+    if (k === 'admin' && perm.admin !== undefined && perm.admin !== '') return perm.admin;
+    if (k === 'sales' && perm.sales !== undefined && perm.sales !== '') return perm.sales;
+    if (k === 'viewer' && perm.viewer !== undefined && perm.viewer !== '') return perm.viewer;
     return 'No';
   };
 
@@ -577,8 +588,8 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     return false;
   };
 
-  // Toggle cell permissions for a specific module & action (recorded into pendingChanges)
-  const handleToggleCellAction = (
+  // Toggle cell permissions for a specific module & action (persisted immediately)
+  const handleToggleCellAction = async (
     perms: RolePermissionItem[],
     roleKey: string,
     targetValue: boolean
@@ -590,6 +601,9 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
     if (perms.length === 0) return;
 
     const newValue = targetValue ? 'Yes' : 'No';
+    const updates = perms.map((p) => ({ id: p.id, value: newValue }));
+
+    // Optimistically update local pending state
     setPendingChanges((prev) => {
       const next = { ...prev };
       perms.forEach((p) => {
@@ -597,10 +611,37 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
       });
       return next;
     });
+
+    try {
+      setIsUpdatingPerm(true);
+      await RoleService.updateRolePermissionsForRole(roleKey, updates);
+      await onRefreshData();
+      try {
+        localStorage.setItem('fw_role_permissions_timestamp', Date.now().toString());
+      } catch {}
+      window.dispatchEvent(new CustomEvent('fw_role_permissions_updated', { detail: { roleKey, updates } }));
+      await refreshRolePermissions();
+      // Clear pending status for these saved items
+      setPendingChanges((prev) => {
+        const next = { ...prev };
+        perms.forEach((p) => {
+          delete next[p.id];
+        });
+        return next;
+      });
+      success(
+        targetValue ? 'Access Granted' : 'Access Revoked',
+        `${perms.length} permission(s) set to "${newValue}" for role "${selectedRole?.name}".`
+      );
+    } catch (err: any) {
+      error('Save Failed', err.message || 'Failed to update capability.');
+    } finally {
+      setIsUpdatingPerm(false);
+    }
   };
 
-  // Toggle a single granular capability
-  const handleToggleGranularPermission = (
+  // Toggle a single granular capability (persisted immediately)
+  const handleToggleGranularPermission = async (
     permId: string,
     targetValue: boolean
   ) => {
@@ -613,6 +654,30 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
       ...prev,
       [permId]: newValue,
     }));
+
+    try {
+      setIsUpdatingPerm(true);
+      await RoleService.updateRolePermissionsForRole(selectedRoleKey, [{ id: permId, value: newValue }]);
+      await onRefreshData();
+      try {
+        localStorage.setItem('fw_role_permissions_timestamp', Date.now().toString());
+      } catch {}
+      window.dispatchEvent(new CustomEvent('fw_role_permissions_updated', { detail: { roleKey: selectedRoleKey, permId, newValue } }));
+      await refreshRolePermissions();
+      setPendingChanges((prev) => {
+        const next = { ...prev };
+        delete next[permId];
+        return next;
+      });
+      success(
+        targetValue ? 'Access Granted' : 'Access Revoked',
+        `Capability set to "${newValue}" for role "${selectedRole?.name}".`
+      );
+    } catch (err: any) {
+      error('Save Failed', err.message || 'Failed to update capability.');
+    } finally {
+      setIsUpdatingPerm(false);
+    }
   };
 
   // Toggle an entire Action column across all modules
@@ -925,23 +990,29 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
   const renderPermissionBadge = (id: string, roleKey: string, val: string) => {
     if (isAdmin) {
       return (
-        <select
+        <Select
           value={val}
-          onChange={(e) => handleUpdateRolePermissionValue(id, roleKey, e.target.value)}
+          onValueChange={(newVal) => handleUpdateRolePermissionValue(id, roleKey, newVal)}
           disabled={isUpdatingPerm}
-          className={cn(
-            'text-[11px] font-bold px-2 py-1 rounded-lg border focus:outline-none transition-all shadow-2xs cursor-pointer',
-            getAccessBadgeClass(val)
-          )}
         >
-          <option value="Yes">Yes</option>
-          <option value="No">No</option>
-          <option value="Assigned / All">Assigned / All</option>
-          <option value="Restricted">Restricted</option>
-          <option value="Limited">Limited</option>
-          <option value="View">View</option>
-          <option value="Configurable">Configurable</option>
-        </select>
+          <SelectTrigger
+            className={cn(
+              'h-7 text-[11px] font-bold px-2 py-0.5 rounded-lg border focus:outline-none transition-all shadow-2xs cursor-pointer',
+              getAccessBadgeClass(val)
+            )}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Yes">Yes</SelectItem>
+            <SelectItem value="No">No</SelectItem>
+            <SelectItem value="Assigned / All">Assigned / All</SelectItem>
+            <SelectItem value="Restricted">Restricted</SelectItem>
+            <SelectItem value="Limited">Limited</SelectItem>
+            <SelectItem value="View">View</SelectItem>
+            <SelectItem value="Configurable">Configurable</SelectItem>
+          </SelectContent>
+        </Select>
       );
     }
 
@@ -961,77 +1032,21 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
   const roleColumns = useMemo<ColumnDef<DataGridFeatures, RoleItem>[]>(
     () => [
       {
-        id: 'actions',
-        header: ({ column }) => <DataGridColumnHeader title="Action" column={column} />,
+        id: 'srNo',
+        meta: { headerTitle: 'Sr. No.' },
+        header: ({ column }) => <DataGridColumnHeader title="Sr. No." column={column} />,
         cell: ({ row }) => {
-          const role = row.original;
+          const serialNo = rolePagination.pageIndex * rolePagination.pageSize + row.index + 1;
           return (
-            <div onClick={(e) => e.stopPropagation()} className="flex items-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
-                    title="Role actions"
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="w-48 bg-surface border border-border shadow-dialog z-50 p-1 rounded-xl"
-                >
-                  <DropdownMenuItem
-                    onClick={() => handleOpenDefinePermissions(role)}
-                    className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg text-fairway-600 font-semibold"
-                  >
-                    <Sliders className="w-3.5 h-3.5" />
-                    <span>Define Permissions</span>
-                  </DropdownMenuItem>
-
-                  {!role.isSystem && (
-                    <>
-                      <DropdownMenuSeparator className="my-1 border-border" />
-                      <DropdownMenuItem
-                        onClick={() => handleDeleteRole(role)}
-                        className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete Role</span>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            <span className="font-medium text-foreground-muted tabular-nums text-xs pl-2">
+              {serialNo}
+            </span>
           );
         },
         size: 75,
         minSize: 65,
         maxSize: 90,
         enableSorting: false,
-        enableResizing: false,
-        enablePinning: true,
-      },
-      {
-        accessorKey: 'key',
-        id: 'key',
-        header: ({ column }) => <DataGridColumnHeader title="Role #" column={column} />,
-        cell: ({ row }) => {
-          const role = row.original;
-          return (
-            <button
-              type="button"
-              onClick={() => handleOpenDefinePermissions(role)}
-              className="font-mono font-bold text-primary dark:text-white bg-primary/10 dark:bg-primary/20 px-2.5 py-1 rounded-full border border-primary/25 dark:border-primary/40 hover:bg-primary/20 dark:hover:bg-primary/30 transition-colors text-xs text-left cursor-pointer inline-flex items-center shadow-xs"
-            >
-              {role.key}
-            </button>
-          );
-        },
-        size: 140,
-        minSize: 130,
-        enableSorting: true,
         enablePinning: true,
       },
       {
@@ -1056,9 +1071,14 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
               >
                 <Shield className="w-3.5 h-3.5" />
               </div>
-              <span className="font-semibold text-foreground hover:text-fairway-600 dark:hover:text-fairway-400 transition-colors text-xs truncate">
-                {role.name}
-              </span>
+              <div className="min-w-0">
+                <span className="font-semibold text-foreground hover:text-fairway-600 dark:hover:text-fairway-400 transition-colors text-xs truncate block">
+                  {role.name}
+                </span>
+                <span className="text-[10px] text-foreground-muted font-mono block">
+                  {role.key}
+                </span>
+              </div>
             </div>
           );
         },
@@ -1137,8 +1157,60 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
         minSize: 95,
         enableSorting: false,
       },
+      {
+        id: 'actions',
+        header: ({ column }) => <DataGridColumnHeader title="Action" column={column} />,
+        cell: ({ row }) => {
+          const role = row.original;
+          return (
+            <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                    title="Role actions"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-48 bg-surface border border-border shadow-dialog z-50 p-1 rounded-xl"
+                >
+                  <DropdownMenuItem
+                    onClick={() => handleOpenDefinePermissions(role)}
+                    className="flex items-center gap-2 text-xs cursor-pointer px-2.5 py-1.5 rounded-lg text-fairway-600 font-semibold"
+                  >
+                    <Sliders className="w-3.5 h-3.5" />
+                    <span>Define Permissions</span>
+                  </DropdownMenuItem>
+
+                  {!role.isSystem && (
+                    <>
+                      <DropdownMenuSeparator className="my-1 border-border" />
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteRole(role)}
+                        className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer px-2.5 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Role</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+        size: 75,
+        minSize: 65,
+        maxSize: 90,
+        enableSorting: false,
+        enableResizing: false,
+      },
     ],
-    []
+    [rolePagination.pageIndex, rolePagination.pageSize]
   );
 
   const roleTable = useTable({
@@ -1167,116 +1239,65 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
 
   return (
     <div className="space-y-4 w-full text-left animate-fade-in">
-      {/* Modern KPI Cards with Glowing Sparkline Waves */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Card 1: Workspace Roles */}
-        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-fairway-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-sm font-bold text-foreground tracking-tight block">
+      {/* KPI Cards (Clean, Responsive & Wave Graph Removed) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        {/* Card 1: Configured Roles */}
+        <div className="bg-surface dark:bg-[#121214] border border-border dark:border-white/[0.08] p-4 sm:p-5 rounded-xl sm:rounded-2xl shadow-2xs hover:shadow-xs transition-all hover:border-fairway-500/40 flex flex-col justify-between group">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight">
               Configured Roles
             </span>
-            <span className="text-xs text-foreground-muted mt-4 block font-medium">
-              {customRolesCount} custom • {systemRolesCount} system default
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+            <div className="size-9 rounded-xl bg-fairway-500/10 text-fairway-600 dark:text-fairway-400 flex items-center justify-center shrink-0">
+              <Shield className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block">
               {roles.length} Roles
             </span>
-          </div>
-
-          <div className="shrink-0 pb-1">
-            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="themeWaveRoles1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4 L 120 40 L 0 40 Z"
-                fill="url(#themeWaveRoles1)"
-              />
-              <path
-                d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4"
-                fill="none"
-                stroke="var(--fw-600, #0084FF)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <span className="text-xs text-foreground-muted mt-1 block font-medium">
+              {customRolesCount} custom • {systemRolesCount} system default
+            </span>
           </div>
         </div>
 
         {/* Card 2: Governed Users */}
-        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-accent-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-sm font-bold text-foreground tracking-tight block">
+        <div className="bg-surface dark:bg-[#121214] border border-border dark:border-white/[0.08] p-4 sm:p-5 rounded-xl sm:rounded-2xl shadow-2xs hover:shadow-xs transition-all hover:border-accent-500/40 flex flex-col justify-between group">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight">
               Governed Team Members
             </span>
-            <span className="text-xs text-foreground-muted mt-4 block font-medium">
-              Across all role profiles
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+            <div className="size-9 rounded-xl bg-accent-500/10 text-accent-600 dark:text-accent-400 flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block">
               {totalGovernedUsers} {totalGovernedUsers === 1 ? 'User' : 'Users'}
             </span>
-          </div>
-
-          <div className="shrink-0 pb-1">
-            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="themeWaveRoles2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent-500, #10B981)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--accent-500, #10B981)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 30 Q 15 22, 30 25 T 60 19 T 90 12 T 120 8 L 120 40 L 0 40 Z"
-                fill="url(#themeWaveRoles2)"
-              />
-              <path
-                d="M 0 30 Q 15 22, 30 25 T 60 19 T 90 12 T 120 8"
-                fill="none"
-                stroke="var(--accent-500, #10B981)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <span className="text-xs text-foreground-muted mt-1 block font-medium">
+              Across all role profiles
+            </span>
           </div>
         </div>
 
-        {/* Card 3: Security Capabilities */}
-        <div className="bg-surface border border-border p-5 rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-indigo-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-sm font-bold text-foreground tracking-tight block">
+        {/* Card 3: Audited Capabilities */}
+        <div className="bg-surface dark:bg-[#121214] border border-border dark:border-white/[0.08] p-4 sm:p-5 rounded-xl sm:rounded-2xl shadow-2xs hover:shadow-xs transition-all hover:border-indigo-500/40 flex flex-col justify-between group sm:col-span-2 lg:col-span-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight">
               Audited Capabilities
             </span>
-            <span className="text-xs text-foreground-muted mt-4 block font-medium">
-              Across {categories.length - 1} CRM modules
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+            <div className="size-9 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4">
+            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block">
               {permissions.length} Operations
             </span>
-          </div>
-
-          <div className="shrink-0 pb-1">
-            <svg className="w-28 sm:w-36 h-12 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="themeWaveRoles3" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--chart-5, #8B5CF6)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--chart-5, #8B5CF6)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6 L 120 40 L 0 40 Z"
-                fill="url(#themeWaveRoles3)"
-              />
-              <path
-                d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6"
-                fill="none"
-                stroke="var(--chart-5, #8B5CF6)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <span className="text-xs text-foreground-muted mt-1 block font-medium">
+              Across {categories.length - 1} CRM modules
+            </span>
           </div>
         </div>
       </div>
@@ -1357,7 +1378,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                   type="button"
                   onClick={handleRefresh}
                   disabled={isBusy}
-                  className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-70"
+                  className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-none outline-none focus:outline-none focus:ring-0 ring-0 active:scale-95 disabled:opacity-70"
                 >
                   <RefreshCw
                     className={cn(
@@ -1370,26 +1391,8 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
               <TooltipContent side="top">Refresh Live Data</TooltipContent>
             </Tooltip>
 
-            {/* Segmented View Mode Switcher (Roles Matrix List, Capabilities Grid, Card View) */}
-            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setRbacViewMode('modules')}
-                    className={cn(
-                      'w-9 h-full flex items-center justify-center transition-all cursor-pointer',
-                      rbacViewMode === 'modules'
-                        ? 'bg-fairway-600 text-white font-bold'
-                        : 'text-foreground hover:text-foreground hover:bg-surface-muted/60'
-                    )}
-                  >
-                    <Layers className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">Module Permissions Matrix</TooltipContent>
-              </Tooltip>
-
+            {/* Segmented View Mode Switcher (Roles List, Role Cards) */}
+            <div className="flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-none ring-0">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -1430,16 +1433,6 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
             {/* Admin Action Buttons */}
             {isAdmin && (
               <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleResetPermissions}
-                  disabled={isResettingPerms}
-                  leftIcon={<RotateCcw className="w-3.5 h-3.5 text-fairway-600" />}
-                  className="hidden md:inline-flex"
-                >
-                  Reset Baseline
-                </Button>
 
                 <Button
                   size="sm"
@@ -1532,7 +1525,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
 
             {/* Role Quick Bulk Actions & Save/Discard */}
             {isAdmin && (
-              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto pr-1">
+              <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-end pr-1">
                 {Object.keys(pendingChanges).length > 0 && (
                   <>
                     <Button
@@ -1620,8 +1613,8 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
           </div>
 
           {/* ================= MODULES IN ROWS TABLE (PRIMARY MATRIX) ================= */}
-          <div className="border border-border rounded-2xl bg-surface overflow-hidden shadow-xs">
-            <div className="p-3 bg-surface-muted/40 border-b border-border flex items-center justify-between gap-3">
+          <div className="border border-border dark:border-white/[0.08] rounded-2xl bg-surface dark:bg-[#121214] overflow-hidden shadow-xs">
+            <div className="p-3 bg-surface-muted/40 dark:bg-[#161c24] border-b border-border dark:border-white/[0.08] flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <div className="size-6 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-xs">
                   <Layers className="w-3.5 h-3.5" />
@@ -1647,12 +1640,12 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
               </div>
             </div>
 
-            <div className="overflow-x-auto no-scrollbar touch-pan-x">
+            <div className="w-full overflow-x-auto no-scrollbar touch-pan-x" style={{ WebkitOverflowScrolling: 'touch' }}>
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-surface-muted dark:bg-[#151c27] text-[11px] font-bold text-foreground-muted border-b border-border">
+                <thead className="bg-surface-muted dark:bg-[#161c24] text-[11px] font-bold text-foreground-muted border-b border-border dark:border-white/[0.08]">
                   <tr>
                     {/* Sticky Module Header */}
-                    <th className="p-3.5 min-w-[220px] sticky left-0 bg-surface-muted dark:bg-[#151c27] z-20 border-r border-border shadow-xs">
+                    <th className="p-3.5 min-w-[220px] sticky left-0 bg-surface-muted dark:bg-[#161c24] z-20 border-r border-border dark:border-white/[0.08] shadow-xs">
                       CRM Module
                     </th>
 
@@ -1670,7 +1663,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                       return (
                         <th
                           key={action.key}
-                          className="p-3 text-center min-w-[96px] border-r border-border/50 group/col"
+                          className="p-3 text-center min-w-[96px] border-r border-border/40 dark:border-white/[0.06] group/col"
                         >
                           <div className="flex flex-col items-center justify-center gap-0.5">
                             <div className="flex items-center justify-center gap-1.5">
@@ -1713,7 +1706,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border/50 dark:divide-white/[0.04]">
                   {filteredStandardModules.length === 0 ? (
                     <tr>
                       <td colSpan={11} className="p-8 text-center text-foreground-muted text-xs">
@@ -1734,7 +1727,7 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
                         <React.Fragment key={mod.key}>
                           <tr className="hover:bg-surface-muted/25 dark:hover:bg-[#151c27]/60 transition-colors group">
                             {/* Sticky Module Column with solid background in dark mode */}
-                            <td className="p-3.5 sticky left-0 bg-surface dark:bg-[#111722] group-hover:bg-surface-muted/60 dark:group-hover:bg-[#161e2b] z-10 border-r border-border shadow-xs">
+                            <td className="p-3.5 sticky left-0 bg-surface dark:bg-[#121214] group-hover:bg-surface-muted/60 dark:group-hover:bg-[#161e2b] z-10 border-r border-border dark:border-white/[0.08] shadow-xs">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2.5">
                                   <div className="size-8 rounded-xl bg-surface-muted/70 dark:bg-[#18202d] border border-border flex items-center justify-center shrink-0">
@@ -2309,17 +2302,21 @@ export const RolesPermissionsTab: React.FC<RolesPermissionsTabProps> = ({
               <label className="text-xs font-semibold text-foreground block">
                 Initial Access for Selected Role ({selectedRole?.name || selectedRoleKey})
               </label>
-              <select
+              <Select
                 value={newPermForm.accessLevel}
-                onChange={(e) => setNewPermForm({ ...newPermForm, accessLevel: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground font-semibold focus:outline-none focus:border-fairway-500 focus:ring-1 focus:ring-fairway-500 shadow-2xs cursor-pointer"
+                onValueChange={(val) => setNewPermForm({ ...newPermForm, accessLevel: val })}
               >
-                <option value="Yes">Full Access (Yes)</option>
-                <option value="Assigned / All">Assigned / All</option>
-                <option value="View">View Only</option>
-                <option value="Restricted">Restricted</option>
-                <option value="No">No Access</option>
-              </select>
+                <SelectTrigger className="w-full h-10 px-3.5 bg-surface-muted/40 border border-border rounded-xl text-xs text-foreground font-semibold">
+                  <SelectValue placeholder="Select Access Level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Yes">Full Access (Yes)</SelectItem>
+                  <SelectItem value="Assigned / All">Assigned / All</SelectItem>
+                  <SelectItem value="View">View Only</SelectItem>
+                  <SelectItem value="Restricted">Restricted</SelectItem>
+                  <SelectItem value="No">No Access</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">

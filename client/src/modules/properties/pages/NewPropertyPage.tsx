@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Warehouse,
   ArrowLeft,
+  ArrowRight,
   MapPin,
   Calendar,
   Truck,
@@ -15,6 +16,12 @@ import {
   FileText,
   HelpCircle,
   AlertCircle,
+  RefreshCw,
+  Layers,
+  Zap,
+  CheckCircle2,
+  Sparkles,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Badge } from '@/modules/core/components/ui/Badge';
@@ -28,28 +35,8 @@ import { formatINR, formatSqFt } from '@/modules/core/utils/formatters';
 export interface NewPropertyPageProps {
   onBack: () => void;
   onSuccess: (propertyId: string) => void;
+  initialProperty?: Property | null;
 }
-
-const CORRIDOR_OPTIONS = [
-  'Dahej PCPIR Corridor',
-  'Sanand Industrial Corridor',
-  'Changodar - Bavla Corridor',
-  'Aslali - Kheda Industrial Corridor',
-  'Ankleshwar - Panoli Chemical Corridor',
-  'Halol - Kalol Industrial Belt',
-  'Hazira Port Logistics Zone',
-  'Jhagadia GIDC Logistics Park',
-  'Mundra Port SEZ Corridor',
-  'Bhiwandi / NH-3 Corridor',
-  'Chakan - Talegaon MIDC',
-  'Oragadam Industrial Corridor',
-  'Bilaspur - Tauru Road Corridor',
-];
-
-const CORRIDOR_COMBOBOX_OPTIONS: ComboboxOption[] = CORRIDOR_OPTIONS.map((c) => ({
-  value: c,
-  label: c,
-}));
 
 const STATE_OPTIONS: ComboboxOption[] = [
   { value: 'Gujarat', label: 'Gujarat' },
@@ -87,18 +74,6 @@ const TRUCK_ACCESS_OPTIONS: ComboboxOption[] = [
   { value: 'Dual-Side Cross-Docking Staging Apron', label: 'Dual-Side Cross-Docking Staging Apron' },
 ];
 
-const INDUSTRY_OPTIONS = [
-  '3PL & Logistics',
-  'E-Commerce & Retail',
-  'Automotive & Ancillary',
-  'FMCG & Consumer Goods',
-  'Pharma & Healthcare',
-  'Cold Chain & Perishables',
-  'Heavy Engineering',
-  'Electronics & High-Tech',
-  'Chemical & Specialized',
-];
-
 const DEFAULT_PHOTOS = [
   'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1200&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1553413077-190dd305871c?w=1200&auto=format&fit=crop&q=80',
@@ -132,48 +107,103 @@ const STATUS_OPTIONS: ComboboxOption[] = [
   },
 ];
 
-export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSuccess }) => {
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const CURATED_INDUSTRIES = [
+  '3PL & Logistics',
+  'E-Commerce Fulfillment',
+  'Automotive & EV Components',
+  'Pharma & Healthcare',
+  'Engineering & Heavy Industrial',
+  'FMCG & Consumer Goods',
+  'Cold Chain & Agro-Logistics',
+  'Specialty Chemicals (GIDC Approved)',
+];
 
-  // Form State: 100% Empty Clean Slate
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [status, setStatus] = useState<PropertyStatus | ''>('');
+export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSuccess, initialProperty }) => {
+  const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [corridors, setCorridors] = useState<string[]>([]);
+  const [dbIndustries, setDbIndustries] = useState<string[]>([]);
+
+  useEffect(() => {
+    PropertyService.getCorridors().then((res) => {
+      if (res.success && res.data) {
+        setCorridors(res.data.map((c: any) => c.corridor || c).filter(Boolean));
+      }
+    });
+    PropertyService.getIndustries().then((res) => {
+      if (res.success && res.data) {
+        setDbIndustries(res.data);
+      }
+    });
+  }, []);
+
+  const corridorComboboxOptions = useMemo<ComboboxOption[]>(
+    () => corridors.map((c) => ({ value: c, label: c })),
+    [corridors]
+  );
+
+  // Auto Code Generator helper
+  const generateRandomCode = (corr?: string) => {
+    const prefix = corr ? corr.slice(0, 3).toUpperCase() : 'PROP';
+    const num = Math.floor(100 + Math.random() * 900);
+    return `${prefix}-${num}`;
+  };
+
+  // Form State
+  const [name, setName] = useState(initialProperty?.name || '');
+  const [code, setCode] = useState(initialProperty?.code || generateRandomCode('SAN'));
+  const [status, setStatus] = useState<PropertyStatus | ''>(initialProperty?.status || 'Available');
 
   // Location
-  const [corridor, setCorridor] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [pincode, setPincode] = useState('');
-  const [location, setLocation] = useState('');
-  const [latitude, setLatitude] = useState<number | ''>('');
-  const [longitude, setLongitude] = useState<number | ''>('');
+  const [corridor, setCorridor] = useState(initialProperty?.corridor || 'Sanand Industrial Corridor');
+  const [city, setCity] = useState(initialProperty?.city || 'Ahmedabad');
+  const [state, setState] = useState(initialProperty?.state || 'Gujarat');
+  const [pincode, setPincode] = useState(initialProperty?.pincode || '382110');
+  const [location, setLocation] = useState(initialProperty?.location || '');
+  const [latitude, setLatitude] = useState<number | ''>(initialProperty?.latitude ?? 22.9868);
+  const [longitude, setLongitude] = useState<number | ''>(initialProperty?.longitude ?? 72.3812);
 
   // Dimensions & Commercials
-  const [totalAreaSqFt, setTotalAreaSqFt] = useState<number | ''>('');
-  const [availableAreaSqFt, setAvailableAreaSqFt] = useState<number | ''>('');
-  const [rentPerSqFtINR, setRentPerSqFtINR] = useState<number | ''>('');
-  const [depositMonths, setDepositMonths] = useState<number | ''>('');
-  const [leaseTermsYears, setLeaseTermsYears] = useState<number | ''>('');
-  const [availabilityDate, setAvailabilityDate] = useState('');
+  const [totalAreaSqFt, setTotalAreaSqFt] = useState<number | ''>(initialProperty?.totalAreaSqFt ?? '');
+  const [availableAreaSqFt, setAvailableAreaSqFt] = useState<number | ''>(initialProperty?.availableAreaSqFt ?? '');
+  const [rentPerSqFtINR, setRentPerSqFtINR] = useState<number | ''>(initialProperty?.rentPerSqFtINR ?? '');
+  const [depositMonths, setDepositMonths] = useState<number | ''>(initialProperty?.depositMonths ?? 3);
+  const [leaseTermsYears, setLeaseTermsYears] = useState<number | ''>(initialProperty?.leaseTermsYears ?? 5);
+  const [availabilityDate, setAvailabilityDate] = useState(
+    initialProperty?.availabilityDate || new Date().toISOString().split('T')[0]
+  );
 
   // Specifications
-  const [clearHeightFt, setClearHeightFt] = useState<number | ''>('');
-  const [docksCount, setDocksCount] = useState<number | ''>('');
-  const [flooringCapacityMT, setFlooringCapacityMT] = useState<number | ''>('');
-  const [powerKVA, setPowerKVA] = useState<number | ''>('');
-  const [parkingSlots, setParkingSlots] = useState<number | ''>('');
-  const [fireSystems, setFireSystems] = useState('');
-  const [truckAccess, setTruckAccess] = useState('');
-  const [greenBuildingCert, setGreenBuildingCert] = useState('');
-  const [cctvSecurity, setCctvSecurity] = useState(false);
+  const [clearHeightFt, setClearHeightFt] = useState<number | ''>(initialProperty?.clearHeightFt ?? 12);
+  const [docksCount, setDocksCount] = useState<number | ''>(initialProperty?.docksCount ?? 8);
+  const [flooringCapacityMT, setFlooringCapacityMT] = useState<number | ''>(initialProperty?.flooringCapacityMT ?? 6);
+  const [powerKVA, setPowerKVA] = useState<number | ''>(initialProperty?.powerKVA ?? 250);
+  const [parkingSlots, setParkingSlots] = useState<number | ''>(initialProperty?.parkingSlots ?? 20);
+  const [fireSystems, setFireSystems] = useState(
+    initialProperty?.fireSystems || 'NFPA ESFR K-25 Sprinklers + Central Hydrant Ring'
+  );
+  const [truckAccess, setTruckAccess] = useState(
+    initialProperty?.truckAccess || '40ft Multi-Axle Container Trailer with 38m Concrete Apron'
+  );
+  const [greenBuildingCert, setGreenBuildingCert] = useState(initialProperty?.greenBuildingCert || 'IGBC Gold Certified');
+  const [cctvSecurity, setCctvSecurity] = useState(initialProperty?.cctvSecurity !== undefined ? initialProperty.cctvSecurity : true);
 
-  // Industries & Description
-  const [suitableIndustries, setSuitableIndustries] = useState<string[]>([]);
-  const [description, setDescription] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [newPhotoUrl, setNewPhotoUrl] = useState('');
+  // Combined cleaned industry list
+  const allIndustryOptions = useMemo(() => {
+    const set = new Set([...CURATED_INDUSTRIES, ...(initialProperty?.suitableIndustries || [])]);
+    return Array.from(set);
+  }, [initialProperty]);
+
+  const [suitableIndustries, setSuitableIndustries] = useState<string[]>(
+    initialProperty?.suitableIndustries && initialProperty.suitableIndustries.length > 0
+      ? initialProperty.suitableIndustries
+      : ['3PL & Logistics', 'E-Commerce Fulfillment']
+  );
+  const [description, setDescription] = useState(
+    initialProperty?.description ||
+      'State-of-the-art Grade-A industrial facility designed for high-throughput logistics, heavy manufacturing, and distribution operations with world-class infrastructure.'
+  );
 
   // Validation Errors
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -197,17 +227,8 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
     }
   };
 
-  const handleAddPhoto = () => {
-    if (!newPhotoUrl.trim()) return;
-    setPhotos([...photos, newPhotoUrl.trim()]);
-    setNewPhotoUrl('');
-  };
-
-  const handleRemovePhoto = (index: number) => {
-    setPhotos(photos.filter((_, i) => i !== index));
-  };
-
-  const validate = () => {
+  // Step 1 Validation
+  const validateStep1 = () => {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'Warehouse / Property name is required';
     if (!code.trim()) errs.code = 'Property code is required';
@@ -217,6 +238,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
     if (!state.trim()) errs.state = 'State is required';
     if (!pincode.trim()) errs.pincode = 'PIN code is required';
     if (!location.trim()) errs.location = 'Micro-market / Site address is required';
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // Step 2 Validation
+  const validateStep2 = () => {
+    const errs: Record<string, string> = {};
     if (!totalAreaSqFt || Number(totalAreaSqFt) <= 0) errs.totalAreaSqFt = 'Valid total park area is required (sq.ft)';
     if (!availableAreaSqFt || Number(availableAreaSqFt) <= 0) errs.availableAreaSqFt = 'Valid available space is required (sq.ft)';
     if (totalAreaSqFt && availableAreaSqFt && Number(availableAreaSqFt) > Number(totalAreaSqFt)) {
@@ -226,12 +255,28 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
     if (!depositMonths || Number(depositMonths) <= 0) errs.depositMonths = 'Security deposit months is required';
     if (!leaseTermsYears || Number(leaseTermsYears) <= 0) errs.leaseTermsYears = 'Lease term years is required';
     if (!availabilityDate.trim()) errs.availabilityDate = 'Availability date is required';
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // Step 3 Validation
+  const validateStep3 = () => {
+    const errs: Record<string, string> = {};
     if (!clearHeightFt || Number(clearHeightFt) <= 0) errs.clearHeightFt = 'Clear height is required (meters)';
     if (docksCount === '' || Number(docksCount) < 0) errs.docksCount = 'Valid hydraulic docks count is required';
     if (!flooringCapacityMT || Number(flooringCapacityMT) <= 0) errs.flooringCapacityMT = 'Floor load capacity is required (MT)';
     if (!powerKVA || Number(powerKVA) <= 0) errs.powerKVA = 'Connected power is required (KVA)';
     if (!fireSystems.trim()) errs.fireSystems = 'Fire safety specification is required';
     if (!truckAccess.trim()) errs.truckAccess = 'Truck circulation / apron is required';
+
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // Step 4 Validation
+  const validateStep4 = () => {
+    const errs: Record<string, string> = {};
     if (suitableIndustries.length === 0) errs.suitableIndustries = 'Select at least one suitable industry segment';
     if (!description.trim()) errs.description = 'Marketing overview / description is required';
 
@@ -239,14 +284,47 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) {
-      toast('Validation Error', {
-        message: 'Please fill in all mandatory fields highlighted in red.',
-        type: 'error',
-      });
+  const handleNext = () => {
+    if (currentStep === 1 && validateStep1()) {
+      setCurrentStep(2);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (currentStep === 2 && validateStep2()) {
+      setCurrentStep(3);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (currentStep === 3 && validateStep3()) {
+      setCurrentStep(4);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => (prev - 1) as any);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    if (!validateStep1()) {
+      setCurrentStep(1);
+      toast('Validation Error', { message: 'Please complete all required fields in Step 1.', type: 'error' });
+      return;
+    }
+    if (!validateStep2()) {
+      setCurrentStep(2);
+      toast('Validation Error', { message: 'Please complete all required fields in Step 2.', type: 'error' });
+      return;
+    }
+    if (!validateStep3()) {
+      setCurrentStep(3);
+      toast('Validation Error', { message: 'Please complete all required fields in Step 3.', type: 'error' });
+      return;
+    }
+    if (!validateStep4()) {
+      setCurrentStep(4);
+      toast('Validation Error', { message: 'Please select industries and provide a brief description.', type: 'error' });
       return;
     }
 
@@ -275,9 +353,9 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
       flooringCapacityMT: Number(flooringCapacityMT),
       cctvSecurity,
       greenBuildingCert: greenBuildingCert.trim() || 'None',
-      latitude: Number(latitude) || 21.7051,
-      longitude: Number(longitude) || 72.5847,
-      photos: photos.length > 0 ? photos : DEFAULT_PHOTOS,
+      latitude: Number(latitude) || 22.9868,
+      longitude: Number(longitude) || 72.3812,
+      photos: initialProperty?.photos || [],
       status: status as PropertyStatus,
       amenities: [
         '24/7 Security Guarding',
@@ -292,16 +370,19 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
     };
 
     try {
-      const res = await PropertyService.createProperty(propertyPayload);
+      const res = initialProperty
+        ? await PropertyService.updateProperty(initialProperty.id, propertyPayload)
+        : await PropertyService.createProperty(propertyPayload);
+
       if (res.success && res.data) {
-        toast('Warehouse Created Successfully', {
-          message: `${res.data.name || name} has been published to the backend inventory.`,
+        toast(initialProperty ? 'Warehouse Updated Successfully' : 'Warehouse Created Successfully', {
+          message: `${res.data.name || name} has been saved to the backend inventory.`,
           type: 'success',
         });
-        onSuccess(res.data.id);
+        onSuccess(res.data.id || initialProperty?.id || '');
       } else {
         const msg = typeof res.error === 'string' ? res.error : res.error?.message || 'Failed to save warehouse to backend.';
-        toast('Failed to Create Warehouse', {
+        toast(initialProperty ? 'Failed to Update Warehouse' : 'Failed to Create Warehouse', {
           message: msg,
           type: 'error',
         });
@@ -316,14 +397,24 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
     }
   };
 
+  // Live Monthly Revenue Calculation
+  const estimatedMonthlyGross =
+    availableAreaSqFt && rentPerSqFtINR ? Number(availableAreaSqFt) * Number(rentPerSqFtINR) : 0;
+
+  const stepsList = [
+    { num: 1, title: 'Identity & Location', sub: 'Name, corridor, address' },
+    { num: 2, title: 'Space & Commercials', sub: 'Area, rent, lease terms' },
+    { num: 3, title: 'Technical Specs', sub: 'Height, docks, floor load' },
+    { num: 4, title: 'Verticals & Review', sub: 'Industries, overview & publish' },
+  ];
+
   return (
-    <div className="min-h-screen bg-background text-foreground text-left py-4 sm:py-6 px-2 sm:px-0 lg:px-0">
-      {/* 8XL Spacious Container */}
-      <div className="max-w-7xl 2xl:max-w-8xl mx-auto w-full space-y-4 sm:space-y-6">
-        {/* Top Header Pattern without template dropdown */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 border-b border-border">
+    <div className="min-h-screen bg-background text-foreground text-left py-4 sm:py-6 px-3 sm:px-6 lg:px-8 pb-28 sm:pb-12">
+      <div className="max-w-5xl mx-auto w-full space-y-6">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-fairway-100 dark:bg-fairway-950/80 border border-fairway-300 dark:border-fairway-800/80 flex items-center justify-center text-fairway-700 dark:text-fairway-400 shrink-0 shadow-xs">
+            <div className="w-10 h-10 rounded-xl bg-fairway-500/10 text-fairway-600 dark:bg-fairway-500/20 dark:text-fairway-400 border border-fairway-500/20 flex items-center justify-center shrink-0 shadow-xs">
               <Warehouse className="w-5 h-5" />
             </div>
             <div>
@@ -331,47 +422,99 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                 Industrial Real Estate / Property Master
               </span>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                <span>Create Warehouse Property</span>
+                <span>{initialProperty ? 'Edit Warehouse Property' : 'Create Warehouse Property'}</span>
                 <Badge variant="outline" size="sm" className="hidden sm:inline-flex text-[11px]">
-                  New Listing
+                  {initialProperty ? `ID: ${initialProperty.code}` : 'New Listing'}
                 </Badge>
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+          <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={onBack}
-              leftIcon={<ArrowLeft className="w-3.5 h-3.5 shrink-0" />}
-              className="w-full sm:w-auto border-border text-foreground hover:bg-surface-muted justify-center h-9"
+              leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
+              className="text-xs font-semibold rounded-xl"
             >
-              Back
+              Back to Catalog
             </Button>
           </div>
         </div>
 
-        {/* Form Container */}
-        <form onSubmit={handleSubmit} className="bg-surface border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 shadow-sm space-y-6 sm:space-y-8">
-          {/* ================= SECTION 1: BASIC INFORMATION ================= */}
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-foreground tracking-tight">Basic Information</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">Core identification and operational status of the facility</p>
+        {/* 4-STEP INTERACTIVE PROGRESS BAR */}
+        <div className="bg-surface border border-border rounded-2xl p-3 sm:p-4 shadow-xs">
+          <div className="grid grid-cols-4 gap-2">
+            {stepsList.map((st) => {
+              const isDone = currentStep > st.num;
+              const isCurrent = currentStep === st.num;
+              return (
+                <button
+                  key={st.num}
+                  type="button"
+                  onClick={() => {
+                    if (st.num < currentStep) setCurrentStep(st.num as any);
+                    else if (st.num === currentStep + 1) handleNext();
+                  }}
+                  className={`text-left p-2 sm:p-3 rounded-xl transition-all cursor-pointer flex flex-col justify-between border ${
+                    isCurrent
+                      ? 'bg-fairway-500/10 border-fairway-500/30 text-fairway-700 dark:text-fairway-300 shadow-xs'
+                      : isDone
+                      ? 'bg-surface-muted/40 border-border text-foreground hover:bg-surface-muted'
+                      : 'border-transparent text-foreground-muted opacity-60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center ${
+                        isDone
+                          ? 'bg-emerald-500 text-white'
+                          : isCurrent
+                          ? 'bg-fairway-600 text-white'
+                          : 'bg-surface-muted text-foreground-muted'
+                      }`}
+                    >
+                      {isDone ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : st.num}
+                    </span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider hidden md:inline-block">
+                      Step {st.num}
+                    </span>
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-xs sm:text-sm font-bold block truncate">{st.title}</span>
+                    <span className="text-[10px] text-foreground-muted hidden sm:block truncate mt-0.5">{st.sub}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ================= STEP 1: PROPERTY IDENTITY & LOCATION ================= */}
+        {currentStep === 1 && (
+          <div className="bg-surface border border-border rounded-2xl p-5 sm:p-7 shadow-xs space-y-6 animate-fade-in">
+            <div className="border-b border-border pb-3">
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-fairway-600" />
+                <span>Step 1: Property Identity & Location</span>
+              </h2>
+              <p className="text-xs text-foreground-muted mt-0.5">
+                Core identity, regional corridor, and geographical address
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Warehouse Name */}
-              <div className="sm:col-span-2 lg:col-span-2 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                  <span>Property / Warehouse Name</span>
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                  <span>Warehouse / Park Name</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Fairway Horizon Logistics Park Grade-A"
+                  placeholder="e.g. Fairway Logistics Park Sanand - Phase 1"
                   value={name}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -379,20 +522,29 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.name ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground placeholder:text-foreground-muted/60 h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground placeholder:text-foreground-muted/60 h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.name && <p className="text-[11px] text-rose-500 font-medium">{errors.name}</p>}
               </div>
 
-              {/* Property Code */}
-              <div className="sm:col-span-1 lg:col-span-1 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                  <span>Property Code</span>
-                  <span className="text-rose-500 font-bold">*</span>
-                </label>
+              {/* Property Code with Auto-Generator */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                    <span>Property Code</span>
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setCode(generateRandomCode(corridor))}
+                    className="text-[10px] text-fairway-600 dark:text-fairway-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-2.5 h-2.5" /> Auto-Gen
+                  </button>
+                </div>
                 <input
                   type="text"
-                  placeholder="e.g. WH-108"
+                  placeholder="e.g. PROP-SAN-001"
                   value={code}
                   onChange={(e) => {
                     setCode(e.target.value);
@@ -400,14 +552,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.code ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm font-mono text-foreground placeholder:text-foreground-muted/60 h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm font-mono text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.code && <p className="text-[11px] text-rose-500 font-medium">{errors.code}</p>}
               </div>
 
-              {/* Status with Combobox */}
-              <div className="sm:col-span-1 lg:col-span-1 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+              {/* Listing Status */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Listing Status</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -419,73 +571,28 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                     clearError('status');
                   }}
                   placeholder="Select listing status..."
-                  searchPlaceholder="Search listing status..."
-                  triggerClassName={`rounded-lg h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
+                  triggerClassName={`rounded-xl h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
                     errors.status ? 'border-rose-500 ring-1 ring-rose-500' : ''
                   }`}
                 />
                 {errors.status && <p className="text-[11px] text-rose-500 font-medium">{errors.status}</p>}
               </div>
 
-              {/* Green Building Cert with Combobox */}
-              <div className="sm:col-span-1 lg:col-span-1 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                  <span>Green Building Rating</span>
-                </label>
-                <Combobox
-                  options={GREEN_BUILDING_OPTIONS}
-                  value={greenBuildingCert}
-                  onChange={(val) => setGreenBuildingCert(val)}
-                  placeholder="Select green building rating..."
-                  searchPlaceholder="Search green building rating..."
-                  triggerClassName="rounded-lg h-10 bg-surface-muted/60 dark:bg-[#18202b]"
-                />
-              </div>
-
-              {/* CCTV & Security Checkbox */}
-              <div className="sm:col-span-1 lg:col-span-1 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                  <span>Facility Security</span>
-                </label>
-                <label className="flex items-center gap-2.5 h-10 px-3.5 bg-surface-muted/40 dark:bg-[#18202b]/60 border border-border rounded-lg cursor-pointer hover:border-fairway-500 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={cctvSecurity}
-                    onChange={(e) => setCctvSecurity(e.target.checked)}
-                    className="w-4 h-4 rounded text-fairway-600 focus:ring-fairway-500 border-border cursor-pointer"
-                  />
-                  <span className="text-xs font-semibold text-foreground">24/7 Gated Security & CCTV</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-b border-border/80" />
-
-          {/* ================= SECTION 2: LOCATION & MICRO-MARKET ================= */}
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-foreground tracking-tight">Location & Corridor Details</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">Geographic position, arterial highways, and corridor connectivity</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Corridor with Combobox */}
-              <div className="sm:col-span-1 lg:col-span-1 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+              {/* Corridor */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Industrial Corridor / Belt</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <Combobox
-                  options={CORRIDOR_COMBOBOX_OPTIONS}
+                  options={corridorComboboxOptions}
                   value={corridor}
                   onChange={(val) => {
                     setCorridor(val);
                     clearError('corridor');
                   }}
                   placeholder="Select industrial corridor..."
-                  searchPlaceholder="Search industrial corridor..."
-                  triggerClassName={`rounded-lg h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
+                  triggerClassName={`rounded-xl h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
                     errors.corridor ? 'border-rose-500 ring-1 ring-rose-500' : ''
                   }`}
                 />
@@ -493,14 +600,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
               </div>
 
               {/* City */}
-              <div className="sm:col-span-1 lg:col-span-1 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>City / District</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Bharuch / Ahmedabad / Surat"
+                  placeholder="e.g. Ahmedabad"
                   value={city}
                   onChange={(e) => {
                     setCity(e.target.value);
@@ -508,14 +615,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.city ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.city && <p className="text-[11px] text-rose-500 font-medium">{errors.city}</p>}
               </div>
 
-              {/* State with Combobox */}
-              <div className="sm:col-span-1 lg:col-span-1 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+              {/* State */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>State</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -527,8 +634,7 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                     clearError('state');
                   }}
                   placeholder="Select state..."
-                  searchPlaceholder="Search state..."
-                  triggerClassName={`rounded-lg h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
+                  triggerClassName={`rounded-xl h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
                     errors.state ? 'border-rose-500 ring-1 ring-rose-500' : ''
                   }`}
                 />
@@ -536,14 +642,15 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
               </div>
 
               {/* PIN Code */}
-              <div className="sm:col-span-1 lg:col-span-1 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>PIN Code</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 392130"
+                  inputMode="numeric"
+                  placeholder="e.g. 382110"
                   value={pincode}
                   onChange={(e) => {
                     setPincode(e.target.value);
@@ -551,20 +658,20 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.pincode ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.pincode && <p className="text-[11px] text-rose-500 font-medium">{errors.pincode}</p>}
               </div>
 
               {/* Full Address */}
-              <div className="sm:col-span-2 lg:col-span-2 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+              <div className="sm:col-span-2 lg:col-span-3 space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Full Micro-Market / Site Address</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Plot 45-B, PCPIR Industrial Area, NH-48 Express Highway, Opp. Logistics Hub"
+                  placeholder="e.g. Plot 42-45, Sanand GIDC Phase II, Near Tata Motors Plant"
                   value={location}
                   onChange={(e) => {
                     setLocation(e.target.value);
@@ -572,32 +679,48 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.location ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.location && <p className="text-[11px] text-rose-500 font-medium">{errors.location}</p>}
               </div>
             </div>
           </div>
+        )}
 
-          <div className="border-b border-border/80" />
+        {/* ================= STEP 2: SPACE & COMMERCIALS ================= */}
+        {currentStep === 2 && (
+          <div className="bg-surface border border-border rounded-2xl p-5 sm:p-7 shadow-xs space-y-6 animate-fade-in">
+            <div className="border-b border-border pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-fairway-600" />
+                  <span>Step 2: Space & Commercial Terms</span>
+                </h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Leasable dimensions, base rate, security deposits, and possession schedule
+                </p>
+              </div>
 
-          {/* ================= SECTION 3: DIMENSIONS & COMMERCIALS ================= */}
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-foreground tracking-tight">Dimensions & Commercial Terms</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">Leasable area, pricing, security deposits, and possession schedule</p>
+              {/* Real-time Calculation Badge */}
+              {estimatedMonthlyGross > 0 && (
+                <div className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-emerald-700 dark:text-emerald-300 font-bold text-xs">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Gross: ~ {formatINR(estimatedMonthlyGross, true)}/mo</span>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Total Park Area */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Total Park Area (sq.ft)</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="number"
-                  placeholder="e.g. 150000"
+                  inputMode="numeric"
+                  placeholder="e.g. 180000"
                   value={totalAreaSqFt}
                   onChange={(e) => {
                     setTotalAreaSqFt(e.target.value ? Number(e.target.value) : '');
@@ -605,20 +728,32 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.totalAreaSqFt ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.totalAreaSqFt && <p className="text-[11px] text-rose-500 font-medium">{errors.totalAreaSqFt}</p>}
               </div>
 
-              {/* Available Space */}
+              {/* Available Space with Helper */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                  <span>Available Space (sq.ft)</span>
-                  <span className="text-rose-500 font-bold">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                    <span>Available Space (sq.ft)</span>
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  {totalAreaSqFt && (
+                    <button
+                      type="button"
+                      onClick={() => setAvailableAreaSqFt(Number(totalAreaSqFt))}
+                      className="text-[10px] text-fairway-600 dark:text-fairway-400 font-bold hover:underline cursor-pointer"
+                    >
+                      = Same as Total
+                    </button>
+                  )}
+                </div>
                 <input
                   type="number"
-                  placeholder="e.g. 75000"
+                  inputMode="numeric"
+                  placeholder="e.g. 125000"
                   value={availableAreaSqFt}
                   onChange={(e) => {
                     setAvailableAreaSqFt(e.target.value ? Number(e.target.value) : '');
@@ -626,14 +761,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.availableAreaSqFt ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.availableAreaSqFt && <p className="text-[11px] text-rose-500 font-medium">{errors.availableAreaSqFt}</p>}
               </div>
 
-              {/* Monthly Rent */}
+              {/* Base Rent with Currency Symbol */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Base Rent (₹ / sq.ft / mo)</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -641,7 +776,9 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   <span className="absolute left-3.5 top-2.5 text-xs text-foreground-muted font-bold">₹</span>
                   <input
                     type="number"
-                    placeholder="e.g. 24"
+                    step="0.1"
+                    inputMode="decimal"
+                    placeholder="e.g. 24.5"
                     value={rentPerSqFtINR}
                     onChange={(e) => {
                       setRentPerSqFtINR(e.target.value ? Number(e.target.value) : '');
@@ -649,21 +786,40 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                     }}
                     className={`w-full pl-8 bg-surface-muted/60 dark:bg-[#18202b] border ${
                       errors.rentPerSqFtINR ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                    } rounded-lg text-sm text-foreground h-10 pr-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                    } rounded-xl text-sm text-foreground h-10 pr-3.5 focus:border-fairway-600 focus:outline-none`}
                   />
                 </div>
                 {errors.rentPerSqFtINR && <p className="text-[11px] text-rose-500 font-medium">{errors.rentPerSqFtINR}</p>}
               </div>
 
-              {/* Deposit Months */}
+              {/* Security Deposit with Chips */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                  <span>Security Deposit (Months)</span>
-                  <span className="text-rose-500 font-bold">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                    <span>Security Deposit (Months)</span>
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <div className="flex gap-1">
+                    {[3, 6].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setDepositMonths(m)}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                          depositMonths === m
+                            ? 'bg-fairway-600 text-white border-fairway-600'
+                            : 'border-border text-foreground-muted hover:bg-surface-muted'
+                        }`}
+                      >
+                        {m}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <input
                   type="number"
-                  placeholder="e.g. 6"
+                  inputMode="numeric"
+                  placeholder="e.g. 3"
                   value={depositMonths}
                   onChange={(e) => {
                     setDepositMonths(e.target.value ? Number(e.target.value) : '');
@@ -671,19 +827,38 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.depositMonths ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.depositMonths && <p className="text-[11px] text-rose-500 font-medium">{errors.depositMonths}</p>}
               </div>
 
-              {/* Lease Terms */}
+              {/* Lease Term with Chips */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                  <span>Lease Term (Years)</span>
-                  <span className="text-rose-500 font-bold">*</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                    <span>Lease Term (Years)</span>
+                    <span className="text-rose-500 font-bold">*</span>
+                  </label>
+                  <div className="flex gap-1">
+                    {[3, 5, 9].map((y) => (
+                      <button
+                        key={y}
+                        type="button"
+                        onClick={() => setLeaseTermsYears(y)}
+                        className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                          leaseTermsYears === y
+                            ? 'bg-fairway-600 text-white border-fairway-600'
+                            : 'border-border text-foreground-muted hover:bg-surface-muted'
+                        }`}
+                      >
+                        {y}y
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <input
                   type="number"
+                  inputMode="numeric"
                   placeholder="e.g. 5"
                   value={leaseTermsYears}
                   onChange={(e) => {
@@ -692,14 +867,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.leaseTermsYears ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.leaseTermsYears && <p className="text-[11px] text-rose-500 font-medium">{errors.leaseTermsYears}</p>}
               </div>
 
-              {/* Availability Date with DatePicker */}
+              {/* Available From Date */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Available From</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -716,25 +891,31 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
               </div>
             </div>
           </div>
+        )}
 
-          <div className="border-b border-border/80" />
-
-          {/* ================= SECTION 4: TECHNICAL SPECIFICATIONS ================= */}
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-foreground tracking-tight">Technical Specifications & Infrastructure</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">Engineering benchmarks, clear height, docks, and fire safety</p>
+        {/* ================= STEP 3: TECHNICAL & LOGISTICS SPECS ================= */}
+        {currentStep === 3 && (
+          <div className="bg-surface border border-border rounded-2xl p-5 sm:p-7 shadow-xs space-y-6 animate-fade-in">
+            <div className="border-b border-border pb-3">
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <Layers className="w-4 h-4 text-fairway-600" />
+                <span>Step 3: Technical Specifications & Safety</span>
+              </h2>
+              <p className="text-xs text-foreground-muted mt-0.5">
+                Engineering benchmarks, load limits, power infrastructure, and compliance standards
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Clear Height */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Clear Height (Meters)</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="number"
+                  step="0.5"
                   placeholder="e.g. 12"
                   value={clearHeightFt}
                   onChange={(e) => {
@@ -743,14 +924,19 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.clearHeightFt ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
+                {clearHeightFt ? (
+                  <span className="text-[10px] text-foreground-muted block">
+                    ~ {(Number(clearHeightFt) * 3.28).toFixed(1)} ft headroom
+                  </span>
+                ) : null}
                 {errors.clearHeightFt && <p className="text-[11px] text-rose-500 font-medium">{errors.clearHeightFt}</p>}
               </div>
 
               {/* Docks Count */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Hydraulic Docks</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -764,14 +950,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.docksCount ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.docksCount && <p className="text-[11px] text-rose-500 font-medium">{errors.docksCount}</p>}
               </div>
 
               {/* Flooring Capacity */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Floor Load (MT/sq.m)</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -785,14 +971,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.flooringCapacityMT ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.flooringCapacityMT && <p className="text-[11px] text-rose-500 font-medium">{errors.flooringCapacityMT}</p>}
               </div>
 
               {/* Connected Power */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Power (KVA)</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -806,14 +992,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
                     errors.powerKVA ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                  } rounded-lg text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none transition-colors`}
+                  } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.powerKVA && <p className="text-[11px] text-rose-500 font-medium">{errors.powerKVA}</p>}
               </div>
 
-              {/* Fire Safety with Combobox */}
-              <div className="sm:col-span-2 lg:col-span-2 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+              {/* Fire Safety Standards */}
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Fire Safety & Suppression</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -825,17 +1011,16 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                     clearError('fireSystems');
                   }}
                   placeholder="Select fire safety standard..."
-                  searchPlaceholder="Search fire safety systems..."
-                  triggerClassName={`rounded-lg h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
+                  triggerClassName={`rounded-xl h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
                     errors.fireSystems ? 'border-rose-500 ring-1 ring-rose-500' : ''
                   }`}
                 />
                 {errors.fireSystems && <p className="text-[11px] text-rose-500 font-medium">{errors.fireSystems}</p>}
               </div>
 
-              {/* Truck Access with Combobox */}
-              <div className="sm:col-span-2 lg:col-span-2 space-y-1.5">
-                <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
+              {/* Truck Access & Circulation */}
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
                   <span>Truck Circulation & Apron</span>
                   <span className="text-rose-500 font-bold">*</span>
                 </label>
@@ -847,146 +1032,298 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                     clearError('truckAccess');
                   }}
                   placeholder="Select truck circulation & apron type..."
-                  searchPlaceholder="Search truck access specifications..."
-                  triggerClassName={`rounded-lg h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
+                  triggerClassName={`rounded-xl h-10 bg-surface-muted/60 dark:bg-[#18202b] ${
                     errors.truckAccess ? 'border-rose-500 ring-1 ring-rose-500' : ''
                   }`}
                 />
                 {errors.truckAccess && <p className="text-[11px] text-rose-500 font-medium">{errors.truckAccess}</p>}
               </div>
-            </div>
-          </div>
 
-          <div className="border-b border-border/80" />
-
-          {/* ================= SECTION 5: INDUSTRY SUITABILITY & DESCRIPTION ================= */}
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-foreground tracking-tight">Industry Suitability & Overview</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">Target occupant verticals and marketing highlights</p>
-            </div>
-
-            {/* Suitable Industry Pills */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                <span>Suitable Industry Segments</span>
-                <span className="text-rose-500 font-bold">*</span>
-              </label>
-              <div className={`flex flex-wrap gap-2 p-3 rounded-xl border ${
-                errors.suitableIndustries ? 'border-rose-500 ring-1 ring-rose-500 bg-rose-50/10' : 'border-border/60 bg-surface-muted/30'
-              }`}>
-                {INDUSTRY_OPTIONS.map((ind) => {
-                  const isSelected = suitableIndustries.includes(ind);
-                  return (
-                    <button
-                      key={ind}
-                      type="button"
-                      onClick={() => toggleIndustry(ind)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        isSelected
-                          ? 'bg-fairway-600 text-white shadow-xs'
-                          : 'bg-surface hover:bg-surface-muted text-foreground border border-border/80'
-                      }`}
-                    >
-                      {isSelected && <Check className="w-3 h-3 shrink-0" />}
-                      <span>{ind}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {errors.suitableIndustries && <p className="text-[11px] text-rose-500 font-medium">{errors.suitableIndustries}</p>}
-            </div>
-
-            {/* Description Textarea */}
-            <div className="space-y-1.5 pt-2">
-              <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                <span>Marketing Overview & Highlights</span>
-                <span className="text-rose-500 font-bold">*</span>
-              </label>
-              <textarea
-                rows={4}
-                placeholder="Describe key differentiators, PEB building quality, clear heights, flooring standards, and logistical advantages..."
-                value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value);
-                  clearError('description');
-                }}
-                className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
-                  errors.description ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
-                } rounded-lg text-sm text-foreground p-3 focus:border-fairway-600 focus:outline-none transition-colors`}
-              />
-              {errors.description && <p className="text-[11px] text-rose-500 font-medium">{errors.description}</p>}
-            </div>
-
-            {/* Photos List & Add */}
-            <div className="space-y-3 pt-2">
-              <label className="text-xs font-semibold text-foreground flex items-center gap-1 h-5 whitespace-nowrap">
-                <span>Facility Gallery & Image URLs</span>
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  placeholder="Paste direct image URL (https://...)"
-                  value={newPhotoUrl}
-                  onChange={(e) => setNewPhotoUrl(e.target.value)}
-                  className="flex-1 bg-surface-muted/60 dark:bg-[#18202b] border border-border rounded-lg text-xs sm:text-sm text-foreground h-10 px-3 focus:border-fairway-600 focus:outline-none"
+              {/* Green Building Rating */}
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                  <span>Green Building Rating</span>
+                </label>
+                <Combobox
+                  options={GREEN_BUILDING_OPTIONS}
+                  value={greenBuildingCert}
+                  onChange={(val) => setGreenBuildingCert(val)}
+                  placeholder="Select green building rating..."
+                  triggerClassName="rounded-xl h-10 bg-surface-muted/60 dark:bg-[#18202b]"
                 />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={handleAddPhoto}
-                  disabled={!newPhotoUrl.trim()}
-                  leftIcon={<Plus className="w-3.5 h-3.5" />}
-                  className="w-full sm:w-auto"
-                >
-                  Add Photo
-                </Button>
               </div>
 
-              {photos.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2">
-                  {photos.map((url, idx) => (
-                    <div key={idx} className="relative group rounded-lg overflow-hidden border border-border aspect-video bg-surface-muted">
-                      <img src={url} alt={`Warehouse view ${idx + 1}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePhoto(idx)}
-                        className="absolute top-1.5 right-1.5 p-1 bg-black/70 hover:bg-rose-600 text-white rounded-md transition-colors shadow-xs cursor-pointer"
-                        title="Remove photo"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+              {/* 24/7 Gated Security & Staging Bays */}
+              <div className="sm:col-span-2 space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                  <span>Security & Parking Slots</span>
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="flex-1 flex items-center gap-2 h-10 px-3.5 bg-surface-muted/40 dark:bg-[#18202b]/60 border border-border rounded-xl cursor-pointer hover:border-fairway-500 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={cctvSecurity}
+                      onChange={(e) => setCctvSecurity(e.target.checked)}
+                      className="w-4 h-4 rounded text-fairway-600 focus:ring-fairway-500 border-border cursor-pointer"
+                    />
+                    <span className="text-xs font-semibold text-foreground">24/7 Gated Security & CCTV</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="20 Bays"
+                    value={parkingSlots}
+                    onChange={(e) => setParkingSlots(e.target.value ? Number(e.target.value) : '')}
+                    className="w-24 bg-surface-muted/60 dark:bg-[#18202b] border border-border rounded-xl text-xs text-foreground h-10 px-3 focus:border-fairway-600 focus:outline-none"
+                    title="Staging Parking Bays"
+                  />
                 </div>
-              )}
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Form Actions Footer */}
-          <div className="pt-4 sm:pt-6 border-t border-border flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2.5 sm:gap-3">
+        {/* ================= STEP 4: PHOTOS, INDUSTRIES & REVIEW ================= */}
+        {currentStep === 4 && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Suitable Industries & Marketing Description */}
+            <div className="bg-surface border border-border rounded-2xl p-5 sm:p-7 shadow-xs space-y-6">
+              <div className="border-b border-border pb-3">
+                <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-fairway-600" />
+                  <span>Step 4: Industry Suitability & Final Review</span>
+                </h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Select target occupant sectors, review property highlights, and verify listing dossier
+                </p>
+              </div>
+
+              {/* Clean Deduplicated Industry Tags */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                  <span>Suitable Industry Verticals</span>
+                  <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <div
+                  className={`flex flex-wrap gap-2 p-3.5 rounded-xl border ${
+                    errors.suitableIndustries
+                      ? 'border-rose-500 ring-1 ring-rose-500 bg-rose-50/10'
+                      : 'border-border/80 bg-surface-muted/30'
+                  }`}
+                >
+                  {allIndustryOptions.map((ind) => {
+                    const isSelected = suitableIndustries.includes(ind);
+                    return (
+                      <button
+                        key={ind}
+                        type="button"
+                        onClick={() => toggleIndustry(ind)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-fairway-600 text-white shadow-xs'
+                            : 'bg-surface hover:bg-surface-muted text-foreground border border-border/80'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        <span>{ind}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {errors.suitableIndustries && <p className="text-[11px] text-rose-500 font-medium">{errors.suitableIndustries}</p>}
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                  <span>Marketing Overview & Key Highlights</span>
+                  <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Describe PEB steel framework, clear height advantages, apron maneuvering, and location benefits..."
+                  value={description}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    clearError('description');
+                  }}
+                  className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
+                    errors.description ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
+                  } rounded-xl text-sm text-foreground p-3 focus:border-fairway-600 focus:outline-none`}
+                />
+                {errors.description && <p className="text-[11px] text-rose-500 font-medium">{errors.description}</p>}
+              </div>
+            </div>
+
+            {/* LIVE DOSSIER PREVIEW CARD */}
+            <div className="bg-fairway-500/5 dark:bg-fairway-500/10 border border-fairway-500/20 rounded-2xl p-5 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-fairway-700 dark:text-fairway-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Eye className="w-4 h-4" /> Live Warehouse Summary Preview
+                </span>
+                <span className="text-xs font-mono font-bold bg-black text-white px-2 py-0.5 rounded-md">
+                  {code || 'PROP-XXX'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 bg-surface rounded-xl border border-border">
+                  <span className="text-[10px] text-foreground-muted block">Available Area</span>
+                  <span className="text-sm sm:text-base font-extrabold text-foreground block mt-0.5">
+                    {availableAreaSqFt ? formatSqFt(Number(availableAreaSqFt)) : '—'}
+                  </span>
+                  <span className="text-[10px] text-foreground-muted block truncate">
+                    of {totalAreaSqFt ? formatSqFt(Number(totalAreaSqFt)) : '—'} total
+                  </span>
+                </div>
+
+                <div className="p-3 bg-surface rounded-xl border border-border">
+                  <span className="text-[10px] text-foreground-muted block">Base Asking Rent</span>
+                  <span className="text-sm sm:text-base font-extrabold text-foreground block mt-0.5">
+                    ₹{rentPerSqFtINR || '0'}/sq.ft
+                  </span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block truncate">
+                    ~ {formatINR(estimatedMonthlyGross, true)}/mo
+                  </span>
+                </div>
+
+                <div className="p-3 bg-surface rounded-xl border border-border">
+                  <span className="text-[10px] text-foreground-muted block">Clear Height</span>
+                  <span className="text-sm sm:text-base font-extrabold text-foreground block mt-0.5">
+                    {clearHeightFt || '0'} Meters
+                  </span>
+                  <span className="text-[10px] text-foreground-muted block">
+                    ~ {(Number(clearHeightFt || 0) * 3.28).toFixed(1)} ft headroom
+                  </span>
+                </div>
+
+                <div className="p-3 bg-surface rounded-xl border border-border">
+                  <span className="text-[10px] text-foreground-muted block">Docks & Logistics</span>
+                  <span className="text-sm sm:text-base font-extrabold text-foreground block mt-0.5">
+                    {docksCount || '0'} Bays
+                  </span>
+                  <span className="text-[10px] text-foreground-muted block truncate">
+                    {flooringCapacityMT || '0'} MT Floor Load
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-xs text-foreground-muted flex items-center gap-2 flex-wrap pt-1">
+                <MapPin className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
+                <span className="font-semibold text-foreground">{name || 'Warehouse Name'}</span>
+                <span>·</span>
+                <span>{corridor}</span>
+                <span>·</span>
+                <span>{city}, {state}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DESKTOP FOOTER NAVIGATION */}
+        <div className="hidden sm:flex items-center justify-between pt-4 border-t border-border">
+          <div>
+            {currentStep > 1 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={handlePrev}
+                leftIcon={<ArrowLeft className="w-4 h-4" />}
+                className="rounded-xl text-xs font-bold"
+              >
+                Previous Step
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                onClick={onBack}
+                className="rounded-xl text-xs font-bold"
+              >
+                Cancel
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {currentStep < 4 ? (
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={handleNext}
+                rightIcon={<ArrowRight className="w-4 h-4" />}
+                className="bg-fairway-600 hover:bg-fairway-700 text-white font-bold text-xs rounded-xl shadow-xs"
+              >
+                Next: {stepsList[currentStep]?.title}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={() => handleSubmit()}
+                isLoading={isSubmitting}
+                leftIcon={<CheckCircle2 className="w-4 h-4" />}
+                className="bg-fairway-600 hover:bg-fairway-700 text-white font-bold text-xs rounded-xl shadow-xs"
+              >
+                {initialProperty ? 'Update Warehouse Asset' : 'Publish Warehouse Listing'}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* MOBILE STICKY BOTTOM NAVIGATION BAR */}
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 bg-surface/95 backdrop-blur-lg border-t border-border z-30 shadow-lg flex items-center justify-between gap-2">
+          {currentStep > 1 ? (
             <Button
               type="button"
               variant="outline"
-              size="md"
+              size="sm"
+              onClick={handlePrev}
+              leftIcon={<ArrowLeft className="w-4 h-4" />}
+              className="rounded-xl text-xs font-bold flex-1 justify-center"
+            >
+              Previous
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               onClick={onBack}
-              disabled={isSubmitting}
-              className="w-full sm:w-auto justify-center"
+              className="rounded-xl text-xs font-bold flex-1 justify-center"
             >
               Cancel
             </Button>
+          )}
+
+          {currentStep < 4 ? (
             <Button
-              type="submit"
+              type="button"
               variant="primary"
-              size="md"
-              disabled={isSubmitting}
-              className="w-full sm:w-auto bg-fairway-600 hover:bg-fairway-700 text-white font-bold shadow-xs justify-center"
+              size="sm"
+              onClick={handleNext}
+              rightIcon={<ArrowRight className="w-4 h-4" />}
+              className="bg-fairway-600 hover:bg-fairway-700 text-white font-bold text-xs rounded-xl shadow-xs flex-1 justify-center"
             >
-              {isSubmitting ? 'Publishing Warehouse...' : 'Publish Warehouse Listing'}
+              Next Step
             </Button>
-          </div>
-        </form>
+          ) : (
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => handleSubmit()}
+              isLoading={isSubmitting}
+              leftIcon={<CheckCircle2 className="w-4 h-4" />}
+              className="bg-fairway-600 hover:bg-fairway-700 text-white font-bold text-xs rounded-xl shadow-xs flex-1 justify-center"
+            >
+              Publish
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

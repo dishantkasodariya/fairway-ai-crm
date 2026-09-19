@@ -144,20 +144,21 @@ export const UserCombobox: React.FC<UserComboboxProps> = ({
           className="w-[var(--radix-popover-trigger-width)] min-w-[min(260px,calc(100vw-24px))] max-w-[calc(100vw-24px)] p-0 rounded-2xl border border-border bg-surface dark:bg-[#161B22] shadow-2xl overflow-hidden z-[99999] animate-fade-in"
         >
           <Command className="w-full bg-transparent">
-            <div className="flex items-center border-b border-border px-3.5 py-1 bg-surface-muted/30">
+            <div className="flex items-center border-b border-border px-3.5 py-1 bg-surface-muted/30 outline-none ring-0 focus-within:ring-0 focus-within:outline-none" cmdk-input-wrapper="">
               <Search className="w-4 h-4 text-foreground-muted mr-2.5 shrink-0 opacity-60" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="h-9 w-full bg-transparent text-xs text-foreground placeholder:text-foreground-muted outline-none border-none ring-0 focus:outline-none focus:ring-0"
+                className="h-9 w-full rounded-none bg-transparent py-2 text-xs text-foreground placeholder:text-foreground-muted outline-none border-0 ring-0 ring-offset-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-0 shadow-none"
+                style={{ outline: 'none', boxShadow: 'none', border: 'none' }}
               />
               {query && (
                 <button
                   type="button"
                   onClick={() => setQuery('')}
-                  className="p-1 text-foreground-muted hover:text-foreground rounded-md"
+                  className="p-1 text-foreground-muted hover:text-foreground rounded-md transition-colors"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>

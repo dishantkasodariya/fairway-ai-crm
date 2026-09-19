@@ -2,6 +2,10 @@ import React from 'react';
 import {
   Warehouse,
   CheckCircle2,
+  Calendar,
+  User,
+  Phone,
+  ArrowRight,
 } from 'lucide-react';
 import { SiteVisit } from '@/modules/core/types';
 import { Button } from '@/modules/core/components/ui/Button';
@@ -25,110 +29,178 @@ export const SiteVisitsList: React.FC<SiteVisitsListProps> = ({
   onNavigateToInquiry,
   onUpdateVisitStatus,
 }) => {
+  const formatHost = (host?: string) => {
+    if (!host) return 'Sales Host';
+    if (host.includes('@')) {
+      const name = host.split('@')[0];
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+    return host;
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Completed':
+        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
+      case 'Cancelled':
+        return 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20';
+      case 'Scheduled':
+      default:
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+    }
+  };
+
   return (
-    <div className="bg-surface rounded-card border border-border shadow-subtle overflow-hidden divide-y divide-border">
-      {visits.map((sv) => (
-        <div
-          key={sv.id}
-          className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-surface-muted/40 transition-colors text-xs"
-        >
-          <div className="space-y-1 flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              {columns.company && (
-                <span
-                  className="font-bold text-foreground text-sm hover:text-fairway-800 cursor-pointer"
-                  onClick={() => onNavigateToCompany(sv.companyId)}
-                >
-                  {sv.companyName}
-                </span>
+    <div className="bg-surface rounded-2xl border border-border shadow-xs overflow-hidden divide-y divide-border">
+      {visits.map((sv) => {
+        const hasValidInquiry = sv.inquiryNumber && sv.inquiryNumber.trim() && sv.inquiryNumber !== '-';
+        const hasDistinctLocation =
+          sv.propertyLocation &&
+          sv.propertyLocation.trim().length > 0 &&
+          sv.propertyLocation.trim().toLowerCase() !== sv.propertyName.trim().toLowerCase() &&
+          !sv.propertyName.toLowerCase().includes(sv.propertyLocation.toLowerCase());
+
+        return (
+          <div
+            key={sv.id}
+            className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-surface-muted/30 transition-colors text-xs text-left"
+          >
+            <div className="space-y-2 flex-1 min-w-0">
+              {/* Top Meta Line: Company, Inquiry badge, Status */}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {columns.company && (
+                  <span
+                    className="font-bold text-foreground text-sm hover:text-fairway-600 transition-colors cursor-pointer"
+                    onClick={() => onNavigateToCompany(sv.companyId)}
+                  >
+                    {sv.companyName}
+                  </span>
+                )}
+
+                {hasValidInquiry && (
+                  <span className="font-mono text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface-muted text-foreground-muted border border-border">
+                    {sv.inquiryNumber}
+                  </span>
+                )}
+
+                {columns.status && (
+                  <span
+                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 ${getStatusBadge(
+                      sv.status
+                    )}`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                    <span>{sv.status}</span>
+                  </span>
+                )}
+
+                {sv.outcome && (
+                  <span className="text-[11px] font-medium text-foreground-muted bg-surface-muted px-2 py-0.5 rounded border border-border">
+                    Outcome: {sv.outcome}
+                  </span>
+                )}
+              </div>
+
+              {/* Property & Location (No duplicate repeating in parentheses) */}
+              {columns.property && (
+                <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
+                  <Warehouse className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
+                  <span className="font-semibold text-foreground">{sv.propertyName}</span>
+                  {hasDistinctLocation && <span>· {sv.propertyLocation}</span>}
+                </div>
               )}
-              <span className="font-mono text-xs px-2.5 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40">
-                {sv.inquiryNumber}
-              </span>
-              {columns.status && (
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    sv.status === 'Completed'
-                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
-                      : 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20'
-                  }`}
-                >
-                  {sv.status}
-                </span>
-              )}
-              {sv.outcome && (
-                <span className="text-[10px] font-semibold bg-blue-50 text-blue-800 px-2 py-0.5 rounded border border-blue-200">
-                  Outcome: {sv.outcome}
-                </span>
+
+              {/* Inspection Date, Host, Client contact */}
+              <div className="flex items-center gap-3 sm:gap-4 text-xs text-foreground-muted pt-0.5 flex-wrap">
+                {columns.inspectionDate && (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                    <span>
+                      Date: <strong className="text-foreground">{formatDate(sv.visitDate)} at {sv.visitTime}</strong>
+                    </span>
+                  </span>
+                )}
+
+                {columns.host && (
+                  <span className="flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                    <span>
+                      Host: <strong className="text-foreground">{formatHost(sv.assignedSalespersonName)}</strong>
+                    </span>
+                  </span>
+                )}
+
+                {sv.contactPhone && (
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                    <span>
+                      Client:{' '}
+                      <a
+                        href={`tel:${sv.contactPhone}`}
+                        className="font-medium text-foreground hover:text-fairway-600 transition-colors"
+                      >
+                        {sv.contactPhone}
+                      </a>
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              {/* Internal Notes & Client Feedback (Clean minimal layout, no loud green/dark boxes) */}
+              {(sv.notes || sv.clientFeedback) && (
+                <div className="mt-1 space-y-1 pl-3 border-l-2 border-border text-xs">
+                  {sv.notes && (
+                    <p className="text-foreground-muted">
+                      <span className="font-semibold text-foreground">Notes: </span>
+                      {sv.notes}
+                    </p>
+                  )}
+                  {sv.clientFeedback && (
+                    <p className="text-foreground-muted">
+                      <span className="font-semibold text-foreground">Client Feedback: </span>
+                      <span className="text-foreground">{sv.clientFeedback}</span>
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
-            {columns.property && (
-              <div className="flex items-center gap-2 text-foreground-muted">
-                <Warehouse className="w-3.5 h-3.5 text-slate-400" />
-                <span className="font-semibold text-foreground">{sv.propertyName}</span>
-                <span>({sv.propertyLocation})</span>
+            {/* Action Buttons */}
+            {columns.actions && (
+              <div className="flex items-center gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border">
+                {canEdit && sv.status === 'Scheduled' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      onUpdateVisitStatus(
+                        sv.id,
+                        'Completed',
+                        'Client satisfied with clear height and dock bays.'
+                      )
+                    }
+                    leftIcon={<CheckCircle2 className="w-3.5 h-3.5 text-fairway-600 dark:text-fairway-400" />}
+                    className="rounded-xl text-xs font-semibold"
+                  >
+                    Mark Completed
+                  </Button>
+                )}
+                {sv.inquiryId && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onNavigateToInquiry(sv.inquiryId)}
+                    rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+                    className="rounded-xl text-xs font-semibold"
+                  >
+                    Inquiry Workspace
+                  </Button>
+                )}
               </div>
             )}
-
-            <div className="flex items-center gap-4 text-[11px] text-foreground-muted pt-1 flex-wrap">
-              {columns.inspectionDate && (
-                <span>
-                  Inspection Date: <strong>{formatDate(sv.visitDate)} at {sv.visitTime}</strong>
-                </span>
-              )}
-              {columns.host && (
-                <span>
-                  Host: <strong>{sv.assignedSalespersonName}</strong>
-                </span>
-              )}
-              {sv.contactPhone && (
-                <span>
-                  Client Phone:{' '}
-                  <a href={`tel:${sv.contactPhone}`} className="hover:underline text-fairway-800">
-                    {sv.contactPhone}
-                  </a>
-                </span>
-              )}
-            </div>
-
-            {sv.notes && (
-              <p className="text-[11px] text-foreground-muted mt-1 bg-surface-muted p-2 rounded">
-                Notes: {sv.notes}
-              </p>
-            )}
-            {sv.clientFeedback && (
-              <p className="text-[11px] text-emerald-900 mt-1 bg-emerald-50 p-2 rounded border border-emerald-100">
-                <strong>Client Feedback:</strong> {sv.clientFeedback}
-              </p>
-            )}
           </div>
-
-          {columns.actions && (
-            <div className="flex items-center gap-2 shrink-0">
-              {canEdit && sv.status === 'Scheduled' && (
-                <Button
-                  size="xs"
-                  variant="primary"
-                  onClick={() =>
-                    onUpdateVisitStatus(
-                      sv.id,
-                      'Completed',
-                      'Client satisfied with clear height and dock bays.'
-                    )
-                  }
-                  leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
-                >
-                  Mark Completed
-                </Button>
-              )}
-              <Button size="xs" variant="outline" onClick={() => onNavigateToInquiry(sv.inquiryId)}>
-                Inquiry Workspace →
-              </Button>
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

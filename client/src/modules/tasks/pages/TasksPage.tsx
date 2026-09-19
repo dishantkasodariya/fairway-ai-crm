@@ -3,52 +3,33 @@ import {
   CheckSquare,
   Plus,
   Search,
-  Filter,
   Clock,
   AlertTriangle,
   CheckCircle2,
   Calendar,
   Building2,
   User,
-  Phone,
-  Mail,
-  Trash2,
   RefreshCw,
-  Loader2,
   List,
   LayoutGrid,
-  Settings,
   X,
   RotateCcw,
-  SlidersHorizontal,
-  ChevronRight,
-  Eye,
+  Sparkles,
+  Phone,
+  Mail,
+  ClipboardList,
+  Users,
+  Zap,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from '@/modules/core/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
-} from '@/modules/core/components/ui/tooltip';
 import { TaskService } from '@/modules/core/services/taskService';
 import { CompanyService } from '@/modules/core/services/companyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { Task, Company } from '@/modules/core/types';
-import { formatRelativeDate, formatDate } from '@/modules/core/utils/formatters';
+import { formatDate } from '@/modules/core/utils/formatters';
 import { Button } from '@/modules/core/components/ui/Button';
-import { Badge } from '@/modules/core/components/ui/Badge';
-import { Tabs } from '@/modules/core/components/ui/Tabs';
 import { Modal } from '@/modules/core/components/ui/Modal';
-import { Input, Select, Textarea } from '@/modules/core/components/ui/Input';
+import { Input, Textarea } from '@/modules/core/components/ui/Input';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
 import { TimePicker } from '@/modules/core/components/ui/TimePicker';
 import { Combobox } from '@/modules/core/components/ui/combobox-1';
@@ -56,13 +37,44 @@ import { UserCombobox } from '@/modules/core/components/ui/UserCombobox';
 import { Skeleton } from '@/modules/core/components/ui/Skeleton';
 import {
   TasksList,
-  ColumnVisibility,
-  getTaskTypeIcon,
   normalizeStatus,
   getValidDueDate,
 } from '../components/TasksList';
 import { TasksCard } from '../components/TasksCard';
 import { cn } from '@/modules/core/lib/utils';
+
+export const TASK_TYPE_OPTIONS = [
+  {
+    value: 'Follow-up',
+    label: 'Follow-up',
+    icon: <ClipboardList className="w-4 h-4 text-foreground-muted shrink-0" />,
+  },
+  {
+    value: 'Call',
+    label: 'Call',
+    icon: <Phone className="w-4 h-4 text-foreground-muted shrink-0" />,
+  },
+  {
+    value: 'Meeting',
+    label: 'Meeting',
+    icon: <Users className="w-4 h-4 text-foreground-muted shrink-0" />,
+  },
+  {
+    value: 'Site Visit',
+    label: 'Site Visit',
+    icon: <Building2 className="w-4 h-4 text-foreground-muted shrink-0" />,
+  },
+  {
+    value: 'Email',
+    label: 'Email',
+    icon: <Mail className="w-4 h-4 text-foreground-muted shrink-0" />,
+  },
+  {
+    value: 'Other',
+    label: 'Other',
+    icon: <Zap className="w-4 h-4 text-foreground-muted shrink-0" />,
+  },
+];
 
 export interface TaskListViewProps {
   onNavigateToCompany: (companyId: string) => void;
@@ -73,11 +85,11 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   onNavigateToCompany,
   onNavigateToInquiry,
 }) => {
-  const { canEdit, canEditModule, currentUser, users, isSales, canCreate, canDeleteModule } = useAuth();
+  const { currentUser, users, isSales, canCreate, canEditModule, canDeleteModule } = useAuth();
   const { success, error } = useToast();
 
-  // Tab & View States
-  const [activeTab, setActiveTab] = useState<'all' | 'today' | 'upcoming' | 'overdue' | 'completed'>('all');
+  // Active Category Filter: 'all' | 'today' | 'upcoming' | 'overdue' | 'completed'
+  const [activeTab, setActiveTab] = useState<'all' | 'today' | 'upcoming' | 'overdue' | 'completed'>('today');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   // Search & Filter States
@@ -85,28 +97,6 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   const [ownerFilter, setOwnerFilter] = useState<string>(isSales ? currentUser.id : 'all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [dateRangeFilter, setDateRangeFilter] = useState('all');
-
-  // Filter Drawer States (Drafts)
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
-  const [draftOwnerFilter, setDraftOwnerFilter] = useState('all');
-  const [draftTypeFilter, setDraftTypeFilter] = useState('all');
-  const [draftPriorityFilter, setDraftPriorityFilter] = useState('all');
-  const [draftCompanyFilter, setDraftCompanyFilter] = useState('all');
-  const [draftDateRangeFilter, setDraftDateRangeFilter] = useState('all');
-
-  // Columns visibility config for List View
-  const [columns, setColumns] = useState<ColumnVisibility>({
-    status: true,
-    description: true,
-    priority: true,
-    company: true,
-    inquiry: true,
-    dueDate: true,
-    assignee: true,
-    actions: true,
-  });
 
   // Task & Data States
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -118,25 +108,14 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const normalizeStatus = (s?: string): Task['status'] => {
-    if (!s) return 'Pending';
-    return s.toString().trim().toLowerCase() === 'completed' ? 'Completed' : 'Pending';
-  };
-
-  const getValidDueDate = (t: Task): string => {
-    if (t.dueDate) return t.dueDate;
-    if (t.createdAt) return t.createdAt.split('T')[0];
-    return todayStr;
-  };
-
   const getEmptyTaskForm = () => ({
     companyId: '',
-    taskType: '' as Task['taskType'],
+    taskType: 'Follow-up' as Task['taskType'],
     description: '',
-    dueDate: '',
-    dueTime: '',
-    priority: '' as Task['priority'],
-    assignedUserId: '',
+    dueDate: todayStr,
+    dueTime: '11:00 AM',
+    priority: 'Medium' as Task['priority'],
+    assignedUserId: currentUser?.id || '',
   });
 
   const [newTaskForm, setNewTaskForm] = useState(getEmptyTaskForm);
@@ -166,7 +145,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     });
   };
 
-  // Load companies dynamically from backend for linked company dropdown
+  // Load companies for linked company dropdown
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
@@ -212,56 +191,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     loadTasks();
   }, []);
 
-  // Filter Drawer Syncing
-  const openFilterDrawer = () => {
-    setDraftOwnerFilter(ownerFilter);
-    setDraftTypeFilter(typeFilter);
-    setDraftPriorityFilter(priorityFilter);
-    setDraftCompanyFilter(companyFilter);
-    setDraftDateRangeFilter(dateRangeFilter);
-    setIsFilterDrawerOpen(true);
-  };
-
-  const applyFilters = () => {
-    setOwnerFilter(draftOwnerFilter);
-    setTypeFilter(draftTypeFilter);
-    setPriorityFilter(draftPriorityFilter);
-    setCompanyFilter(draftCompanyFilter);
-    setDateRangeFilter(draftDateRangeFilter);
-    if (draftDateRangeFilter !== 'all') {
-      setActiveTab('all');
-    }
-    setIsFilterDrawerOpen(false);
-  };
-
-  const resetFilters = () => {
-    setDraftOwnerFilter('all');
-    setDraftTypeFilter('all');
-    setDraftPriorityFilter('all');
-    setDraftCompanyFilter('all');
-    setDraftDateRangeFilter('all');
-    setOwnerFilter('all');
-    setTypeFilter('all');
-    setPriorityFilter('all');
-    setCompanyFilter('all');
-    setDateRangeFilter('all');
-    setSearchQuery('');
-    setActiveTab('all');
-    setIsFilterDrawerOpen(false);
-  };
-
-  // Calculate active filters count
-  const activeFiltersCount = useMemo(() => {
-    let count = 0;
-    if (ownerFilter !== 'all') count++;
-    if (typeFilter !== 'all') count++;
-    if (priorityFilter !== 'all') count++;
-    if (companyFilter !== 'all') count++;
-    if (dateRangeFilter !== 'all') count++;
-    return count;
-  }, [ownerFilter, typeFilter, priorityFilter, companyFilter, dateRangeFilter]);
-
-  // Base tasks matching non-tab filters (search, owner, type, priority, company)
+  // Base tasks matching non-tab filters (search, owner, type, priority)
   const baseFilteredTasks = useMemo(() => {
     return tasks.filter((t) => {
       const q = searchQuery.toLowerCase().trim();
@@ -275,16 +205,15 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       const matchesOwner = ownerFilter === 'all' || t.assignedUserId === ownerFilter;
       const matchesType = typeFilter === 'all' || t.taskType === typeFilter;
       const matchesPriority = priorityFilter === 'all' || t.priority === priorityFilter;
-      const matchesCompany = companyFilter === 'all' || t.companyId === companyFilter;
 
-      return matchesQuery && matchesOwner && matchesType && matchesPriority && matchesCompany;
+      return matchesQuery && matchesOwner && matchesType && matchesPriority;
     });
-  }, [tasks, searchQuery, ownerFilter, typeFilter, priorityFilter, companyFilter]);
+  }, [tasks, searchQuery, ownerFilter, typeFilter, priorityFilter]);
 
-  // Tab counts dynamically calculated from base filtered tasks
-  const allOpenCount = useMemo(
-    () => baseFilteredTasks.filter((t) => normalizeStatus(t.status) === 'Pending').length,
-    [baseFilteredTasks]
+  // Executive Metric Counts dynamically computed
+  const overdueCount = useMemo(
+    () => baseFilteredTasks.filter((t) => normalizeStatus(t.status) === 'Pending' && getValidDueDate(t) < todayStr).length,
+    [baseFilteredTasks, todayStr]
   );
   const todaysCount = useMemo(
     () => baseFilteredTasks.filter((t) => normalizeStatus(t.status) === 'Pending' && getValidDueDate(t) === todayStr).length,
@@ -294,106 +223,149 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     () => baseFilteredTasks.filter((t) => normalizeStatus(t.status) === 'Pending' && getValidDueDate(t) > todayStr).length,
     [baseFilteredTasks, todayStr]
   );
-  const overdueCount = useMemo(
-    () => baseFilteredTasks.filter((t) => normalizeStatus(t.status) === 'Pending' && getValidDueDate(t) < todayStr).length,
-    [baseFilteredTasks, todayStr]
-  );
   const completedCount = useMemo(
     () => baseFilteredTasks.filter((t) => normalizeStatus(t.status) === 'Completed').length,
     [baseFilteredTasks]
   );
+  const allOpenCount = useMemo(
+    () => baseFilteredTasks.filter((t) => normalizeStatus(t.status) === 'Pending').length,
+    [baseFilteredTasks]
+  );
 
+  // Filter tasks based on active category card
+  const filteredTasks = useMemo(() => {
+    return baseFilteredTasks.filter((t) => {
+      const taskStatus = normalizeStatus(t.status);
+      const taskDueDate = getValidDueDate(t);
+
+      if (activeTab === 'all') return taskStatus === 'Pending';
+      if (activeTab === 'today') return taskStatus === 'Pending' && taskDueDate === todayStr;
+      if (activeTab === 'upcoming') return taskStatus === 'Pending' && taskDueDate > todayStr;
+      if (activeTab === 'overdue') return taskStatus === 'Pending' && taskDueDate < todayStr;
+      if (activeTab === 'completed') return taskStatus === 'Completed';
+
+      return true;
+    });
+  }, [baseFilteredTasks, activeTab, todayStr]);
+
+  // Toggle task completion
   const handleToggleTask = async (id: string) => {
+    const target = tasks.find((t) => t.id === id);
+    if (!target) return;
+
+    const newStatus: Task['status'] = target.status === 'Completed' ? 'Pending' : 'Completed';
+
+    // Optimistic UI update
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t))
+    );
+
     try {
-      const res = await TaskService.toggleTask(id);
-      if (res.success && res.data) {
-        const updated = {
-          ...res.data,
-          status: normalizeStatus(res.data.status),
-          dueDate: getValidDueDate(res.data),
-        };
-        setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
-        success('Task Updated', 'Follow-up status synchronized.');
+      const res = await TaskService.updateTask(id, { status: newStatus });
+      if (!res.success) {
+        // Revert on failure
+        setTasks((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, status: target.status } : t))
+        );
+        error('Failed to update task', res.error);
       } else {
-        error('Update Failed', res.error || 'Failed to update task');
+        success(
+          newStatus === 'Completed' ? 'Task Completed' : 'Task Reopened',
+          newStatus === 'Completed'
+            ? 'Follow-up marked as completed.'
+            : 'Follow-up moved back to open tasks.'
+        );
+      }
+    } catch {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: target.status } : t))
+      );
+      error('Error', 'Failed to update task status');
+    }
+  };
+
+  // Delete task
+  const handleDeleteTask = async (id: string) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this task?');
+    if (!confirmDelete) return;
+
+    try {
+      const res = await TaskService.deleteTask(id);
+      if (res.success) {
+        setTasks((prev) => prev.filter((t) => t.id !== id));
+        success('Task Deleted', 'Follow-up task removed.');
+      } else {
+        error('Delete Failed', res.error || 'Failed to delete task.');
       }
     } catch (err: any) {
-      error('Update Failed', err.message || 'Failed to update task');
+      error('Error', err.message || 'Failed to delete task.');
     }
   };
 
-  const handleDeleteTask = async (id: string) => {
-    try {
-      await TaskService.deleteTask(id);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
-      success('Task Deleted', 'Follow-up task removed.');
-    } catch (e: any) {
-      console.error('Backend deleteTask error:', e);
-      error('Delete Failed', e.message || 'Failed to delete task');
-    }
+  // Open Edit Modal
+  const handleOpenEditTask = (task: Task) => {
+    setEditingTask(task);
+    setEditTaskForm({
+      companyId: task.companyId || '',
+      taskType: task.taskType || 'Follow-up',
+      description: task.description || '',
+      dueDate: getValidDueDate(task),
+      dueTime: task.dueTime || '',
+      priority: task.priority || 'Medium',
+      assignedUserId: task.assignedUserId || '',
+    });
+    setEditTaskErrors({});
   };
 
+  // Create Task Submission
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-
     const errors: Record<string, string> = {};
-    if (!newTaskForm.companyId) {
-      errors.companyId = 'Linked company is required';
-    }
-    if (!newTaskForm.taskType) {
-      errors.taskType = 'Task type is required';
-    }
-    if (!newTaskForm.priority) {
-      errors.priority = 'Priority level is required';
+
+    if (!newTaskForm.description.trim()) {
+      errors.description = 'Please enter task details or what to follow up on';
     }
     if (!newTaskForm.dueDate) {
       errors.dueDate = 'Due date is required';
     }
-    if (!newTaskForm.assignedUserId) {
-      errors.assignedUserId = 'Assigned salesperson is required';
-    }
-    if (!newTaskForm.description.trim()) {
-      errors.description = 'Task description is required';
-    }
 
     if (Object.keys(errors).length > 0) {
       setTaskErrors(errors);
-      error('Validation Error', 'Please fill in all mandatory fields highlighted in red.');
       return;
     }
 
-    const comp = companies.find((c) => c.id === newTaskForm.companyId);
-    const assigned = users.find((u) => u.id === newTaskForm.assignedUserId) || currentUser;
-
     setIsSubmitting(true);
     try {
+      const selectedComp = companies.find((c) => c.id === newTaskForm.companyId);
+      const selectedUser = users.find((u) => u.id === newTaskForm.assignedUserId);
+
       const taskData: Partial<Task> = {
-        companyId: comp?.id,
-        companyName: comp?.name,
-        assignedUserId: assigned.id,
-        assignedUserName: assigned.name,
-        taskType: newTaskForm.taskType as Task['taskType'],
+        companyId: newTaskForm.companyId || undefined,
+        companyName: selectedComp ? selectedComp.name : undefined,
+        assignedUserId: newTaskForm.assignedUserId || currentUser?.id,
+        assignedUserName: selectedUser ? selectedUser.name : currentUser?.name,
+        taskType: newTaskForm.taskType,
         description: newTaskForm.description.trim(),
         dueDate: newTaskForm.dueDate,
         dueTime: newTaskForm.dueTime || undefined,
-        priority: newTaskForm.priority as Task['priority'],
-        status: 'Pending' as const,
+        priority: newTaskForm.priority,
+        status: 'Pending',
       };
 
       const res = await TaskService.createTask(taskData);
       if (res.success && res.data) {
-        const created = {
+        const created: Task = {
           ...res.data,
-          status: normalizeStatus(res.data.status),
+          status: 'Pending',
           dueDate: getValidDueDate(res.data),
         };
         setTasks((prev) => [created, ...prev]);
         setIsNewTaskOpen(false);
         setNewTaskForm(getEmptyTaskForm());
         setTaskErrors({});
-        success('Task Created', 'Follow-up task scheduled.');
+        success('Task Scheduled', 'New follow-up task added to your schedule.');
       } else {
-        error('Create Failed', res.error || 'Failed to create task on backend');
+        error('Failed to create task', res.error || 'Server error creating task');
       }
     } catch (err: any) {
       error('Error', err.message || 'Failed to create task.');
@@ -402,32 +374,17 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     }
   };
 
-  const handleOpenEditTask = (task: Task) => {
-    setEditingTask(task);
-    setEditTaskForm({
-      companyId: task.companyId || '',
-      taskType: (task.taskType || 'Follow-up') as Task['taskType'],
-      description: task.description || '',
-      dueDate: getValidDueDate(task),
-      dueTime: task.dueTime || '',
-      priority: (task.priority || 'Medium') as Task['priority'],
-      assignedUserId: task.assignedUserId || currentUser.id,
-    });
-    setEditTaskErrors({});
-  };
-
+  // Update Task Submission
   const handleUpdateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTask) return;
 
     const errors: Record<string, string> = {};
-    if (!editTaskForm.companyId) errors.companyId = 'Please select a company';
-    if (!editTaskForm.taskType) errors.taskType = 'Task type is required';
-    if (!editTaskForm.priority) errors.priority = 'Priority is required';
-    if (!editTaskForm.dueDate) errors.dueDate = 'Due date is required';
-    if (!editTaskForm.assignedUserId) errors.assignedUserId = 'Assignee is required';
-    if (!editTaskForm.description || !editTaskForm.description.trim()) {
-      errors.description = 'Task description is required';
+    if (!editTaskForm.description.trim()) {
+      errors.description = 'Description is required';
+    }
+    if (!editTaskForm.dueDate) {
+      errors.dueDate = 'Due date is required';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -435,21 +392,21 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       return;
     }
 
-    const comp = companies.find((c) => c.id === editTaskForm.companyId);
-    const assigned = users.find((u) => u.id === editTaskForm.assignedUserId) || currentUser;
-
     setIsUpdating(true);
     try {
+      const selectedComp = companies.find((c) => c.id === editTaskForm.companyId);
+      const selectedUser = users.find((u) => u.id === editTaskForm.assignedUserId);
+
       const taskData: Partial<Task> = {
-        companyId: comp?.id,
-        companyName: comp?.name,
-        assignedUserId: assigned.id,
-        assignedUserName: assigned.name,
-        taskType: editTaskForm.taskType as Task['taskType'],
+        companyId: editTaskForm.companyId || undefined,
+        companyName: selectedComp ? selectedComp.name : undefined,
+        assignedUserId: editTaskForm.assignedUserId || undefined,
+        assignedUserName: selectedUser ? selectedUser.name : undefined,
+        taskType: editTaskForm.taskType,
         description: editTaskForm.description.trim(),
         dueDate: editTaskForm.dueDate,
         dueTime: editTaskForm.dueTime || undefined,
-        priority: editTaskForm.priority as Task['priority'],
+        priority: editTaskForm.priority,
       };
 
       const res = await TaskService.updateTask(editingTask.id, taskData);
@@ -465,7 +422,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         setEditTaskErrors({});
         success('Task Updated', 'Follow-up task details updated.');
       } else {
-        error('Update Failed', res.error || 'Failed to update task on backend');
+        error('Update Failed', res.error || 'Failed to update task');
       }
     } catch (err: any) {
       error('Error', err.message || 'Failed to update task.');
@@ -474,50 +431,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     }
   };
 
-  // Filter tasks based on active tab, search query, and filters
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
-      const q = searchQuery.toLowerCase().trim();
-      const matchesQuery =
-        !q ||
-        t.description.toLowerCase().includes(q) ||
-        (t.companyName && t.companyName.toLowerCase().includes(q)) ||
-        (t.assignedUserName && t.assignedUserName.toLowerCase().includes(q)) ||
-        (t.inquiryNumber && t.inquiryNumber.toLowerCase().includes(q));
-
-      const matchesOwner = ownerFilter === 'all' || t.assignedUserId === ownerFilter;
-      const matchesType = typeFilter === 'all' || t.taskType === typeFilter;
-      const matchesPriority = priorityFilter === 'all' || t.priority === priorityFilter;
-      const matchesCompany = companyFilter === 'all' || t.companyId === companyFilter;
-
-      const taskStatus = normalizeStatus(t.status);
-      const taskDueDate = getValidDueDate(t);
-
-      // Date Range Filter
-      let matchesDateRange = true;
-      if (dateRangeFilter === 'today') matchesDateRange = taskDueDate === todayStr;
-      else if (dateRangeFilter === 'overdue') matchesDateRange = taskDueDate < todayStr;
-      else if (dateRangeFilter === 'upcoming') matchesDateRange = taskDueDate > todayStr;
-      else if (dateRangeFilter === 'week') {
-        const endOfWeek = new Date();
-        endOfWeek.setDate(endOfWeek.getDate() + 7);
-        const endOfWeekStr = endOfWeek.toISOString().split('T')[0];
-        matchesDateRange = taskDueDate >= todayStr && taskDueDate <= endOfWeekStr;
-      }
-
-      // Tab matching
-      let matchesTab = false;
-      if (activeTab === 'all') matchesTab = taskStatus === 'Pending';
-      if (activeTab === 'today') matchesTab = taskStatus === 'Pending' && taskDueDate === todayStr;
-      if (activeTab === 'upcoming') matchesTab = taskStatus === 'Pending' && taskDueDate > todayStr;
-      if (activeTab === 'overdue') matchesTab = taskStatus === 'Pending' && taskDueDate < todayStr;
-      if (activeTab === 'completed') matchesTab = taskStatus === 'Completed';
-
-      return matchesQuery && matchesOwner && matchesType && matchesPriority && matchesCompany && matchesDateRange && matchesTab;
-    });
-  }, [tasks, searchQuery, ownerFilter, typeFilter, priorityFilter, companyFilter, dateRangeFilter, activeTab, todayStr]);
-
-  // Options for combobox filters
+  // Dropdown filter options
   const salespersonOptions = useMemo(() => {
     return [
       { value: 'all', label: 'All Salespersons' },
@@ -526,13 +440,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
   }, [users]);
 
   const taskTypeOptions = [
-    { value: 'all', label: 'All Task Types' },
-    { value: 'Call', label: 'Call' },
-    { value: 'Meeting', label: 'Meeting' },
-    { value: 'Email', label: 'Email' },
-    { value: 'Follow-up', label: 'Follow-up' },
-    { value: 'Site Visit', label: 'Site Visit' },
-    { value: 'Other', label: 'Other' },
+    { value: 'all', label: 'All Types' },
+    ...TASK_TYPE_OPTIONS,
   ];
 
   const priorityOptions = [
@@ -542,48 +451,28 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     { value: 'Low', label: 'Low Priority' },
   ];
 
-  const companyOptions = useMemo(() => {
-    return [
-      { value: 'all', label: 'All Companies' },
-      ...companies.map((c) => ({ value: c.id, label: c.name })),
-    ];
-  }, [companies]);
-
-  const dateRangeOptions = [
-    { value: 'all', label: 'All Dates' },
-    { value: 'today', label: 'Due Today' },
-    { value: 'overdue', label: 'Overdue' },
-    { value: 'week', label: 'Due This Week' },
-    { value: 'upcoming', label: 'Future / Upcoming' },
-  ];
-
-  const getTaskTypeIcon = (type?: string) => {
-    switch (type) {
-      case 'Call':
-        return <Phone className="w-3.5 h-3.5" />;
-      case 'Meeting':
-        return <Calendar className="w-3.5 h-3.5" />;
-      case 'Email':
-        return <Mail className="w-3.5 h-3.5" />;
-      case 'Site Visit':
-        return <Building2 className="w-3.5 h-3.5" />;
-      default:
-        return <Clock className="w-3.5 h-3.5" />;
-    }
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setTypeFilter('all');
+    setPriorityFilter('all');
+    setOwnerFilter(isSales ? currentUser.id : 'all');
+    setActiveTab('today');
   };
 
+  const hasActiveFilters = searchQuery !== '' || typeFilter !== 'all' || priorityFilter !== 'all';
+
   return (
-    <div className="space-y-4 max-w-8xl mx-auto text-left px-1 sm:px-0">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-3 border-b border-border">
+    <div className="space-y-5 max-w-8xl mx-auto text-left px-1 sm:px-0 pb-16">
+      {/* 1. HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
         <div>
-          <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">CRM / Tasks</span>
+          <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">CRM / Follow-ups</span>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 mt-0.5">
             <CheckSquare className="w-5 h-5 sm:w-6 h-6 text-foreground shrink-0" />
-            <span>Follow-up & Tasks Management</span>
+            <span>Daily Follow-up & Tasks</span>
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
-            Ensure zero dropped customer touchpoints with scheduled calls, meetings, and follow-ups.
+            Ensure zero dropped deals with scheduled calls, site visits, and follow-ups.
           </p>
         </div>
 
@@ -606,39 +495,157 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         </div>
       </div>
 
-      {/* Tabs Row with Mobile Previous / Next Arrows */}
-      <div className="w-full pb-0.5">
-        <Tabs
-          activeTab={activeTab}
-          onChange={(id) => {
-            setActiveTab(id as any);
-            if (dateRangeFilter !== 'all') {
-              setDateRangeFilter('all');
-              setDraftDateRangeFilter('all');
-            }
-          }}
-          variant="pills"
-          tabs={[
-            { id: 'all', label: 'All Open Tasks', count: allOpenCount },
-            { id: 'today', label: "Today's Tasks", count: todaysCount },
-            { id: 'overdue', label: 'Overdue Follow-ups', count: overdueCount },
-            { id: 'upcoming', label: 'Upcoming', count: upcomingCount },
-            { id: 'completed', label: 'Completed History', count: completedCount },
-          ]}
-        />
+      {/* 2. EXECUTIVE FOCUS STRIP (4 Clickable Cards + All Open Pill) */}
+      <div className="space-y-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          {/* Card 1: Overdue Follow-ups */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('overdue')}
+            className={cn(
+              'p-3 sm:p-4 rounded-xl border text-left transition-all cursor-pointer relative overflow-hidden',
+              activeTab === 'overdue'
+                ? 'bg-surface-muted border-foreground/40 shadow-2xs'
+                : 'bg-surface border-border hover:bg-surface-muted/40 hover:border-foreground/20'
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground-muted flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                Overdue
+              </span>
+              {activeTab === 'overdue' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-foreground" />
+              )}
+            </div>
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-2xl font-bold font-mono tracking-tight text-foreground">
+                {overdueCount}
+              </span>
+              <span className="text-[11px] text-foreground-muted">urgent</span>
+            </div>
+          </button>
+
+          {/* Card 2: Today's Tasks */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('today')}
+            className={cn(
+              'p-3 sm:p-4 rounded-xl border text-left transition-all cursor-pointer relative overflow-hidden',
+              activeTab === 'today'
+                ? 'bg-surface-muted border-foreground/40 shadow-2xs'
+                : 'bg-surface border-border hover:bg-surface-muted/40 hover:border-foreground/20'
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground-muted flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                Today's Tasks
+              </span>
+              {activeTab === 'today' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-foreground" />
+              )}
+            </div>
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-2xl font-bold font-mono tracking-tight text-foreground">
+                {todaysCount}
+              </span>
+              <span className="text-[11px] text-foreground-muted">scheduled</span>
+            </div>
+          </button>
+
+          {/* Card 3: Upcoming Tasks */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('upcoming')}
+            className={cn(
+              'p-3 sm:p-4 rounded-xl border text-left transition-all cursor-pointer relative overflow-hidden',
+              activeTab === 'upcoming'
+                ? 'bg-surface-muted border-foreground/40 shadow-2xs'
+                : 'bg-surface border-border hover:bg-surface-muted/40 hover:border-foreground/20'
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground-muted flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                Upcoming
+              </span>
+              {activeTab === 'upcoming' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-foreground" />
+              )}
+            </div>
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-2xl font-bold font-mono tracking-tight text-foreground">
+                {upcomingCount}
+              </span>
+              <span className="text-[11px] text-foreground-muted">next 7 days</span>
+            </div>
+          </button>
+
+          {/* Card 4: Completed History */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('completed')}
+            className={cn(
+              'p-3 sm:p-4 rounded-xl border text-left transition-all cursor-pointer relative overflow-hidden',
+              activeTab === 'completed'
+                ? 'bg-surface-muted border-foreground/40 shadow-2xs'
+                : 'bg-surface border-border hover:bg-surface-muted/40 hover:border-foreground/20'
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground-muted flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                Completed
+              </span>
+              {activeTab === 'completed' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-foreground" />
+              )}
+            </div>
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="text-2xl font-bold font-mono tracking-tight text-foreground">
+                {completedCount}
+              </span>
+              <span className="text-[11px] text-foreground-muted">done</span>
+            </div>
+          </button>
+        </div>
+
+        {/* Quick pill toggle to view all open tasks */}
+        <div className="flex items-center justify-between text-xs pt-1 px-0.5">
+          <div className="flex items-center gap-2">
+            <span className="text-foreground-muted text-[11px]">View Scope:</span>
+            <button
+              type="button"
+              onClick={() => setActiveTab('all')}
+              className={cn(
+                'px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer',
+                activeTab === 'all'
+                  ? 'bg-foreground text-background font-semibold shadow-2xs'
+                  : 'bg-surface border border-border text-foreground-muted hover:text-foreground'
+              )}
+            >
+              All Open Tasks ({allOpenCount})
+            </button>
+          </div>
+
+          <div className="text-[11px] text-foreground-muted hidden sm:block">
+            Showing <strong className="text-foreground">{filteredTasks.length}</strong> tasks in active view
+          </div>
+        </div>
       </div>
 
-      {/* Sleek Search & Control Toolbar matching reference */}
-      <div className="flex items-center justify-between gap-2 sm:gap-3 pt-1 w-full">
+      {/* 3. STREAMLINED CONTROL TOOLBAR (No Icon Clutter) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 w-full">
         {/* Left: Search Bar */}
         <div className="relative flex-1 min-w-0 max-w-md">
-          <Search className="w-4 h-4 text-foreground-muted absolute left-3.5 top-2.5 pointer-events-none" />
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-2.5 pointer-events-none" />
           <input
             type="text"
             placeholder="Search tasks, descriptions, companies, salesperson..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors h-9"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-surface border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-foreground/50 focus:outline-none transition-colors h-9"
           />
           {searchQuery && (
             <button
@@ -652,311 +659,132 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
           )}
         </div>
 
-        {/* Right: Controls & View Switcher */}
-        <TooltipProvider delayDuration={150}>
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Left on Mobile: Filter Drawer Trigger Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={openFilterDrawer}
-                  className={cn(
-                    "relative size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs",
-                    activeFiltersCount > 0 && "text-fairway-600 border-fairway-400 bg-fairway-50 dark:bg-fairway-950/40"
-                  )}
-                >
-                  <Filter className="w-4 h-4" />
-                  {activeFiltersCount > 0 && (
-                    <span className="absolute -top-1 -right-1 size-4 rounded-full bg-fairway-600 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
-                      {activeFiltersCount}
-                    </span>
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                Filter
-              </TooltipContent>
-            </Tooltip>
-
-            {/* Right Group on Mobile: Column Settings, Refresh, and View Switcher (List / Card) */}
-            <div className="flex items-center gap-2">
-              {/* Column Settings Dropdown (Desktop Only) */}
-              <div className="hidden sm:block">
-                <DropdownMenu>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
-                        >
-                          <Settings className="w-4 h-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      Column
-                    </TooltipContent>
-                  </Tooltip>
-                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
-                  <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
-                    Toggle Columns
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={columns.status}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, status: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    Status Checkbox
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columns.description}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, description: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    Task Description
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columns.priority}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, priority: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    Priority Badge
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columns.company}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, company: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    Linked Company
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columns.inquiry}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, inquiry: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    Inquiry Reference
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columns.dueDate}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, dueDate: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    Due Date & Time
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columns.assignee}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, assignee: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    Salesperson
-                  </DropdownMenuCheckboxItem>
-                  <DropdownMenuCheckboxItem
-                    checked={columns.actions}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={(val) => setColumns((prev) => ({ ...prev, actions: !!val }))}
-                    className="text-xs cursor-pointer"
-                  >
-                    Action Buttons
-                  </DropdownMenuCheckboxItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-              {/* Refresh Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => loadTasks(true)}
-                    disabled={isRefreshing || isLoading}
-                    className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-70"
-                  >
-                    <RefreshCw
-                      className={cn(
-                        "w-4 h-4 transition-transform duration-700",
-                        (isRefreshing || isLoading) && "animate-spin text-fairway-600"
-                      )}
-                    />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Refresh
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Segmented View Switcher (List / Card) - Desktop Only */}
-              <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('list')}
-                      className={cn(
-                        "w-9 h-full flex items-center justify-center transition-all cursor-pointer",
-                        viewMode === 'list'
-                          ? "bg-fairway-600 text-white font-bold"
-                          : "text-foreground hover:text-foreground hover:bg-surface-muted/60"
-                      )}
-                    >
-                      <List className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    List
-                  </TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('grid')}
-                      className={cn(
-                        "w-9 h-full flex items-center justify-center transition-all cursor-pointer",
-                        viewMode === 'grid'
-                          ? "bg-fairway-600 text-white font-bold"
-                          : "text-foreground hover:text-foreground hover:bg-surface-muted/60"
-                      )}
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Card
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
+        {/* Right: Clean Filters & View Toggle */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+          {/* Task Type Filter */}
+          <div className="w-[125px]">
+            <Combobox
+              options={taskTypeOptions}
+              value={typeFilter}
+              onChange={setTypeFilter}
+              placeholder="All Types"
+              searchPlaceholder="Filter type..."
+              triggerClassName="h-9 text-xs"
+            />
           </div>
-        </TooltipProvider>
+
+          {/* Salesperson Filter */}
+          <div className="w-[145px]">
+            <Combobox
+              options={salespersonOptions}
+              value={ownerFilter}
+              onChange={setOwnerFilter}
+              placeholder="All Salespersons"
+              searchPlaceholder="Filter person..."
+              triggerClassName="h-9 text-xs"
+            />
+          </div>
+
+          {/* Reset Filters button if any active */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className="h-9 px-2 text-xs font-semibold text-foreground-muted hover:text-foreground flex items-center gap-1 cursor-pointer"
+              title="Reset Filters"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline">Reset</span>
+            </button>
+          )}
+
+          {/* Refresh Button */}
+          <button
+            type="button"
+            onClick={() => loadTasks(true)}
+            disabled={isRefreshing || isLoading}
+            className="h-9 w-9 rounded-lg border border-border bg-surface hover:bg-surface-muted flex items-center justify-center text-foreground transition-colors cursor-pointer shrink-0"
+            title="Refresh tasks"
+          >
+            <RefreshCw
+              className={cn(
+                'w-3.5 h-3.5',
+                (isRefreshing || isLoading) && 'animate-spin'
+              )}
+            />
+          </button>
+
+          {/* Desktop-only List vs Card Toggle */}
+          <div className="hidden sm:flex items-center h-9 bg-surface border border-border rounded-lg overflow-hidden shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={cn(
+                'w-8 h-full flex items-center justify-center transition-colors cursor-pointer',
+                viewMode === 'list'
+                  ? 'bg-foreground text-background font-bold'
+                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-muted'
+              )}
+              title="Table View"
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={cn(
+                'w-8 h-full flex items-center justify-center transition-colors cursor-pointer',
+                viewMode === 'grid'
+                  ? 'bg-foreground text-background font-bold'
+                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-muted'
+              )}
+              title="Cards View"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* 4. MAIN TASK CONTENT */}
       {isLoading || isRefreshing ? (
-        <>
-          {/* Mobile view: Always render Card Skeletons */}
-          <div className="grid grid-cols-1 gap-3 sm:hidden animate-fade-in">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div
-                key={i}
-                className="bg-surface rounded-card border border-border p-4 shadow-subtle flex flex-col justify-between gap-3 text-left"
-              >
-                <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2.5">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="w-16 h-5 rounded" />
-                    <Skeleton className="w-14 h-5 rounded-full" />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Skeleton className="w-5 h-5 rounded-full" />
-                    <Skeleton className="w-5 h-5 rounded-full" />
-                  </div>
-                </div>
-                <div className="space-y-2 flex-1">
-                  <Skeleton className="h-4 w-full rounded" />
-                  <Skeleton className="h-4 w-4/5 rounded" />
-                  <div className="space-y-1 pt-1">
-                    <Skeleton className="h-3.5 w-32 rounded" />
-                    <Skeleton className="h-3.5 w-24 rounded" />
-                  </div>
-                </div>
-                <div className="pt-2.5 border-t border-border/60 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="w-6 h-6 rounded-full" />
-                    <Skeleton className="w-20 h-3.5 rounded" />
-                  </div>
-                  <Skeleton className="w-20 h-7 rounded-lg" />
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="p-4 bg-surface rounded-xl border border-border flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                <Skeleton className="w-5 h-5 rounded-full" />
+                <div className="space-y-1.5 flex-1 max-w-md">
+                  <Skeleton className="h-4 w-3/4 rounded" />
+                  <Skeleton className="h-3 w-1/2 rounded" />
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Desktop view: Render based on viewMode */}
-          <div className="hidden sm:block">
-            {viewMode === 'list' ? (
-              <div className="bg-surface rounded-card border border-border shadow-subtle overflow-hidden divide-y divide-border animate-fade-in">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                      <Skeleton className="w-5 h-5 rounded-full shrink-0" />
-                      <Skeleton className="w-16 h-5 rounded-md shrink-0" />
-                      <div className="space-y-1.5 flex-1 max-w-md">
-                        <Skeleton className="h-4 w-full rounded" />
-                        <Skeleton className="h-3 w-3/4 rounded" />
-                      </div>
-                      <Skeleton className="w-24 h-4 rounded hidden md:block" />
-                      <Skeleton className="w-16 h-5 rounded-full hidden sm:block" />
-                      <Skeleton className="w-20 h-4 rounded hidden lg:block" />
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Skeleton className="w-6 h-6 rounded-full" />
-                      <Skeleton className="w-16 h-7 rounded-lg" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 animate-fade-in">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="bg-surface rounded-card border border-border p-4 shadow-subtle flex flex-col justify-between gap-3 text-left"
-                  >
-                    <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="w-16 h-5 rounded" />
-                        <Skeleton className="w-14 h-5 rounded-full" />
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Skeleton className="w-5 h-5 rounded-full" />
-                        <Skeleton className="w-5 h-5 rounded-full" />
-                      </div>
-                    </div>
-                    <div className="space-y-2 flex-1">
-                      <Skeleton className="h-4 w-full rounded" />
-                      <Skeleton className="h-4 w-4/5 rounded" />
-                      <div className="space-y-1 pt-1">
-                        <Skeleton className="h-3.5 w-32 rounded" />
-                        <Skeleton className="h-3.5 w-24 rounded" />
-                      </div>
-                    </div>
-                    <div className="pt-2.5 border-t border-border/60 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="w-6 h-6 rounded-full" />
-                        <Skeleton className="w-20 h-3.5 rounded" />
-                      </div>
-                      <Skeleton className="w-20 h-7 rounded-lg" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </>
+              <Skeleton className="w-20 h-6 rounded-md hidden sm:block" />
+              <Skeleton className="w-24 h-4 rounded" />
+              <Skeleton className="w-6 h-6 rounded" />
+            </div>
+          ))}
+        </div>
       ) : filteredTasks.length === 0 ? (
-        <div className="py-16 text-center text-xs text-foreground-muted bg-surface rounded-card border border-border shadow-subtle p-6">
-          <CheckCircle2 className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-          <p className="font-bold text-foreground text-sm">No tasks in this category</p>
-          <p className="mt-1 max-w-sm mx-auto">
-            {activeFiltersCount > 0 || searchQuery
-              ? "No tasks match your current search and filter criteria. Try resetting them."
-              : "Everything looks clear! Schedule a new task to keep customer relationships warm."}
-          </p>
-          {(activeFiltersCount > 0 || searchQuery) && (
+        <div className="py-16 text-center text-xs text-foreground-muted bg-surface rounded-xl border border-border p-6 space-y-3">
+          <CheckCircle2 className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+          <div>
+            <p className="font-bold text-foreground text-sm">No tasks found</p>
+            <p className="text-xs text-foreground-muted mt-1 max-w-sm mx-auto">
+              {hasActiveFilters || searchQuery
+                ? 'No tasks match your search or filters. Try clearing them.'
+                : activeTab === 'overdue'
+                ? 'Great job! You have zero overdue tasks.'
+                : activeTab === 'today'
+                ? 'No tasks due today. Schedule a new touchpoint to stay ahead.'
+                : 'No tasks scheduled in this view.'}
+            </p>
+          </div>
+          {(hasActiveFilters || searchQuery) && (
             <Button
               size="sm"
               variant="outline"
-              onClick={resetFilters}
-              className="mt-4"
+              onClick={resetAllFilters}
+              className="mt-2 text-xs"
               leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
             >
               Reset Filters
@@ -965,8 +793,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         </div>
       ) : (
         <>
-          {/* Mobile view: ONLY Card View show, NOT list page show */}
-          <div className="block sm:hidden">
+          {/* Mobile view (<768px): Always render clean touch Cards for best UX */}
+          <div className="block md:hidden">
             <TasksCard
               tasks={filteredTasks}
               todayStr={todayStr}
@@ -978,13 +806,13 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
             />
           </div>
 
-          {/* Desktop view: Respects user viewMode (List vs Card) */}
-          <div className="hidden sm:block">
+          {/* Desktop view (≥768px): Respects user's view mode (List vs Grid) */}
+          <div className="hidden md:block">
             {viewMode === 'list' ? (
               <TasksList
                 tasks={filteredTasks}
-                columns={columns}
                 todayStr={todayStr}
+                isLoading={isLoading || isRefreshing}
                 onToggleTask={handleToggleTask}
                 onEditTask={canEditModule('tasks') ? handleOpenEditTask : undefined}
                 onDeleteTask={canDeleteModule('tasks') ? handleDeleteTask : undefined}
@@ -1006,150 +834,43 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         </>
       )}
 
-      {/* Advanced Filters Drawer (Right Slide-out matching reference) */}
-      {isFilterDrawerOpen && (
-        <div className="fixed inset-0 z-[99999] flex justify-end animate-fade-in select-none overflow-hidden m-0 p-0">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 w-full h-full bg-black/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsFilterDrawerOpen(false)}
-          />
-
-          {/* Drawer Container */}
-          <div className="relative w-full sm:w-96 max-w-full sm:max-w-sm bg-surface border-l border-border border-t-0 border-r-0 border-b-0 h-full shadow-2xl flex flex-col z-10 animate-slide-left outline-none ring-0 text-left">
-            {/* Header */}
-            <div className="p-4 sm:p-5 border-b border-border bg-surface flex items-start justify-between border-t-0">
-              <div>
-                <h2 className="text-base font-bold text-foreground tracking-tight flex items-center gap-2">
-                  <SlidersHorizontal className="w-4 h-4 text-fairway-600" />
-                  <span>Advanced Task Filters</span>
-                </h2>
-                <p className="text-xs text-foreground-muted mt-0.5">
-                  Refine tasks by salesperson, type, priority, or dates
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFilterDrawerOpen(false)}
-                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
-                title="Close"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Filter Fields Body using Combobox */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-              {/* Assigned Salesperson */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground block">Assigned Salesperson</label>
-                <Combobox
-                  options={salespersonOptions}
-                  value={draftOwnerFilter}
-                  onChange={setDraftOwnerFilter}
-                  placeholder="Select salesperson..."
-                  searchPlaceholder="Search salesperson..."
-                />
-              </div>
-
-              {/* Task Type */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground block">Task Type</label>
-                <Combobox
-                  options={taskTypeOptions}
-                  value={draftTypeFilter}
-                  onChange={setDraftTypeFilter}
-                  placeholder="Select task type..."
-                  searchPlaceholder="Search task type..."
-                />
-              </div>
-
-              {/* Priority */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground block">Priority</label>
-                <Combobox
-                  options={priorityOptions}
-                  value={draftPriorityFilter}
-                  onChange={setDraftPriorityFilter}
-                  placeholder="Select priority..."
-                  searchPlaceholder="Search priority..."
-                />
-              </div>
-
-              {/* Linked Company */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground block">Linked Company</label>
-                <Combobox
-                  options={companyOptions}
-                  value={draftCompanyFilter}
-                  onChange={setDraftCompanyFilter}
-                  placeholder="Select company..."
-                  searchPlaceholder="Search company..."
-                />
-              </div>
-
-              {/* Due Date Range */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground block">Due Date Range</label>
-                <Combobox
-                  options={dateRangeOptions}
-                  value={draftDateRangeFilter}
-                  onChange={setDraftDateRangeFilter}
-                  placeholder="Select date range..."
-                  searchPlaceholder="Search date range..."
-                />
-              </div>
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="p-4 border-t border-border bg-surface flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="flex-1 py-2.5 px-4 rounded-button border text-xs font-bold transition-all text-center bg-surface hover:bg-surface-muted border-border text-foreground cursor-pointer shadow-2xs"
-              >
-                Reset All
-              </button>
-              <button
-                type="button"
-                onClick={applyFilters}
-                className="flex-1 py-2.5 px-4 rounded-button bg-fairway-600 hover:bg-fairway-700 text-white text-xs font-bold transition-all text-center shadow-xs cursor-pointer"
-              >
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* New Task Modal */}
+      {/* 5. NEW TASK MODAL */}
       <Modal
         isOpen={isNewTaskOpen}
         onClose={() => {
           setIsNewTaskOpen(false);
           setTaskErrors({});
         }}
-        title="Create Follow-up Task"
-        description="Schedule a sales call, proposal follow-up, or client meeting"
+        title="Schedule Follow-up Task"
+        description="Plan a customer call, meeting, site visit, or follow-up note."
         footer={
-          <div className="flex items-center justify-end gap-2.5 sm:gap-3 w-full">
+          <div className="flex items-center justify-end gap-2.5 w-full">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsNewTaskOpen(false)}
+            >
+              Cancel
+            </Button>
             <Button
               type="submit"
               form="new-task-form"
               variant="primary"
               size="sm"
               disabled={isSubmitting}
-              className="w-full xs:w-auto"
+              className="font-semibold"
             >
-              {isSubmitting ? 'Scheduling...' : 'Schedule Task'}
+              {isSubmitting ? 'Scheduling...' : 'Save Task'}
             </Button>
           </div>
         }
       >
         <form id="new-task-form" onSubmit={handleCreateTask} noValidate className="space-y-4 text-xs text-left">
+          {/* Linked Company */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground block">
-              Linked Company <span className="text-rose-500 font-bold">*</span>
+              Customer Company
             </label>
             <Combobox
               options={companies.map((c) => ({
@@ -1162,68 +883,46 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 setNewTaskForm({ ...newTaskForm, companyId: val });
                 clearTaskError('companyId');
               }}
-              placeholder="Select company..."
+              placeholder="Select company (or leave blank)..."
               searchPlaceholder="Search company..."
-              triggerClassName={taskErrors.companyId ? 'border-rose-500 ring-1 ring-rose-500' : ''}
             />
-            {taskErrors.companyId && (
-              <p className="text-[11px] text-rose-500 font-medium">{taskErrors.companyId}</p>
-            )}
           </div>
 
+          {/* Task Type & Priority */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
                 Task Type <span className="text-rose-500 font-bold">*</span>
               </label>
               <Combobox
-                options={[
-                  { value: 'Call', label: 'Call' },
-                  { value: 'Meeting', label: 'Meeting' },
-                  { value: 'Email', label: 'Email' },
-                  { value: 'Follow-up', label: 'Follow-up' },
-                  { value: 'Site Visit', label: 'Site Visit' },
-                  { value: 'Other', label: 'Other' },
-                ]}
+                options={TASK_TYPE_OPTIONS}
                 value={newTaskForm.taskType}
                 onChange={(val) => {
                   setNewTaskForm({ ...newTaskForm, taskType: val as any });
                   clearTaskError('taskType');
                 }}
                 placeholder="Select task type..."
-                searchPlaceholder="Search task type..."
-                triggerClassName={taskErrors.taskType ? 'border-rose-500 ring-1 ring-rose-500' : ''}
               />
-              {taskErrors.taskType && (
-                <p className="text-[11px] text-rose-500 font-medium">{taskErrors.taskType}</p>
-              )}
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
-                Priority <span className="text-rose-500 font-bold">*</span>
+                Priority
               </label>
               <Combobox
                 options={[
-                  { value: 'High', label: 'High' },
-                  { value: 'Medium', label: 'Medium' },
-                  { value: 'Low', label: 'Low' },
+                  { value: 'Medium', label: 'Medium (Standard)' },
+                  { value: 'High', label: 'High (Urgent)' },
+                  { value: 'Low', label: 'Low (Flexible)' },
                 ]}
                 value={newTaskForm.priority}
-                onChange={(val) => {
-                  setNewTaskForm({ ...newTaskForm, priority: val as any });
-                  clearTaskError('priority');
-                }}
+                onChange={(val) => setNewTaskForm({ ...newTaskForm, priority: val as any })}
                 placeholder="Select priority..."
-                searchPlaceholder="Search priority..."
-                triggerClassName={taskErrors.priority ? 'border-rose-500 ring-1 ring-rose-500' : ''}
               />
-              {taskErrors.priority && (
-                <p className="text-[11px] text-rose-500 font-medium">{taskErrors.priority}</p>
-              )}
             </div>
           </div>
 
+          {/* Due Date & Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
@@ -1235,7 +934,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                   setNewTaskForm({ ...newTaskForm, dueDate: dateStr });
                   clearTaskError('dueDate');
                 }}
-                placeholder="Select due date"
+                placeholder="Select date"
                 error={taskErrors.dueDate}
               />
             </div>
@@ -1247,38 +946,31 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
             />
           </div>
 
+          {/* Assigned Salesperson */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground block">
-              Assigned Salesperson <span className="text-rose-500 font-bold">*</span>
+              Assigned Salesperson
             </label>
             <UserCombobox
               users={users}
               value={newTaskForm.assignedUserId}
-              onChange={(val) => {
-                setNewTaskForm({ ...newTaskForm, assignedUserId: val });
-                clearTaskError('assignedUserId');
-              }}
-              placeholder="Select salesperson..."
-              searchPlaceholder="Search salespeople..."
-              triggerClassName={taskErrors.assignedUserId ? 'border-rose-500 ring-1 ring-rose-500' : ''}
+              onChange={(val) => setNewTaskForm({ ...newTaskForm, assignedUserId: val })}
+              placeholder="Assign to salesperson..."
             />
-            {taskErrors.assignedUserId && (
-              <p className="text-[11px] text-rose-500 font-medium">{taskErrors.assignedUserId}</p>
-            )}
           </div>
 
+          {/* Description */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground block">
-              Task Description <span className="text-rose-500 font-bold">*</span>
+              Task Details / Notes <span className="text-rose-500 font-bold">*</span>
             </label>
             <Textarea
-              placeholder="e.g. Call Rahul Shah regarding chemical containment and fire sprinkler approval..."
+              placeholder="e.g. Follow up with Deepak regarding shed lease agreement and advance token..."
               value={newTaskForm.description}
               onChange={(e) => {
                 setNewTaskForm({ ...newTaskForm, description: e.target.value });
                 clearTaskError('description');
               }}
-              className={taskErrors.description ? 'border-rose-500 ring-1 ring-rose-500' : ''}
               error={taskErrors.description}
               rows={3}
             />
@@ -1286,7 +978,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         </form>
       </Modal>
 
-      {/* Edit Task Modal */}
+      {/* 6. EDIT TASK MODAL */}
       <Modal
         isOpen={!!editingTask}
         onClose={() => {
@@ -1294,9 +986,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
           setEditTaskErrors({});
         }}
         title="Edit Follow-up Task"
-        description="Update task details, schedule, priority, and salesperson."
+        description="Update task notes, schedule, priority, or salesperson."
         footer={
-          <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 w-full">
+          <div className="flex items-center justify-end gap-2.5 w-full">
             <Button
               type="button"
               variant="outline"
@@ -1305,7 +997,6 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 setEditingTask(null);
                 setEditTaskErrors({});
               }}
-              className="w-full xs:w-auto"
             >
               Cancel
             </Button>
@@ -1315,7 +1006,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
               variant="primary"
               size="sm"
               disabled={isUpdating}
-              className="w-full xs:w-auto"
+              className="font-semibold"
             >
               {isUpdating ? 'Saving...' : 'Save Changes'}
             </Button>
@@ -1323,9 +1014,10 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         }
       >
         <form id="edit-task-form" onSubmit={handleUpdateTask} className="space-y-4 pt-1 text-xs text-left">
+          {/* Linked Company */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground block">
-              Related Company <span className="text-rose-500 font-bold">*</span>
+              Customer Company
             </label>
             <Combobox
               options={companies.map((c) => ({
@@ -1334,72 +1026,43 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
                 description: `${c.city || 'Gujarat'} · ${c.industry || 'Industrial'}`,
               }))}
               value={editTaskForm.companyId}
-              onChange={(val) => {
-                setEditTaskForm({ ...editTaskForm, companyId: val });
-                clearEditTaskError('companyId');
-              }}
+              onChange={(val) => setEditTaskForm({ ...editTaskForm, companyId: val })}
               placeholder="Select company..."
-              searchPlaceholder="Search company..."
-              triggerClassName={editTaskErrors.companyId ? 'border-rose-500 ring-1 ring-rose-500' : ''}
             />
-            {editTaskErrors.companyId && (
-              <p className="text-[11px] text-rose-500 font-medium">{editTaskErrors.companyId}</p>
-            )}
           </div>
 
+          {/* Task Type & Priority */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
                 Task Type <span className="text-rose-500 font-bold">*</span>
               </label>
               <Combobox
-                options={[
-                  { value: 'Call', label: 'Call' },
-                  { value: 'Meeting', label: 'Meeting' },
-                  { value: 'Email', label: 'Email' },
-                  { value: 'Follow-up', label: 'Follow-up' },
-                  { value: 'Site Visit', label: 'Site Visit' },
-                  { value: 'Other', label: 'Other' },
-                ]}
+                options={TASK_TYPE_OPTIONS}
                 value={editTaskForm.taskType}
-                onChange={(val) => {
-                  setEditTaskForm({ ...editTaskForm, taskType: val as any });
-                  clearEditTaskError('taskType');
-                }}
+                onChange={(val) => setEditTaskForm({ ...editTaskForm, taskType: val as any })}
                 placeholder="Select task type..."
-                searchPlaceholder="Search task type..."
-                triggerClassName={editTaskErrors.taskType ? 'border-rose-500 ring-1 ring-rose-500' : ''}
               />
-              {editTaskErrors.taskType && (
-                <p className="text-[11px] text-rose-500 font-medium">{editTaskErrors.taskType}</p>
-              )}
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
-                Priority <span className="text-rose-500 font-bold">*</span>
+                Priority
               </label>
               <Combobox
                 options={[
-                  { value: 'High', label: 'High' },
-                  { value: 'Medium', label: 'Medium' },
-                  { value: 'Low', label: 'Low' },
+                  { value: 'Medium', label: 'Medium (Standard)' },
+                  { value: 'High', label: 'High (Urgent)' },
+                  { value: 'Low', label: 'Low (Flexible)' },
                 ]}
                 value={editTaskForm.priority}
-                onChange={(val) => {
-                  setEditTaskForm({ ...editTaskForm, priority: val as any });
-                  clearEditTaskError('priority');
-                }}
+                onChange={(val) => setEditTaskForm({ ...editTaskForm, priority: val as any })}
                 placeholder="Select priority..."
-                searchPlaceholder="Search priority..."
-                triggerClassName={editTaskErrors.priority ? 'border-rose-500 ring-1 ring-rose-500' : ''}
               />
-              {editTaskErrors.priority && (
-                <p className="text-[11px] text-rose-500 font-medium">{editTaskErrors.priority}</p>
-              )}
             </div>
           </div>
 
+          {/* Due Date & Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
@@ -1407,11 +1070,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
               </label>
               <DatePicker
                 value={editTaskForm.dueDate}
-                onChange={(dateStr) => {
-                  setEditTaskForm({ ...editTaskForm, dueDate: dateStr });
-                  clearEditTaskError('dueDate');
-                }}
-                placeholder="Select due date"
+                onChange={(dateStr) => setEditTaskForm({ ...editTaskForm, dueDate: dateStr })}
+                placeholder="Select date"
                 error={editTaskErrors.dueDate}
               />
             </div>
@@ -1423,38 +1083,28 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
             />
           </div>
 
+          {/* Assigned Salesperson */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground block">
-              Assigned Salesperson <span className="text-rose-500 font-bold">*</span>
+              Assigned Salesperson
             </label>
             <UserCombobox
               users={users}
               value={editTaskForm.assignedUserId}
-              onChange={(val) => {
-                setEditTaskForm({ ...editTaskForm, assignedUserId: val });
-                clearEditTaskError('assignedUserId');
-              }}
+              onChange={(val) => setEditTaskForm({ ...editTaskForm, assignedUserId: val })}
               placeholder="Select salesperson..."
-              searchPlaceholder="Search salespeople..."
-              triggerClassName={editTaskErrors.assignedUserId ? 'border-rose-500 ring-1 ring-rose-500' : ''}
             />
-            {editTaskErrors.assignedUserId && (
-              <p className="text-[11px] text-rose-500 font-medium">{editTaskErrors.assignedUserId}</p>
-            )}
           </div>
 
+          {/* Description */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground block">
-              Task Description <span className="text-rose-500 font-bold">*</span>
+              Task Details / Notes <span className="text-rose-500 font-bold">*</span>
             </label>
             <Textarea
-              placeholder="e.g. Call Rahul Shah regarding chemical containment and fire sprinkler approval..."
+              placeholder="Enter task details..."
               value={editTaskForm.description}
-              onChange={(e) => {
-                setEditTaskForm({ ...editTaskForm, description: e.target.value });
-                clearEditTaskError('description');
-              }}
-              className={editTaskErrors.description ? 'border-rose-500 ring-1 ring-rose-500' : ''}
+              onChange={(e) => setEditTaskForm({ ...editTaskForm, description: e.target.value })}
               error={editTaskErrors.description}
               rows={3}
             />

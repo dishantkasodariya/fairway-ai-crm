@@ -418,7 +418,7 @@ export const DocumentsPage: React.FC<DocumentsPageProps> = ({ onSelectCompany, o
                     Column
                   </TooltipContent>
                 </Tooltip>
-                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
+                <DropdownMenuContent align="end" className="w-48 bg-surface dark:bg-[#161c24] border border-border dark:border-white/[0.12] shadow-none ring-0 outline-none p-1 rounded-card z-50">
                   <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
                     Toggle Columns
                   </DropdownMenuLabel>

@@ -41,10 +41,10 @@ export const WarehouseInquiryCard: React.FC<WarehouseInquiryCardProps> = ({
       <div>
         {/* Top Row: Code Badge + Stage Pill */}
         <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-border">
-          <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40 shadow-xs">
+          <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full border bg-primary/10 text-primary border-primary/25 dark:bg-primary/20 dark:text-white dark:border-primary/40 shadow-xs whitespace-nowrap">
             {inquiry.inquiryNumber}
           </span>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${stageStyle.className}`}>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${stageStyle.className}`}>
             {stageStyle.label}
           </span>
         </div>
@@ -61,13 +61,13 @@ export const WarehouseInquiryCard: React.FC<WarehouseInquiryCardProps> = ({
 
         {/* Key Specs Matrix */}
         <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border/70 text-[11px]">
-          <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
+          <div className="bg-surface-muted p-2 rounded-lg border border-border/60">
             <span className="text-[10px] text-foreground-muted block">Required Area</span>
-            <span className="font-bold text-foreground">{formatSqFt(inquiry.requiredAreaSqFt)}</span>
+            <span className="font-bold text-foreground tabular-nums whitespace-nowrap truncate block">{formatSqFt(inquiry.requiredAreaSqFt)}</span>
           </div>
-          <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-lg border border-border/50">
+          <div className="bg-surface-muted p-2 rounded-lg border border-border/60">
             <span className="text-[10px] text-foreground-muted block">Monthly Budget</span>
-            <span className="font-mono font-bold text-foreground">{formatINR(inquiry.budgetMonthlyINR, true)}</span>
+            <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap truncate block">{formatINR(inquiry.budgetMonthlyINR, true)}</span>
           </div>
         </div>
 
@@ -167,7 +167,7 @@ export const WarehouseInquiryLineCard: React.FC<WarehouseInquiryCardProps> = ({
         </span>
 
         <div className="hidden lg:flex items-center gap-1 text-[11px] text-foreground-muted bg-surface-muted/60 px-2 py-1 rounded-md border border-border/60 whitespace-nowrap">
-          <User className="w-3 h-3 text-slate-400 shrink-0" />
+          <User className="w-3 h-3 text-foreground-muted shrink-0" />
           <span className="truncate max-w-[100px]">{inquiry.salespersonName}</span>
         </div>
 
@@ -183,7 +183,7 @@ export const WarehouseInquiryLineCard: React.FC<WarehouseInquiryCardProps> = ({
           <div
             className={`hidden xl:flex items-center gap-1 text-[11px] px-2 py-0.8 rounded-md font-medium whitespace-nowrap ${
               isOverdue
-                ? 'bg-rose-50 text-rose-700 border border-rose-200 font-bold dark:bg-rose-950/70 dark:text-rose-300 dark:border-rose-800/60'
+                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-bold'
                 : 'bg-surface-muted text-foreground-muted border border-border/70'
             }`}
           >
@@ -199,7 +199,7 @@ export const WarehouseInquiryLineCard: React.FC<WarehouseInquiryCardProps> = ({
           <span className="text-[10px] text-foreground-muted block leading-none">/ month</span>
         </div>
 
-        <div className="w-7 h-7 rounded-lg bg-surface group-hover:bg-fairway-600 group-hover:text-white text-foreground-muted flex items-center justify-center border border-border group-hover:border-fairway-600 transition-all shrink-0">
+        <div className="w-7 h-7 rounded-lg bg-surface group-hover:bg-primary group-hover:text-white text-foreground-muted flex items-center justify-center border border-border group-hover:border-primary transition-all shrink-0">
           <ChevronRight className="w-4 h-4" />
         </div>
       </div>
@@ -215,16 +215,16 @@ export const WarehouseInquiryCardSkeleton: React.FC<{ mode?: 'grid' | 'line' }> 
     return (
       <div className="bg-surface border border-border rounded-xl p-3.5 space-y-2 animate-pulse flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-1">
-          <div className="size-7 bg-slate-200/80 dark:bg-slate-800/80 rounded-lg shrink-0" />
+          <div className="size-7 bg-surface-muted rounded-lg shrink-0" />
           <div className="space-y-1.5 flex-1">
-            <div className="h-4.5 w-48 bg-slate-200/80 dark:bg-slate-800/80 rounded-md" />
-            <div className="h-3.5 w-72 bg-slate-200/80 dark:bg-slate-800/80 rounded-md" />
+            <div className="h-4.5 w-48 bg-surface-muted rounded-md" />
+            <div className="h-3.5 w-72 bg-surface-muted rounded-md" />
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <div className="h-6 w-20 bg-slate-200/80 dark:bg-slate-800/80 rounded-md" />
-          <div className="h-6 w-16 bg-slate-200/80 dark:bg-slate-800/80 rounded-full" />
-          <div className="h-6 w-24 bg-slate-200/80 dark:bg-slate-800/80 rounded-md" />
+          <div className="h-6 w-20 bg-surface-muted rounded-md" />
+          <div className="h-6 w-16 bg-surface-muted rounded-full" />
+          <div className="h-6 w-24 bg-surface-muted rounded-md" />
         </div>
       </div>
     );
@@ -233,16 +233,16 @@ export const WarehouseInquiryCardSkeleton: React.FC<{ mode?: 'grid' | 'line' }> 
   return (
     <div className="bg-surface border border-border rounded-xl p-4 space-y-3 animate-pulse">
       <div className="flex justify-between items-center pb-2.5 border-b border-border">
-        <div className="h-5 w-20 bg-slate-200/80 dark:bg-slate-800/80 rounded-md" />
-        <div className="h-5 w-16 bg-slate-200/80 dark:bg-slate-800/80 rounded-full" />
+        <div className="h-5 w-20 bg-surface-muted rounded-md" />
+        <div className="h-5 w-16 bg-surface-muted rounded-full" />
       </div>
       <div className="space-y-1.5 pt-1">
-        <div className="h-5 w-3/4 bg-slate-200/80 dark:bg-slate-800/80 rounded-md" />
-        <div className="h-3.5 w-full bg-slate-200/80 dark:bg-slate-800/80 rounded-md" />
+        <div className="h-5 w-3/4 bg-surface-muted rounded-md" />
+        <div className="h-3.5 w-full bg-surface-muted rounded-md" />
       </div>
       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
-        <div className="h-10 bg-slate-200/80 dark:bg-slate-800/80 rounded-lg" />
-        <div className="h-10 bg-slate-200/80 dark:bg-slate-800/80 rounded-lg" />
+        <div className="h-10 bg-surface-muted rounded-lg" />
+        <div className="h-10 bg-surface-muted rounded-lg" />
       </div>
     </div>
   );

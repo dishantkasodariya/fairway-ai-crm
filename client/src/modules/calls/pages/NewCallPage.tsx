@@ -20,6 +20,13 @@ import {
 import { Button } from '@/modules/core/components/ui/Button';
 import { DatePicker } from '@/modules/core/components/ui/DatePicker';
 import { TimePicker } from '@/modules/core/components/ui/TimePicker';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/modules/core/components/ui/Select';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { CallService } from '@/modules/core/services/callService';
@@ -401,21 +408,27 @@ export const NewCallPage: React.FC<NewCallPageProps> = ({
               </label>
               <div className="sm:col-span-9 relative" ref={callForRef}>
                 <div className="flex items-center border border-border rounded-xl bg-surface-muted/40 overflow-hidden focus-within:border-fairway-600 focus-within:ring-1 focus-within:ring-fairway-600 transition-all">
-                  <select
-                    value={formData.callForType}
-                    onChange={(e) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        callForType: e.target.value as CallForType,
-                        callForName: '',
-                        callForId: '',
-                      }));
-                    }}
-                    className="bg-transparent text-xs font-semibold text-foreground px-3 py-2.5 border-r border-border outline-none shrink-0 cursor-pointer"
-                  >
-                    <option value="Contact">Contact</option>
-                    <option value="Lead">Lead</option>
-                  </select>
+                  <div className="w-28 shrink-0 border-r border-border">
+                    <Select
+                      value={formData.callForType}
+                      onValueChange={(val) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          callForType: val as CallForType,
+                          callForName: '',
+                          callForId: '',
+                        }));
+                      }}
+                    >
+                      <SelectTrigger className="border-0 rounded-none bg-transparent shadow-none h-10 px-3 text-xs font-semibold focus:border-0 focus:ring-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Contact">Contact</SelectItem>
+                        <SelectItem value="Lead">Lead</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <div
                     onClick={() => setIsCallForOpen(true)}
@@ -483,22 +496,28 @@ export const NewCallPage: React.FC<NewCallPageProps> = ({
               </label>
               <div className="sm:col-span-9 relative" ref={relatedToRef}>
                 <div className="flex items-center border border-border rounded-xl bg-surface-muted/40 overflow-hidden focus-within:border-fairway-600 focus-within:ring-1 focus-within:ring-fairway-600 transition-all">
-                  <select
-                    value={formData.relatedToType}
-                    onChange={(e) => {
-                      setFormData((prev) => ({
-                        ...prev,
-                        relatedToType: e.target.value as RelatedToType,
-                        relatedToName: '',
-                        relatedToId: '',
-                      }));
-                    }}
-                    className="bg-transparent text-xs font-semibold text-foreground px-3 py-2.5 border-r border-border outline-none shrink-0 cursor-pointer"
-                  >
-                    <option value="Account">Account</option>
-                    <option value="Deal">Deal</option>
-                    <option value="Campaign">Campaign</option>
-                  </select>
+                  <div className="w-32 shrink-0 border-r border-border">
+                    <Select
+                      value={formData.relatedToType}
+                      onValueChange={(val) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          relatedToType: val as RelatedToType,
+                          relatedToName: '',
+                          relatedToId: '',
+                        }));
+                      }}
+                    >
+                      <SelectTrigger className="border-0 rounded-none bg-transparent shadow-none h-10 px-3 text-xs font-semibold focus:border-0 focus:ring-0">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Account">Account</SelectItem>
+                        <SelectItem value="Deal">Deal</SelectItem>
+                        <SelectItem value="Campaign">Campaign</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <div
                     onClick={() => setIsRelatedToOpen(true)}
@@ -561,16 +580,18 @@ export const NewCallPage: React.FC<NewCallPageProps> = ({
                 <span className="w-1.5 h-3.5 bg-rose-500 rounded-xs inline-block ml-1" />
               </label>
               <div className="sm:col-span-9">
-                <div className="flex items-center justify-between border border-border rounded-xl bg-surface-muted/40 px-3.5 py-2">
-                  <select
-                    value={formData.callType}
-                    onChange={(e) => setFormData({ ...formData, callType: e.target.value as CallType })}
-                    className="bg-transparent text-xs font-semibold text-foreground outline-none w-full cursor-pointer"
-                  >
-                    <option value="Outbound">Outbound</option>
-                    <option value="Inbound">Inbound</option>
-                  </select>
-                </div>
+                <Select
+                  value={formData.callType}
+                  onValueChange={(val) => setFormData({ ...formData, callType: val as CallType })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select call type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Outbound">Outbound</SelectItem>
+                    <SelectItem value="Inbound">Inbound</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -580,18 +601,20 @@ export const NewCallPage: React.FC<NewCallPageProps> = ({
                 Outgoing Call Status
               </label>
               <div className="sm:col-span-9">
-                <div className="flex items-center justify-between border border-border rounded-xl bg-surface-muted/40 px-3.5 py-2">
-                  <select
-                    value={formData.callStatus}
-                    onChange={(e) => setFormData({ ...formData, callStatus: e.target.value as CallStatus })}
-                    className="bg-transparent text-xs font-semibold text-foreground outline-none w-full cursor-pointer"
-                  >
-                    <option value="Scheduled">Scheduled</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
-                    <option value="Overdue">Overdue</option>
-                  </select>
-                </div>
+                <Select
+                  value={formData.callStatus}
+                  onValueChange={(val) => setFormData({ ...formData, callStatus: val as CallStatus })}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Scheduled">Scheduled</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                    <SelectItem value="Cancelled">Cancelled</SelectItem>
+                    <SelectItem value="Overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -627,7 +650,7 @@ export const NewCallPage: React.FC<NewCallPageProps> = ({
                   placeholder="e.g. 00:15"
                   value={formData.callDuration}
                   onChange={(e) => setFormData({ ...formData, callDuration: e.target.value })}
-                  className="w-full bg-surface-muted/40 border border-border rounded-xl px-3.5 py-2.5 text-xs font-mono text-foreground focus:border-fairway-600 focus:outline-none"
+                  className="w-full bg-surface border border-border rounded-xl px-3.5 py-2.5 text-xs font-mono text-foreground focus:border-fairway-600 focus:outline-none"
                 />
               </div>
             </div>
@@ -638,29 +661,28 @@ export const NewCallPage: React.FC<NewCallPageProps> = ({
                 Call Owner
               </label>
               <div className="sm:col-span-9">
-                <div className="flex items-center border border-border rounded-xl bg-surface-muted/40 overflow-hidden focus-within:border-fairway-600 transition-all">
-                  <select
-                    value={formData.callOwnerId}
-                    onChange={(e) => {
-                      const u = users.find((usr) => usr.id === e.target.value);
-                      setFormData({
-                        ...formData,
-                        callOwnerId: e.target.value,
-                        callOwnerName: u ? u.name : formData.callOwnerName,
-                      });
-                    }}
-                    className="flex-1 bg-transparent px-3.5 py-2.5 text-xs font-medium text-foreground outline-none cursor-pointer"
-                  >
+                <Select
+                  value={formData.callOwnerId}
+                  onValueChange={(val) => {
+                    const u = users.find((usr) => usr.id === val);
+                    setFormData({
+                      ...formData,
+                      callOwnerId: val,
+                      callOwnerName: u ? u.name : formData.callOwnerName,
+                    });
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Call Owner" />
+                  </SelectTrigger>
+                  <SelectContent>
                     {users.map((u) => (
-                      <option key={u.id} value={u.id}>
+                      <SelectItem key={u.id} value={u.id}>
                         {u.name} ({u.role.replace('_', ' ')})
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
-                  <div className="pr-3 text-foreground-muted shrink-0">
-                    <User className="w-4 h-4" />
-                  </div>
-                </div>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -716,19 +738,23 @@ export const NewCallPage: React.FC<NewCallPageProps> = ({
                 Call Purpose
               </label>
               <div className="sm:col-span-9">
-                <select
+                <Select
                   value={formData.callPurpose}
-                  onChange={(e) => setFormData({ ...formData, callPurpose: e.target.value })}
-                  className="w-full bg-surface-muted/40 border border-border rounded-xl px-3.5 py-2.5 text-xs text-foreground focus:border-fairway-600 focus:outline-none cursor-pointer"
+                  onValueChange={(val) => setFormData({ ...formData, callPurpose: val })}
                 >
-                  <option value="Prospecting">Prospecting</option>
-                  <option value="Administrative">Administrative</option>
-                  <option value="Negotiation">Negotiation</option>
-                  <option value="Project Demo">Project Demo / Site Tour</option>
-                  <option value="Follow-up">Follow-up</option>
-                  <option value="Cold Outreach">Cold Outreach</option>
-                  <option value="Support">Support & Queries</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Purpose" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Prospecting">Prospecting</SelectItem>
+                    <SelectItem value="Administrative">Administrative</SelectItem>
+                    <SelectItem value="Negotiation">Negotiation</SelectItem>
+                    <SelectItem value="Project Demo">Project Demo / Site Tour</SelectItem>
+                    <SelectItem value="Follow-up">Follow-up</SelectItem>
+                    <SelectItem value="Cold Outreach">Cold Outreach</SelectItem>
+                    <SelectItem value="Support">Support & Queries</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

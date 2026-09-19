@@ -23,6 +23,7 @@ import {
   Trash2,
   Eye,
   AlertTriangle,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -39,6 +40,7 @@ import {
   TooltipContent,
   TooltipProvider,
 } from '@/modules/core/components/ui/tooltip';
+import { DataGridColumnVisibilityMenu } from '@/modules/core/components/ui/CommonDataGrid';
 import { CompanyService } from '@/modules/core/services/companyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
@@ -103,27 +105,19 @@ const formatStageLabel = (stage?: string) => {
 const getStageBadgeStyle = (stage?: string) => {
   const clean = (stage || '').toLowerCase();
   if (clean.includes('won') || clean.includes('active')) {
-    return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60';
+    return 'bg-primary/10 text-primary border-primary/30 font-bold';
   }
-  if (clean.includes('requirement') || clean.includes('confirm')) {
-    return 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800/60';
-  }
-  if (clean.includes('matched') || clean.includes('visit')) {
-    return 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800/60';
-  }
-  if (clean.includes('proposal')) {
-    return 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800/60';
-  }
-  return 'bg-surface-muted text-foreground-muted border-border';
+  return 'bg-surface-muted text-foreground border-border font-medium';
 };
 
 const sanitizeDisplayString = (str?: string, fallback: string = '—'): string => {
   if (!str) return fallback;
-  // If string contains non-printable or corrupt binary chars from raw zip imports
-  if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/.test(str) || str.startsWith('PK') || str.includes('table1.xml')) {
+  const trimmed = str.trim();
+  // If string contains non-printable or corrupt binary chars from raw zip imports or too short artifacts
+  if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/.test(trimmed) || trimmed.startsWith('PK') || trimmed.includes('table1.xml') || trimmed.length <= 1) {
     return fallback;
   }
-  return str.trim() || fallback;
+  return trimmed || fallback;
 };
 
 // Safe JSON parser for stored table state
@@ -210,14 +204,16 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
   const [sorting, setSorting] = useState<SortingState>(() => initialTableState.sorting || []);
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityMap>(() => initialTableState.columnVisibility || {});
   const [columnPinning, setColumnPinning] = useState<ColumnPinningMap>(
-    () => ({
-      start: Array.isArray(initialTableState.columnPinning?.start) && initialTableState.columnPinning.start.length > 0
-        ? initialTableState.columnPinning.start
-        : ['actions', 'name'],
-      end: Array.isArray(initialTableState.columnPinning?.end)
-        ? initialTableState.columnPinning.end
-        : [],
-    })
+    () => {
+      const savedStart = (initialTableState.columnPinning?.start || []).filter((col: string) => col !== 'select');
+      const start = savedStart.length > 0 && savedStart.includes('srNo')
+        ? savedStart
+        : ['actions', 'srNo'];
+      return {
+        start,
+        end: Array.isArray(initialTableState.columnPinning?.end) ? initialTableState.columnPinning.end : [],
+      };
+    }
   );
 
   // Adaptive column pinning: On mobile screens (<768px), pin only 'actions' so it doesn't freeze the whole viewport
@@ -419,7 +415,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                     onClick={() => onSelectCompany(comp.id)}
                     className="flex items-center gap-2 text-xs cursor-pointer"
                   >
-                    <Eye className="w-3.5 h-3.5 text-fairway-600" />
+                    <Eye className="w-3.5 h-3.5 text-foreground-muted" />
                     <span>View Company</span>
                   </DropdownMenuItem>
                   {canEditModule('companies') && (
@@ -427,7 +423,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                       onClick={() => handleOpenEditCompany(comp)}
                       className="flex items-center gap-2 text-xs cursor-pointer"
                     >
-                      <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                      <Edit3 className="w-3.5 h-3.5 text-foreground-muted" />
                       <span>Edit Company</span>
                     </DropdownMenuItem>
                   )}
@@ -436,7 +432,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => handleDeleteCompanyConfirm(comp)}
-                        className="flex items-center gap-2 text-xs text-rose-600 dark:text-rose-400 focus:text-rose-700 cursor-pointer"
+                        className="flex items-center gap-2 text-xs text-destructive focus:text-destructive cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Delete Company</span>
@@ -450,17 +446,40 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         },
         size: 70,
         minSize: 60,
+        maxSize: 80,
         enableSorting: false,
+        enableResizing: false,
+        enablePinning: true,
+      },
+      {
+        accessorKey: 'srNo',
+        id: 'srNo',
+        meta: { headerTitle: 'Sr. No.' },
+        header: ({ column }) => <DataGridColumnHeader title="Sr. No." column={column} />,
+        cell: ({ row }) => {
+          const serialNo = pagination.pageIndex * pagination.pageSize + row.index + 1;
+          return (
+            <span className="font-medium text-foreground-muted tabular-nums text-xs pl-2">
+              {serialNo}
+            </span>
+          );
+        },
+        size: 85,
+        minSize: 75,
+        maxSize: 95,
+        enableSorting: true,
         enablePinning: true,
       },
       {
         id: 'name',
         accessorKey: 'name',
+        meta: { headerTitle: 'Company Name' },
         header: ({ column }) => <DataGridColumnHeader column={column} title="Company Name" />,
         cell: ({ row }) => {
           const comp = row.original;
           const displayName = sanitizeDisplayString(comp.name, 'Unnamed Enterprise');
-          const displayLegal = sanitizeDisplayString(comp.legalName, `${displayName} Pvt Ltd`);
+          const legal = sanitizeDisplayString(comp.legalName, '');
+          const displayLegal = legal && legal.toLowerCase() !== displayName.toLowerCase() ? legal : null;
           const initials = (displayName.slice(0, 2) || 'CO').toUpperCase();
 
           return (
@@ -468,16 +487,18 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
               onClick={() => onSelectCompany(comp.id)}
               className="flex items-center gap-2.5 py-0.5 cursor-pointer group/cell"
             >
-              <div className="w-7 h-7 rounded-lg bg-fairway-100 text-fairway-900 dark:bg-fairway-950/70 dark:text-fairway-200 dark:border-fairway-700/60 font-bold text-xs flex items-center justify-center shrink-0 border border-fairway-300 shadow-xs">
+              <div className="w-7 h-7 rounded-lg bg-surface-muted text-foreground font-bold text-xs flex items-center justify-center shrink-0 border border-border shadow-2xs">
                 {initials}
               </div>
               <div className="min-w-0">
-                <span className="font-bold text-foreground group-hover/cell:text-fairway-700 transition-colors block truncate">
+                <span className="font-bold text-foreground group-hover/cell:text-primary transition-colors block truncate">
                   {displayName}
                 </span>
-                <span className="text-[10px] text-foreground-muted font-normal block truncate">
-                  {displayLegal}
-                </span>
+                {displayLegal && (
+                  <span className="text-[10px] text-foreground-muted font-normal block truncate">
+                    {displayLegal}
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -490,6 +511,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       {
         id: 'industry',
         accessorKey: 'industry',
+        meta: { headerTitle: 'Industry' },
         header: ({ column }) => <DataGridColumnHeader column={column} title="Industry" />,
         cell: ({ row }) => (
           <span className="text-xs text-foreground-muted truncate block max-w-[200px]">
@@ -503,15 +525,22 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       {
         id: 'location',
         accessorKey: 'city',
+        meta: { headerTitle: 'Location' },
         header: ({ column }) => <DataGridColumnHeader column={column} title="Location" />,
-        cell: ({ row }) => (
-          <div className="flex items-center gap-1 text-xs text-foreground truncate">
-            <MapPin className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
-            <span className="truncate">
-              {sanitizeDisplayString(row.original.city, 'Dahej')}, {sanitizeDisplayString(row.original.state, 'Gujarat')}
-            </span>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const city = sanitizeDisplayString(row.original.city, '');
+          const state = sanitizeDisplayString(row.original.state, '');
+          const locationText = [city, state].filter(Boolean).join(', ') || 'Gujarat, India';
+
+          return (
+            <div className="flex items-center gap-1 text-xs text-foreground truncate">
+              <MapPin className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+              <span className="truncate font-medium">
+                {locationText}
+              </span>
+            </div>
+          );
+        },
         size: 160,
         minSize: 130,
         enableSorting: true,
@@ -519,6 +548,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       {
         id: 'assignedOwnerName',
         accessorKey: 'assignedOwnerName',
+        meta: { headerTitle: 'Owner' },
         header: ({ column }) => <DataGridColumnHeader column={column} title="Owner" />,
         cell: ({ row }) => {
           const comp = row.original;
@@ -534,7 +564,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                 <img
                   src={avatarUrl}
                   alt={ownerName}
-                  className="w-5 h-5 rounded-full object-cover border border-fairway-300 dark:border-fairway-700/60 shrink-0"
+                  className="w-5 h-5 rounded-full object-cover border border-border shrink-0"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                     if (e.currentTarget.nextElementSibling) {
@@ -545,7 +575,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
               ) : null}
               <div
                 className={cn(
-                  "w-5 h-5 rounded-full bg-fairway-100 text-fairway-800 font-bold text-[10px] items-center justify-center border border-fairway-300 dark:bg-fairway-950/70 dark:text-fairway-300 dark:border-fairway-700/60 shrink-0",
+                  "w-5 h-5 rounded-full bg-surface-muted text-foreground font-bold text-[10px] items-center justify-center border border-border shrink-0",
                   avatarUrl ? "hidden" : "flex"
                 )}
               >
@@ -564,6 +594,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       {
         id: 'prospectStage',
         accessorKey: 'prospectStage',
+        meta: { headerTitle: 'Stage' },
         header: ({ column }) => <DataGridColumnHeader column={column} title="Stage" />,
         cell: ({ row }) => {
           const badgeClass = getStageBadgeStyle(row.original.prospectStage);
@@ -581,15 +612,12 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       {
         id: 'priority',
         accessorKey: 'priority',
+        meta: { headerTitle: 'Priority' },
         header: ({ column }) => <DataGridColumnHeader column={column} title="Priority" />,
         cell: ({ row }) => (
-          <Badge
-            variant={row.original.priority === 'High' ? 'danger' : row.original.priority === 'Medium' ? 'warning' : 'default'}
-            size="sm"
-            dot
-          >
-            {row.original.priority || 'Medium'}
-          </Badge>
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border bg-surface-muted text-foreground border-border whitespace-nowrap">
+            {row.original.priority || 'Normal'}
+          </span>
         ),
         size: 110,
         minSize: 90,
@@ -597,12 +625,13 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       },
       {
         id: 'facilitiesCount',
+        meta: { headerTitle: 'Facilities' },
         header: ({ column }) => <DataGridColumnHeader column={column} title="Facilities" className="justify-center" />,
         cell: ({ row }) => {
           const count = row.original.facilitiesCount ?? 0;
           return (
             <div className="text-center">
-              <span className="font-mono font-bold bg-surface-muted dark:bg-[#161c24] px-2 py-0.5 rounded border border-border text-[11px]">
+              <span className="font-mono font-bold bg-surface-muted px-2 py-0.5 rounded border border-border text-[11px]">
                 {count}
               </span>
             </div>
@@ -614,12 +643,13 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       },
       {
         id: 'inquiriesCount',
+        meta: { headerTitle: 'Inquiries' },
         header: ({ column }) => <DataGridColumnHeader column={column} title="Inquiries" className="justify-center" />,
         cell: ({ row }) => {
           const count = row.original.inquiriesCount ?? 0;
           return (
             <div className="text-center">
-              <span className="font-mono font-bold bg-fairway-50 text-fairway-900 dark:bg-fairway-950 dark:text-fairway-300 px-2 py-0.5 rounded border border-fairway-200 dark:border-fairway-800 text-[11px]">
+              <span className="font-mono font-bold bg-surface-muted text-foreground px-2 py-0.5 rounded border border-border text-[11px]">
                 {count}
               </span>
             </div>
@@ -750,8 +780,11 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-2.5 sm:pb-3 border-b border-border">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-fairway-600 shrink-0" />
+            <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary shrink-0" />
             <span>Companies Master</span>
+            <span className="text-xs font-mono font-bold bg-surface-muted text-foreground border border-border px-2 py-0.5 rounded-full shrink-0">
+              {totalCount || companies.length} Accounts
+            </span>
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
             Top-level customer accounts, linked facilities, active inquiry requirements and ownership.
@@ -792,7 +825,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                 setPageMode('form');
               }}
               leftIcon={<Plus className="w-4 h-4 shrink-0" />}
-              className="flex-1 sm:flex-initial text-[11px] sm:text-xs px-1.5 sm:px-3 justify-center whitespace-nowrap h-8.5"
+              className="flex-1 sm:flex-initial text-[11px] sm:text-xs px-1.5 sm:px-3 justify-center whitespace-nowrap h-8.5 shadow-xs font-bold"
             >
               Add Company
             </Button>
@@ -800,131 +833,56 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
         </div>
       </div>
 
-      {/* Modern KPI Cards with Glowing Sparkline Waves */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        {/* Card 1: Total Corporate Accounts */}
-        <div className="bg-surface border border-border p-3.5 sm:p-5 rounded-xl sm:rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-fairway-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight block">
-              Total Corporate Accounts
-            </span>
-            <span className="text-xs text-foreground-muted mt-3 sm:mt-4 block font-medium">
-              Registered Clients
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+      {/* Compact 1-Line Stats Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 sm:p-4 rounded-xl border border-border bg-surface shadow-2xs">
+        <div className="flex items-center gap-3">
+          <div className="size-8 rounded-lg bg-surface-muted text-foreground flex items-center justify-center border border-border shrink-0">
+            <Building2 className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[11px] font-medium text-foreground-muted block">Registered Clients</span>
+            <span className="text-lg sm:text-xl font-bold text-foreground tabular-nums tracking-tight block">
               {totalCount || companies.length}
             </span>
           </div>
-
-          <div className="shrink-0 pb-1">
-            <svg className="w-20 sm:w-28 md:w-32 lg:w-36 h-10 sm:h-12 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="compWave1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--fw-600, #0084FF)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4 L 120 40 L 0 40 Z"
-                fill="url(#compWave1)"
-              />
-              <path
-                d="M 0 28 Q 12 18, 24 24 T 48 18 T 72 14 T 96 8 T 120 4"
-                fill="none"
-                stroke="var(--fw-600, #0084FF)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
         </div>
 
-        {/* Card 2: Linked Facility Nodes */}
-        <div className="bg-surface border border-border p-3.5 sm:p-5 rounded-xl sm:rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-accent-400/60 relative overflow-hidden group">
-          <div>
-            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight block">
-              Linked Facility Nodes
-            </span>
-            <span className="text-xs text-foreground-muted mt-3 sm:mt-4 block font-medium">
-              Industrial Sites Mapped
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+        <div className="flex items-center gap-3 sm:border-l border-border sm:pl-4">
+          <div className="size-8 rounded-lg bg-surface-muted text-foreground flex items-center justify-center border border-border shrink-0">
+            <Warehouse className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[11px] font-medium text-foreground-muted block">Industrial Sites Mapped</span>
+            <span className="text-lg sm:text-xl font-bold text-foreground tabular-nums tracking-tight block">
               {companies.reduce((acc, curr) => acc + (curr.facilitiesCount || 0), 0)}
             </span>
           </div>
-
-          <div className="shrink-0 pb-1">
-            <svg className="w-20 sm:w-28 md:w-32 lg:w-36 h-10 sm:h-12 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="compWave2" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent-500, #10B981)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--accent-500, #10B981)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 30 Q 15 22, 30 25 T 60 19 T 90 12 T 120 8 L 120 40 L 0 40 Z"
-                fill="url(#compWave2)"
-              />
-              <path
-                d="M 0 30 Q 15 22, 30 25 T 60 19 T 90 12 T 120 8"
-                fill="none"
-                stroke="var(--accent-500, #10B981)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
         </div>
 
-        {/* Card 3: Active Opportunities (spans 2 columns on tablet so grid is nicely balanced) */}
-        <div className="bg-surface border border-border p-3.5 sm:p-5 rounded-xl sm:rounded-2xl shadow-xs flex items-end justify-between transition-all hover:border-indigo-400/60 relative overflow-hidden group sm:col-span-2 lg:col-span-1">
-          <div>
-            <span className="text-xs sm:text-sm font-bold text-foreground tracking-tight block">
-              Active Opportunities
-            </span>
-            <span className="text-xs text-foreground-muted mt-3 sm:mt-4 block font-medium">
-              Ongoing Inquiries
-            </span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight block mt-0.5">
+        <div className="flex items-center gap-3 sm:border-l border-border sm:pl-4">
+          <div className="size-8 rounded-lg bg-surface-muted text-foreground flex items-center justify-center border border-border shrink-0">
+            <FileText className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[11px] font-medium text-foreground-muted block">Active Inquiries</span>
+            <span className="text-lg sm:text-xl font-bold text-foreground tabular-nums tracking-tight block">
               {companies.reduce((acc, curr) => acc + (curr.inquiriesCount || 0), 0)}
             </span>
-          </div>
-
-          <div className="shrink-0 pb-1">
-            <svg className="w-20 sm:w-28 md:w-32 lg:w-36 h-10 sm:h-12 overflow-visible" viewBox="0 0 120 40">
-              <defs>
-                <linearGradient id="compWave3" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--chart-5, #8B5CF6)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--chart-5, #8B5CF6)" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6 L 120 40 L 0 40 Z"
-                fill="url(#compWave3)"
-              />
-              <path
-                d="M 0 26 Q 15 18, 30 22 T 60 14 T 90 10 T 120 6"
-                fill="none"
-                stroke="var(--chart-5, #8B5CF6)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-              />
-            </svg>
           </div>
         </div>
       </div>
 
-      {/* Control Bar: Search, Filters, Refresh, Customizer & View Switcher */}
-      <div className="bg-surface border border-border p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+      {/* Control Bar: Search, Quick Dropdown Filters, Refresh & View Switcher */}
+      <div className="bg-surface border border-border p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3">
         {/* Search Box */}
-        <div className="relative w-full sm:flex-1 sm:min-w-[200px] sm:max-w-md">
+        <div className="relative w-full lg:max-w-xs xl:max-w-sm">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by company name, location, email, contact..."
-            className="w-full bg-surface-muted/60 dark:bg-[#11161d] text-foreground text-xs rounded-xl pl-9 pr-9 py-2 border border-border/80 focus:border-fairway-600 focus:outline-none focus:ring-1 focus:ring-fairway-600 transition-all placeholder:text-foreground-muted"
+            placeholder="Search by company, city, contact..."
+            className="w-full bg-surface-muted/60 text-foreground text-xs rounded-xl pl-9 pr-9 py-2 border border-border/80 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all placeholder:text-foreground-muted"
           />
           {searchQuery && (
             <button
@@ -937,46 +895,37 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           )}
         </div>
 
-        {/* Right Side: Tool Buttons & View Toggle */}
-        <TooltipProvider delayDuration={200}>
-          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2 w-full sm:w-auto overflow-x-auto pb-0.5 sm:pb-0 scrollbar-none">
+        {/* Filters and View Controls (Matches Warehouse Pattern) */}
+        <TooltipProvider delayDuration={150}>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Filter Drawer Trigger Button */}
-            <button
-              type="button"
-              onClick={openFilterDrawer}
-              className={cn(
-                "h-9 px-3 rounded-button border text-xs font-semibold flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer shadow-2xs shrink-0",
-                activeFiltersCount > 0
-                  ? "bg-fairway-50 text-fairway-700 border-fairway-300 dark:bg-fairway-950/60 dark:text-fairway-300 dark:border-fairway-700"
-                  : "bg-white dark:bg-[#11161d] text-foreground border-border hover:bg-surface-muted"
-              )}
-            >
-              <Filter className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-              <span>Filter</span>
-              {activeFiltersCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-fairway-600 text-white text-[10px] flex items-center justify-center font-bold">
-                  {activeFiltersCount}
-                </span>
-              )}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={openFilterDrawer}
+                  className={cn(
+                    "relative size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs",
+                    activeFiltersCount > 0 && "text-fairway-600 border-fairway-400 bg-fairway-50 dark:bg-fairway-950/40"
+                  )}
+                >
+                  <Filter className="w-4 h-4" />
+                  {activeFiltersCount > 0 && (
+                    <span className="absolute -top-1 -right-1 size-4 rounded-full bg-fairway-600 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
+                      {activeFiltersCount}
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                Filter
+              </TooltipContent>
+            </Tooltip>
 
-            {/* Clear Filters Button */}
-            {activeFiltersCount > 0 && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={handleClearAllFilters}
-                    className="size-9 rounded-button border border-rose-200 dark:border-rose-800/60 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 hover:bg-rose-100 flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-2xs"
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  Reset all filters
-                </TooltipContent>
-              </Tooltip>
-            )}
+            {/* Column Visibility Customizer Menu (Desktop Only) */}
+            <div className="hidden sm:block">
+              <DataGridColumnVisibilityMenu table={table} excludeColumns={['actions', 'srNo']} />
+            </div>
 
             {/* Refresh Button */}
             <Tooltip>
@@ -1000,48 +949,8 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            {/* Column Visibility Customizer Menu (Table Mode Only) */}
-            {viewMode === 'table' && (
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
-                      >
-                        <Settings className="w-4 h-4 text-foreground-muted" />
-                      </button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    Customize columns
-                  </TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent align="end" className="w-56 bg-surface border border-border shadow-dialog z-50">
-                  <DropdownMenuLabel className="text-xs font-bold text-foreground">
-                    Toggle Column Visibility
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {table.getAllLeafColumns().map((column) => {
-                    if (column.id === 'actions') return null;
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.id}
-                        className="capitalize text-xs cursor-pointer text-foreground"
-                        checked={column.getIsVisible()}
-                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                      >
-                        {column.id.replace(/([A-Z])/g, ' $1')}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
             {/* Segmented View Switcher (Desktop Only) */}
-            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs shrink-0">
+            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -1078,7 +987,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  Card
+                  Grid
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -1114,6 +1023,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
             hasFilters={activeFiltersCount > 0 || !!searchQuery}
             onClearFilters={handleClearAllFilters}
             onNewCompany={onOpenNewCompany}
+            onRowClick={(company) => onSelectCompany(company.id)}
           />
         ) : (
           <CompaniesCard
@@ -1144,7 +1054,7 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           }}
           maxWidth="md"
           title={
-            <div className="flex items-center gap-2 text-rose-600">
+            <div className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="w-5 h-5" />
               <span>Delete Company Account</span>
             </div>
@@ -1152,8 +1062,8 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
           description="Are you sure you want to permanently delete this corporate record?"
         >
           <div className="space-y-4 text-xs">
-            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 rounded-xl space-y-1.5 text-foreground">
-              <p className="font-semibold text-rose-900 dark:text-rose-200">
+            <div className="p-3.5 bg-surface-muted border border-border rounded-xl space-y-1.5 text-foreground">
+              <p className="font-semibold text-foreground">
                 You are deleting: <span className="font-bold underline">{companyToDelete.name}</span>
               </p>
               <p className="text-[11px] text-foreground-muted">
@@ -1202,13 +1112,19 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
             {/* Header */}
             <div className="p-5 border-b border-border bg-surface flex items-start justify-between border-t-0">
               <div>
-                <h3 className="text-base font-bold text-foreground">Advanced Filters</h3>
-                <p className="text-xs text-foreground-muted mt-0.5">Filter companies by category and ownership...</p>
+                <h2 className="text-base font-bold text-foreground tracking-tight flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-fairway-600" />
+                  <span>Company Filters</span>
+                </h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Filter companies by industry, city, priority & status
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsFilterDrawerOpen(false)}
-                className="p-1 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
+                title="Close"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1216,44 +1132,12 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
 
             {/* Filter Controls Body */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
-              {/* Status Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">Company Status</label>
-                <Combobox
-                  options={[
-                    { value: 'all', label: 'All statuses' },
-                    { value: 'Active', label: 'Active' },
-                    { value: 'Prospect', label: 'Prospect' },
-                    { value: 'Inactive', label: 'Inactive' },
-                  ]}
-                  value={draftStatusFilter}
-                  onChange={setDraftStatusFilter}
-                  placeholder="Select status..."
-                />
-              </div>
-
-              {/* Priority Filter */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">Priority Level</label>
-                <Combobox
-                  options={[
-                    { value: 'all', label: 'All priorities' },
-                    { value: 'High', label: '🔴 High Priority' },
-                    { value: 'Medium', label: '🟡 Medium Priority' },
-                    { value: 'Low', label: '🟢 Low Priority' },
-                  ]}
-                  value={draftPriorityFilter}
-                  onChange={setDraftPriorityFilter}
-                  placeholder="Select priority..."
-                />
-              </div>
-
               {/* Industry Filter */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">Industry Segment</label>
+                <label className="text-xs font-bold text-foreground block">Industry Segment</label>
                 <Combobox
                   options={[
-                    { value: 'all', label: 'All industries' },
+                    { value: 'all', label: 'All Industries' },
                     ...uniqueIndustries.map((ind) => ({ value: ind, label: ind })),
                   ]}
                   value={draftIndustryFilter}
@@ -1265,10 +1149,10 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
 
               {/* City Filter */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground block">City / Cluster</label>
+                <label className="text-xs font-bold text-foreground block">City / Cluster</label>
                 <Combobox
                   options={[
-                    { value: 'all', label: 'All cities' },
+                    { value: 'all', label: 'All Cities' },
                     ...uniqueCities.map((ct) => ({ value: ct, label: ct })),
                   ]}
                   value={draftCityFilter}
@@ -1278,35 +1162,69 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                 />
               </div>
 
-              {/* Assigned Owner Filter with Images */}
-              <UserCombobox
-                label="Assigned Account Owner"
-                users={users}
-                value={draftOwnerFilter === 'all' ? '' : draftOwnerFilter}
-                onChange={(val) => setDraftOwnerFilter(val || 'all')}
-                placeholder="All salespersons"
-                allowClear
-              />
+              {/* Status Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground block">Company Status</label>
+                <Combobox
+                  options={[
+                    { value: 'all', label: 'All Statuses' },
+                    { value: 'Active', label: 'Active' },
+                    { value: 'Prospect', label: 'Prospect' },
+                    { value: 'Inactive', label: 'Inactive' },
+                  ]}
+                  value={draftStatusFilter}
+                  onChange={setDraftStatusFilter}
+                  placeholder="Select status..."
+                  searchPlaceholder="Search status..."
+                />
+              </div>
+
+              {/* Priority Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground block">Priority Level</label>
+                <Combobox
+                  options={[
+                    { value: 'all', label: 'All Priorities' },
+                    { value: 'High', label: 'High Priority' },
+                    { value: 'Medium', label: 'Medium Priority' },
+                    { value: 'Low', label: 'Low Priority' },
+                  ]}
+                  value={draftPriorityFilter}
+                  onChange={setDraftPriorityFilter}
+                  placeholder="Select priority..."
+                  searchPlaceholder="Search priority..."
+                />
+              </div>
+
+              {/* Assigned Owner Filter */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-foreground block">Assigned Account Owner</label>
+                <UserCombobox
+                  users={users}
+                  value={draftOwnerFilter === 'all' ? '' : draftOwnerFilter}
+                  onChange={(val) => setDraftOwnerFilter(val || 'all')}
+                  placeholder="All salespersons"
+                  allowClear
+                />
+              </div>
             </div>
 
             {/* Footer Actions */}
             <div className="p-4 border-t border-border bg-surface flex items-center justify-between gap-3">
-              <Button
-                variant="outline"
-                size="sm"
+              <button
+                type="button"
                 onClick={handleClearAllFilters}
-                className="flex-1 text-xs"
+                className="flex-1 py-2.5 px-4 rounded-button border text-xs font-bold transition-all text-center bg-surface hover:bg-surface-muted border-border text-foreground cursor-pointer shadow-2xs"
               >
-                Clear Filters
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
+                Reset All
+              </button>
+              <button
+                type="button"
                 onClick={handleApplyFilters}
-                className="flex-1 text-xs bg-fairway-700 hover:bg-fairway-800"
+                className="flex-1 py-2.5 px-4 rounded-button bg-fairway-600 hover:bg-fairway-700 text-white text-xs font-bold transition-all text-center shadow-xs cursor-pointer"
               >
                 Apply Filters
-              </Button>
+              </button>
             </div>
           </div>
         </div>

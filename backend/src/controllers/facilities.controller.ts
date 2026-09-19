@@ -63,8 +63,8 @@ export const createFacility = async (req: Request, res: Response): Promise<void>
       builtUpAreaSqFt = 0,
     } = req.body;
 
-    if (!companyId || !name) {
-      res.status(400).json({ success: false, error: { message: 'companyId and facility name are required' } });
+    if (!name || !name.trim()) {
+      res.status(400).json({ success: false, error: { message: 'Facility name is required' } });
       return;
     }
 
@@ -119,6 +119,77 @@ export const createFacility = async (req: Request, res: Response): Promise<void>
   } catch (error: any) {
     console.error('Error creating facility:', error);
     res.status(500).json({ success: false, error: { message: error.message || 'Failed to create facility' } });
+  }
+};
+
+/**
+ * PUT /api/facilities/:id
+ */
+export const updateFacility = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { name, type, address, city, state, pincode, latitude, longitude, status, builtUpAreaSqFt } = req.body;
+
+    const sql = `
+      UPDATE facilities SET
+        name = COALESCE($1, name),
+        type = COALESCE($2, type),
+        address = COALESCE($3, address),
+        city = COALESCE($4, city),
+        state = COALESCE($5, state),
+        pincode = COALESCE($6, pincode),
+        latitude = COALESCE($7, latitude),
+        longitude = COALESCE($8, longitude),
+        status = COALESCE($9, status),
+        built_up_area_sq_ft = COALESCE($10, built_up_area_sq_ft),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $11
+      RETURNING *;
+    `;
+
+    const result = await query(sql, [
+      name || null,
+      type || null,
+      address || null,
+      city || null,
+      state || null,
+      pincode || null,
+      latitude ? parseFloat(latitude) : null,
+      longitude ? parseFloat(longitude) : null,
+      status || null,
+      builtUpAreaSqFt ? parseFloat(builtUpAreaSqFt) : null,
+      id,
+    ]);
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, error: { message: 'Facility not found' } });
+      return;
+    }
+
+    const f = result.rows[0];
+    res.status(200).json({
+      success: true,
+      data: {
+        id: f.id,
+        companyId: f.company_id,
+        companyName: f.company_name,
+        name: f.name,
+        type: f.type,
+        address: f.address,
+        city: f.city,
+        state: f.state,
+        pincode: f.pincode,
+        latitude: f.latitude ? parseFloat(f.latitude) : null,
+        longitude: f.longitude ? parseFloat(f.longitude) : null,
+        status: f.status,
+        builtUpAreaSqFt: f.built_up_area_sq_ft ? parseFloat(f.built_up_area_sq_ft) : 0,
+        createdAt: f.created_at,
+        updatedAt: f.updated_at,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error updating facility:', error);
+    res.status(500).json({ success: false, error: { message: error.message || 'Failed to update facility' } });
   }
 };
 

@@ -3,13 +3,6 @@ import { query } from '../config/db.js';
 
 export const getRolePermissions = async (req: Request, res: Response): Promise<void> => {
   try {
-    // Deduplicate any duplicate ids that might have been inserted in earlier migrations
-    await query(`
-      DELETE FROM role_permissions a 
-      USING role_permissions b 
-      WHERE a.ctid < b.ctid AND a.id = b.id;
-    `).catch(() => {});
-
     const result = await query(
       `SELECT id, capability, category, super_admin, admin, sales, viewer, custom_permissions, description, created_at, updated_at 
        FROM role_permissions 

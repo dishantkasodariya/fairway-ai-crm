@@ -36,27 +36,27 @@ export const getCallStatusBadge = (status: string) => {
     case 'completed':
       return {
         label: 'Completed',
-        className: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800',
+        className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
       };
     case 'scheduled':
       return {
         label: 'Scheduled',
-        className: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800',
+        className: 'bg-surface-muted text-foreground border-border',
       };
     case 'overdue':
       return {
         label: 'Overdue',
-        className: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800',
+        className: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
       };
     case 'cancelled':
       return {
         label: 'Cancelled',
-        className: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+        className: 'bg-surface-muted text-foreground-muted border-border',
       };
     default:
       return {
         label: status || 'Scheduled',
-        className: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
+        className: 'bg-surface-muted text-foreground border-border',
       };
   }
 };
@@ -65,14 +65,14 @@ export const getCallTypeBadge = (type: string) => {
   if (type === 'Inbound') {
     return {
       label: 'Inbound',
-      icon: <PhoneIncoming className="w-3 h-3" />,
-      className: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/60 dark:text-teal-300 dark:border-teal-800',
+      icon: <PhoneIncoming className="w-3 h-3 text-foreground-muted" />,
+      className: 'bg-surface-muted text-foreground border-border',
     };
   }
   return {
     label: 'Outbound',
-    icon: <PhoneOutgoing className="w-3 h-3" />,
-    className: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800',
+    icon: <PhoneOutgoing className="w-3 h-3 text-foreground-muted" />,
+    className: 'bg-surface-muted text-foreground border-border',
   };
 };
 
@@ -171,7 +171,7 @@ export const CallCard: React.FC<CallCardProps> = ({
 
         {/* Association Matrix: Call For & Related To */}
         <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border/70 text-[11px]">
-          <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-xl border border-border/50">
+          <div className="bg-surface-muted p-2 rounded-xl border border-border/60">
             <span className="text-[10px] text-foreground-muted block font-medium">
               Call For ({call.callForType})
             </span>
@@ -179,7 +179,7 @@ export const CallCard: React.FC<CallCardProps> = ({
               {call.callForName || 'Not Specified'}
             </span>
           </div>
-          <div className="bg-surface-muted/60 dark:bg-[#161c24] p-2 rounded-xl border border-border/50">
+          <div className="bg-surface-muted p-2 rounded-xl border border-border/60">
             <span className="text-[10px] text-foreground-muted block font-medium">
               Related To ({call.relatedToType})
             </span>

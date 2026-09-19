@@ -54,7 +54,8 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
   onNavigateToCompany,
   onNavigateToInquiry,
 }) => {
-  const { canEdit, users } = useAuth();
+  const { canEditModule, users } = useAuth();
+  const canEdit = canEditModule('tasks');
   const { success, error } = useToast();
 
   const [siteVisits, setSiteVisits] = useState<SiteVisit[]>([]);
@@ -200,9 +201,9 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
-          <span className="text-xs font-semibold text-fairway-800 uppercase tracking-wider">CRM / Site Visits</span>
+          <span className="text-xs font-semibold text-fairway-800 dark:text-fairway-400 uppercase tracking-wider">CRM / Site Visits</span>
           <h1 className="text-2xl font-bold text-foreground tracking-tight flex items-center gap-2 mt-0.5">
-            <Calendar className="w-6 h-6 text-orange-600" />
+            <Calendar className="w-6 h-6 text-fairway-600 dark:text-fairway-400" />
             <span>Warehouse Site Inspections</span>
           </h1>
           <p className="text-xs text-foreground-muted mt-1">
@@ -221,7 +222,7 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
             placeholder="Search inspections by company, property, or inquiry..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/60 dark:bg-[#141a23] border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors h-9"
+            className="w-full pl-9 pr-8 py-2 text-xs bg-surface-muted/50 border border-border rounded-lg text-foreground placeholder:text-foreground-muted/60 focus:border-fairway-600 focus:outline-none transition-colors h-9"
           />
           {searchQuery && (
             <button
@@ -245,7 +246,7 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
                   type="button"
                   onClick={openFilterDrawer}
                   className={cn(
-                    "relative size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs",
+                    "relative size-9 rounded-button border border-border bg-surface hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs",
                     activeFiltersCount > 0 && "text-fairway-600 border-fairway-400 bg-fairway-50 dark:bg-fairway-950/40"
                   )}
                 >
@@ -270,7 +271,7 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
                     <DropdownMenuTrigger asChild>
                       <button
                         type="button"
-                        className="size-9 rounded-button border border-border bg-white dark:bg-[#171717] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
+                        className="size-9 rounded-button border border-border bg-surface hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs"
                       >
                         <Settings className="w-4 h-4" />
                       </button>
@@ -280,7 +281,7 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
                     Column
                   </TooltipContent>
                 </Tooltip>
-                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-2xl p-1 rounded-card z-50">
+                <DropdownMenuContent align="end" className="w-48 bg-surface border border-border shadow-none ring-0 outline-none p-1 rounded-card z-50">
                   <DropdownMenuLabel className="text-xs font-bold text-foreground px-2 py-1.5">
                     Toggle Columns
                   </DropdownMenuLabel>
@@ -344,7 +345,7 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
                   type="button"
                   onClick={() => refreshData(true)}
                   disabled={isRefreshing}
-                  className="size-9 rounded-button border border-border bg-white dark:bg-[#11161d] hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-70"
+                  className="size-9 rounded-button border border-border bg-surface hover:bg-surface-muted flex items-center justify-center text-foreground hover:text-foreground transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-70"
                 >
                   <RefreshCw
                     className={cn(
@@ -360,7 +361,7 @@ export const SiteVisitListView: React.FC<SiteVisitListViewProps> = ({
             </Tooltip>
 
             {/* Segmented View Switcher (Desktop Only) */}
-            <div className="hidden sm:flex items-center h-9 bg-white dark:bg-[#11161d] border border-border rounded-button overflow-hidden shadow-2xs">
+            <div className="hidden sm:flex items-center h-9 bg-surface border border-border rounded-button overflow-hidden shadow-2xs">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button

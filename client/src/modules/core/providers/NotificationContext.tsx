@@ -31,8 +31,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   useEffect(() => {
     refreshNotifications();
-    const interval = setInterval(refreshNotifications, 60000); // 1-minute background sync
-    return () => clearInterval(interval);
+    const interval = setInterval(refreshNotifications, 20000); // 20-second real-time sync
+    const handleFocus = () => refreshNotifications();
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const markAsRead = async (id: string) => {

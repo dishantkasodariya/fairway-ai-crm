@@ -255,7 +255,7 @@ function DataGridColumnHeaderInner<TData extends object, TValue>({
             <Settings2Icon className="size-3.5 shrink-0 text-foreground-muted" />
             <span>Columns</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="bg-white dark:bg-[#171717] border border-border shadow-2xl p-1.5 rounded-card">
+          <DropdownMenuSubContent className="bg-white dark:bg-[#161c24] border border-border dark:border-white/[0.12] shadow-none ring-0 outline-none p-1.5 rounded-card">
             {table
               .getAllColumns()
               .filter((col) => col.getCanHide())
@@ -312,24 +312,13 @@ function DataGridColumnHeaderInner<TData extends object, TValue>({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-44 bg-white dark:bg-[#171717] rounded-card border border-border shadow-2xl p-1.5 space-y-0.5 z-50 animate-in fade-in-0 zoom-in-95"
+            className="w-44 bg-white dark:bg-[#161c24] rounded-card border border-border dark:border-white/[0.12] shadow-none ring-0 outline-none p-1.5 space-y-0.5 z-50 animate-in fade-in-0 zoom-in-95"
             align="start"
             sideOffset={4}
           >
             {menuItems}
           </DropdownMenuContent>
         </DropdownMenu>
-        {props.tableLayout?.columnsPinnable && canPin && isPinned && (
-          <button
-            type="button"
-            className="rounded-md -me-1 size-6 inline-flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-muted transition-colors cursor-pointer"
-            onClick={() => column.pin(false)}
-            aria-label={`Unpin ${resolvedTitle} column`}
-            title={`Unpin ${resolvedTitle} column`}
-          >
-            <PinOffIcon className="size-3.5 opacity-50" aria-hidden="true" />
-          </button>
-        )}
       </div>
     )
   }

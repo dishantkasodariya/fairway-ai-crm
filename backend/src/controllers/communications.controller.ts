@@ -106,10 +106,10 @@ export const getCommunications = async (req: Request, res: Response): Promise<vo
 export const createCommunication = async (req: Request, res: Response): Promise<void> => {
   try {
     const {
-      channel = 'Email',
+      channel: rawChannel,
       direction = 'Outbound',
       subject,
-      message,
+      message: rawMessage,
       companyId,
       companyName,
       contactId,
@@ -122,7 +122,10 @@ export const createCommunication = async (req: Request, res: Response): Promise<
       outcome,
     } = req.body;
 
-    if (!message || !message.trim()) {
+    const channel = rawChannel || req.body.type || 'Email';
+    const message = (rawMessage || req.body.content || req.body.body || '').trim();
+
+    if (!message) {
       res.status(400).json({ success: false, error: { message: 'Message content is required' } });
       return;
     }
@@ -298,5 +301,23 @@ export const sendFollowUpEmail = async (req: Request, res: Response): Promise<vo
   } catch (error: any) {
     console.error('Error sending follow-up email:', error);
     res.status(500).json({ success: false, error: { message: error.message || 'Failed to send follow-up email' } });
+  }
+};
+
+/**
+ * DELETE /api/communications/:id
+ */
+export const deleteCommunication = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const result = await query('DELETE FROM communications WHERE id = $1 RETURNING id;', [id]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ success: false, error: { message: 'Communication record not found' } });
+      return;
+    }
+    res.status(200).json({ success: true, message: 'Communication deleted successfully.' });
+  } catch (error: any) {
+    console.error('Error deleting communication:', error);
+    res.status(500).json({ success: false, error: { message: error.message || 'Failed to delete communication' } });
   }
 };

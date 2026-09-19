@@ -156,7 +156,10 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
       createdByUserName,
     } = req.body;
 
-    if (!companyId || !propertyName || !proposedAreaSqFt || !baseRentPerSqFtINR) {
+    const finalCompanyId = companyId || `comp_${crypto.randomUUID().slice(0, 6)}`;
+    const finalCompanyName = companyName || 'Corporate Client';
+
+    if ((!companyId && !companyName) || !propertyName || !proposedAreaSqFt || !baseRentPerSqFtINR) {
       res.status(400).json({
         success: false,
         error: 'Company, Property, Proposed Area, and Base Rent are required.',
@@ -202,8 +205,8 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
       proposalNumber,
       inquiryId || null,
       inquiryNumber || null,
-      companyId,
-      companyName || 'Corporate Client',
+      finalCompanyId,
+      finalCompanyName,
       contactId || null,
       contactName || null,
       propertyId || null,

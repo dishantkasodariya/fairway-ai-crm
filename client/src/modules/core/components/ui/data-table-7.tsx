@@ -23,7 +23,7 @@ export interface ColumnConfig<T = any> {
   key: string;
   label: string;
   width: number;
-  render?: (row: T) => ReactNode;
+  render?: (row: T, index?: number) => ReactNode;
   headerAlign?: 'left' | 'center' | 'right';
 }
 
@@ -136,59 +136,63 @@ export const DataTable7 = <T extends Record<string, any>>({
                   <TableHead
                     key={column.key}
                     className={cn(
-                      'relative h-11 px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-wider text-foreground-muted select-none border-b border-border bg-surface-muted/90 backdrop-blur-sm',
-                      pinSide && 'bg-surface shadow-sm border-r border-border'
+                      'relative h-11 px-3.5 py-2.5 text-[11px] font-bold uppercase tracking-wider text-foreground-muted select-none border-b border-border bg-surface-muted/80 backdrop-blur-sm',
+                      pinSide && 'shadow-sm border-r border-border'
                     )}
                     style={getPinnedStyles(column)}
                   >
                     <div className="flex items-center justify-between gap-1.5">
-                      <span className="truncate">{column.label}</span>
+                      <span className={cn("truncate", column.key === 'srNo' && "whitespace-nowrap font-bold")}>
+                        {column.label}
+                      </span>
 
-                      <div className="relative">
-                        {pinSide ? (
-                          <button
-                            type="button"
-                            className="inline-flex h-6 w-6 items-center justify-center rounded text-fairway-700 hover:bg-fairway-100 transition-colors"
-                            onClick={() => setPin(column.key, false)}
-                            aria-label={`Unpin ${column.label} column`}
-                            title={`Unpin ${column.label} column`}
-                          >
-                            <PinOff className="w-3.5 h-3.5" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setOpenDropdownKey(openDropdownKey === column.key ? null : column.key)
-                            }
-                            className="inline-flex h-6 w-6 items-center justify-center rounded text-foreground-muted hover:bg-surface-muted hover:text-foreground transition-colors"
-                            title="Pin column"
-                          >
-                            <MoreVertical className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-
-                        {openDropdownKey === column.key && (
-                          <div className="absolute right-0 top-full mt-1 w-36 rounded-md bg-surface border border-border p-1 shadow-popover z-50 animate-fade-in text-xs font-normal">
+                      {column.key !== 'srNo' && (
+                        <div className="relative">
+                          {pinSide ? (
                             <button
                               type="button"
-                              onClick={() => setPin(column.key, 'left')}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-muted text-foreground text-left"
+                              className="inline-flex h-6 w-6 items-center justify-center rounded text-fairway-700 hover:bg-fairway-100 transition-colors"
+                              onClick={() => setPin(column.key, false)}
+                              aria-label={`Unpin ${column.label} column`}
+                              title={`Unpin ${column.label} column`}
                             >
-                              <ArrowLeftToLine className="w-3.5 h-3.5 text-foreground-muted" />
-                              <span>Stick to left</span>
+                              <PinOff className="w-3.5 h-3.5" />
                             </button>
+                          ) : (
                             <button
                               type="button"
-                              onClick={() => setPin(column.key, 'right')}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-muted text-foreground text-left"
+                              onClick={() =>
+                                setOpenDropdownKey(openDropdownKey === column.key ? null : column.key)
+                              }
+                              className="inline-flex h-6 w-6 items-center justify-center rounded text-foreground-muted hover:bg-surface-muted hover:text-foreground transition-colors"
+                              title="Pin column"
                             >
-                              <ArrowRightToLine className="w-3.5 h-3.5 text-foreground-muted" />
-                              <span>Stick to right</span>
+                              <MoreVertical className="w-3.5 h-3.5" />
                             </button>
-                          </div>
-                        )}
-                      </div>
+                          )}
+
+                          {openDropdownKey === column.key && (
+                            <div className="absolute right-0 top-full mt-1 w-36 rounded-md bg-surface border border-border p-1 shadow-popover z-50 animate-fade-in text-xs font-normal">
+                              <button
+                                type="button"
+                                onClick={() => setPin(column.key, 'left')}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-muted text-foreground text-left"
+                              >
+                                <ArrowLeftToLine className="w-3.5 h-3.5 text-foreground-muted" />
+                                <span>Stick to left</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPin(column.key, 'right')}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-muted text-foreground text-left"
+                              >
+                                <ArrowRightToLine className="w-3.5 h-3.5 text-foreground-muted" />
+                                <span>Stick to right</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </TableHead>
                 );
@@ -203,12 +207,12 @@ export const DataTable7 = <T extends Record<string, any>>({
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((row) => (
+              data.map((row, rowIndex) => (
                 <TableRow
                   key={keyExtractor(row)}
                   onClick={() => onRowClick && onRowClick(row)}
                   className={cn(
-                    'border-b border-border/70 hover:bg-surface-muted/40 transition-colors',
+                    'border-b border-border/70 transition-colors group/row',
                     onRowClick && 'cursor-pointer'
                   )}
                 >
@@ -220,11 +224,11 @@ export const DataTable7 = <T extends Record<string, any>>({
                         key={column.key}
                         className={cn(
                           'truncate px-3.5 py-3 text-xs text-foreground',
-                          pinSide ? 'bg-surface z-10 border-r border-border font-medium' : ''
+                          pinSide ? 'z-10 border-r border-border font-medium' : ''
                         )}
                         style={getPinnedStyles(column)}
                       >
-                        {column.render ? column.render(row) : row[column.key] ?? '—'}
+                        {column.render ? column.render(row, rowIndex) : row[column.key] ?? '—'}
                       </TableCell>
                     );
                   })}
