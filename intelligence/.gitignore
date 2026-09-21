@@ -1,0 +1,20 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+.pytest_cache/
+
+# Logs
+logs/
+streamlit.log
+
+# Generated outputs
+results/
+*.html
+
+# OS
+.DS_Store

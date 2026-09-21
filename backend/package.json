@@ -6,9 +6,9 @@
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon",
-    "build": "tsc",
-    "start": "node dist/server.js"
+    "dev": "node init && nodemon",
+    "build": "node init && tsc",
+    "start": "node init && node dist/server.js"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
