@@ -91,6 +91,12 @@ Fairway bridges this gap with domain-specific workflows covering high-value leas
   - `sales`: Pipeline execution, lead tracking, proposals, and client communications.
   - `viewer`: Read-only access for auditors, partners, or executive oversight.
 
+### 11. ✨ AI-Discovered Prospects (Company Intelligence Engine)
+- **Radius-Based Prospect Discovery**: From any warehouse park's detail page, kick off a tiled search for manufacturers/suppliers/logistics companies within a configurable radius of its coordinates.
+- **Opportunity Scoring**: Each discovered company is enriched with a revenue estimate and lead signals (expansion, funding, hiring, tenders, distress, etc.) and given a deterministic, auditable opportunity score.
+- **One-Click CRM Conversion**: Promote a scored prospect straight into a real `companies` (+ `facilities`) record without leaving the property page.
+- Powered by `/intelligence`, a separate Python/FastAPI service in this repo — see [`intelligence/README.md`](./intelligence/README.md). The Node backend proxies to it via `backend/src/controllers/intelligence.controller.ts` so its API key never reaches the browser.
+
 ---
 
 ## 🏗️ System Architecture
@@ -289,6 +295,19 @@ On initial startup, the database automatically initializes tables, runs required
 | Email | Password | Role | Access Level |
 | :--- | :--- | :--- | :--- |
 | `admin@fairway.com` | `admin123` | `super_admin` | Full System Access |
+
+### 5. (Optional) AI-Discovered Prospects Service
+The "AI Prospects" tab on a property's page needs the intelligence service running and pointed to by the backend's `INTELLIGENCE_API_URL`/`INTELLIGENCE_API_KEY` env vars (see `backend/.env.example`). Everything else in the CRM works without it. Setup:
+```bash
+cd intelligence
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # fill in PLACES_API, GROQ_API_KEY, SERPER_API_KEY, API_KEY
+cd docker && docker compose up -d postgres && cd ..
+alembic upgrade head
+uvicorn app.main:app --reload   # http://localhost:8000
+```
+Full details in [`intelligence/README.md`](./intelligence/README.md).
 
 ---
 

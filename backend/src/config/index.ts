@@ -16,4 +16,7 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/fairway_crm?schema=public',
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  // Fairway Company Intelligence API (Python/FastAPI service under /intelligence)
+  intelligenceApiUrl: process.env.INTELLIGENCE_API_URL || 'http://localhost:8000',
+  intelligenceApiKey: process.env.INTELLIGENCE_API_KEY || '',
 };

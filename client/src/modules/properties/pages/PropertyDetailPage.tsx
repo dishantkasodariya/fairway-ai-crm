@@ -14,6 +14,7 @@ import {
   Trash2,
   Edit3,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { InquiryService } from '@/modules/core/services/inquiryService';
@@ -25,6 +26,7 @@ import { cn } from '@/modules/core/lib/utils';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { NewPropertyPage } from './NewPropertyPage';
+import { AiProspectsPanel } from '../components/AiProspectsPanel';
 
 export interface PropertyDetailViewProps {
   propertyId: string;
@@ -51,7 +53,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'facility' | 'inquiries'>('facility');
+  const [activeTab, setActiveTab] = useState<'facility' | 'inquiries' | 'prospects'>('facility');
   const [areaUnit, setAreaUnit] = useState<'sqft' | 'sqm'>('sqft');
 
   useEffect(() => {
@@ -496,6 +498,20 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
           <FileText className="w-4 h-4" />
           <span>Compatible CRM Leads ({matchingInquiries.length})</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('prospects')}
+          className={cn(
+            'px-4 sm:px-5 py-3 text-xs font-bold transition-all cursor-pointer rounded-none flex items-center gap-2 -mb-px',
+            activeTab === 'prospects'
+              ? 'text-fairway-600 dark:text-fairway-400 border-b-2 border-fairway-600 dark:border-fairway-400 bg-fairway-500/5'
+              : 'text-foreground-muted hover:text-foreground border-b-2 border-transparent hover:bg-surface-muted/50'
+          )}
+        >
+          <Sparkles className="w-4 h-4" />
+          <span>AI Prospects</span>
+        </button>
       </div>
 
       {/* ================= TAB 1: CONSOLIDATED FACILITY DOSSIER ================= */}
@@ -710,6 +726,9 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
           )}
         </div>
       )}
+
+      {/* ================= TAB 3: AI-DISCOVERED PROSPECTS ================= */}
+      {activeTab === 'prospects' && <AiProspectsPanel property={property} />}
 
       {/* ================= MOBILE STICKY BOTTOM BAR ================= */}
       <div className="sm:hidden fixed bottom-0 left-0 right-0 p-3 bg-surface/95 backdrop-blur-lg border-t border-border z-30 shadow-lg flex items-center justify-between gap-3">
