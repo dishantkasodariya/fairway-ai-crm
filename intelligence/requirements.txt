@@ -1,0 +1,22 @@
+# Agents
+beautifulsoup4==4.15.0
+boto3==1.43.97
+
+# API service
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+sqlalchemy==2.0.54
+alembic==1.20.0
+psycopg2-binary==2.9.13
+pydantic==2.13.5
+pydantic-settings==2.15.0
+
+# Legacy discovery/mapping tools (still used by app.py / map_builder.py)
+requests==2.34.2
+python-dotenv==1.2.3
+folium==0.20.0
+streamlit==1.62.0
+
+# Used by build_methodology_doc.py and data/company_revenue_reference.md parsing
+python-docx==1.2.0
+pandas==3.0.5
