@@ -167,6 +167,7 @@ export const getCompanies = async (req: Request, res: Response): Promise<void> =
       annualTurnover: row.annual_turnover || '₹500+ Cr',
       employeeCount: row.employee_count || '1,000+',
       gujaratPresence: row.gujarat_presence ?? true,
+      source: row.source || 'Manual',
       contactsCount: row.contacts_count || 0,
       facilitiesCount: row.facilities_count || 0,
       inquiriesCount: row.inquiries_count || 0,
@@ -226,6 +227,7 @@ export const getCompanyById = async (req: Request, res: Response): Promise<void>
       annualTurnover: row.annual_turnover,
       employeeCount: row.employee_count,
       gujaratPresence: row.gujarat_presence,
+      source: row.source || 'Manual',
       contacts: contactsRes.rows.map((c) => ({
         id: c.id,
         companyId: c.company_id,
@@ -328,6 +330,7 @@ export const createCompany = async (req: Request, res: Response): Promise<void> 
       annualTurnover = '₹500+ Cr',
       employeeCount = '1,000+',
       gujaratPresence = true,
+      source = 'Manual',
       // Contact & notes from NewCompanyPage
       contactName,
       contactDesignation,
@@ -349,11 +352,11 @@ export const createCompany = async (req: Request, res: Response): Promise<void> 
       INSERT INTO companies (
         id, name, legal_name, website, industry, status, address, city, state, pincode,
         phone, email, assigned_owner_id, assigned_owner_name, prospect_stage, priority,
-        annual_turnover, employee_count, gujarat_presence, created_at, updated_at
+        annual_turnover, employee_count, gujarat_presence, source, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
         $11, $12, $13, $14, $15, $16,
-        $17, $18, $19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        $17, $18, $19, $20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       ) RETURNING *;
     `;
 
@@ -377,6 +380,7 @@ export const createCompany = async (req: Request, res: Response): Promise<void> 
       annualTurnover,
       employeeCount,
       gujaratPresence,
+      source,
     ];
 
     const result = await query(insertSql, values);
@@ -458,6 +462,7 @@ export const createCompany = async (req: Request, res: Response): Promise<void> 
         annualTurnover: row.annual_turnover,
         employeeCount: row.employee_count,
         gujaratPresence: row.gujarat_presence,
+        source: row.source || 'Manual',
         contactsCount: createdContact ? 1 : 0,
         contact: createdContact,
         createdAt: row.created_at,

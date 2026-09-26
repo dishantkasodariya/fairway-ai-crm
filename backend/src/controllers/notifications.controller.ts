@@ -36,9 +36,9 @@ const syncRealTimeNotifications = async (): Promise<void> => {
       const message = `${sv.description || 'Site inspection'} scheduled for ${dateStr}${timeStr}.`;
       await query(`
         INSERT INTO notifications (
-          id, type, title, message, entity_type, entity_id, is_read, "isRead", created_at, "createdAt"
+          id, type, title, message, entity_type, entity_id, is_read, created_at
         )
-        VALUES ($1, 'site_visit_upcoming', $2, $3, 'site_visit', $4, false, false, $5, $5)
+        VALUES ($1, 'site_visit_upcoming', $2, $3, 'site_visit', $4, false, $5)
         ON CONFLICT (id) DO NOTHING;
       `, [notifId, title, message, sv.id, sv.created_at || new Date()]);
     }
@@ -61,9 +61,9 @@ const syncRealTimeNotifications = async (): Promise<void> => {
       const message = `${tsk.description || tsk.task_type || 'Follow-up task'} due on ${dateStr}. Priority: ${tsk.priority || 'Normal'}.`;
       await query(`
         INSERT INTO notifications (
-          id, type, title, message, entity_type, entity_id, is_read, "isRead", created_at, "createdAt"
+          id, type, title, message, entity_type, entity_id, is_read, created_at
         )
-        VALUES ($1, $2, $3, $4, 'task', $5, false, false, $6, $6)
+        VALUES ($1, $2, $3, $4, 'task', $5, false, $6)
         ON CONFLICT (id) DO NOTHING;
       `, [notifId, notifType, title, message, tsk.id, tsk.created_at || new Date()]);
     }
@@ -86,9 +86,9 @@ const syncRealTimeNotifications = async (): Promise<void> => {
       const message = `${area ? area + ' • ' : ''}${ind} requirement in ${loc} (${stage}).`;
       await query(`
         INSERT INTO notifications (
-          id, type, title, message, entity_type, entity_id, is_read, "isRead", created_at, "createdAt"
+          id, type, title, message, entity_type, entity_id, is_read, created_at
         )
-        VALUES ($1, 'inquiry_assigned', $2, $3, 'inquiry', $4, false, false, $5, $5)
+        VALUES ($1, 'inquiry_assigned', $2, $3, 'inquiry', $4, false, $5)
         ON CONFLICT (id) DO NOTHING;
       `, [notifId, title, message, inq.id, inq.created_at || new Date()]);
     }
@@ -110,9 +110,9 @@ const syncRealTimeNotifications = async (): Promise<void> => {
       const message = `${area}${prop} is currently in "${status}" status.`;
       await query(`
         INSERT INTO notifications (
-          id, type, title, message, entity_type, entity_id, is_read, "isRead", created_at, "createdAt"
+          id, type, title, message, entity_type, entity_id, is_read, created_at
         )
-        VALUES ($1, 'proposal_updated', $2, $3, 'proposal', $4, false, false, $5, $5)
+        VALUES ($1, 'proposal_updated', $2, $3, 'proposal', $4, false, $5)
         ON CONFLICT (id) DO NOTHING;
       `, [notifId, title, message, prp.id, prp.created_at || new Date()]);
     }
@@ -133,19 +133,19 @@ export const getNotifications = async (req: AuthenticatedRequest, res: Response)
     await syncRealTimeNotifications();
 
     const sql = `
-      SELECT 
+      SELECT
         id,
-        COALESCE(user_id, "userId") AS user_id,
+        user_id,
         COALESCE(type, 'system') AS type,
         title,
         message,
-        COALESCE(entity_type, link, 'inquiry') AS entity_type,
+        COALESCE(entity_type, 'inquiry') AS entity_type,
         entity_id,
-        COALESCE(is_read, "isRead", false) AS is_read,
-        COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP) AS created_at
-      FROM notifications 
-      WHERE (user_id IS NULL OR user_id = $1 OR "userId" IS NULL OR "userId" = $1)
-      ORDER BY COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP) DESC 
+        is_read,
+        created_at
+      FROM notifications
+      WHERE (user_id IS NULL OR user_id = $1)
+      ORDER BY created_at DESC
       LIMIT 50;
     `;
 
@@ -182,10 +182,9 @@ export const markAsRead = async (req: AuthenticatedRequest, res: Response): Prom
   try {
     const { id } = req.params;
     await query(`
-      UPDATE notifications 
-      SET 
+      UPDATE notifications
+      SET
         is_read = true,
-        "isRead" = true,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $1;
     `, [id]);
@@ -204,12 +203,11 @@ export const markAllAsRead = async (req: AuthenticatedRequest, res: Response): P
   try {
     const userId = req.user?.userId;
     await query(`
-      UPDATE notifications 
-      SET 
+      UPDATE notifications
+      SET
         is_read = true,
-        "isRead" = true,
         updated_at = CURRENT_TIMESTAMP
-      WHERE user_id IS NULL OR user_id = $1 OR "userId" IS NULL OR "userId" = $1;
+      WHERE user_id IS NULL OR user_id = $1;
     `, [userId || '']);
     res.json({ success: true, message: 'All notifications marked as read.' });
   } catch (error: any) {
@@ -237,10 +235,9 @@ export const createNotification = async (req: AuthenticatedRequest, res: Respons
 
     const insertSql = `
       INSERT INTO notifications (
-        id, user_id, type, title, message, entity_type, entity_id, is_read,
-        "userId", "isRead", created_at, "createdAt"
+        id, user_id, type, title, message, entity_type, entity_id, is_read, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, false, CURRENT_TIMESTAMP)
       RETURNING *;
     `;
 
@@ -252,7 +249,6 @@ export const createNotification = async (req: AuthenticatedRequest, res: Respons
       message,
       entityType || 'inquiry',
       entityId || null,
-      targetUserId,
     ]);
 
     const r = result.rows[0];
@@ -260,14 +256,14 @@ export const createNotification = async (req: AuthenticatedRequest, res: Respons
       success: true,
       data: {
         id: r.id,
-        userId: r.user_id || r.userId,
+        userId: r.user_id,
         type: r.type,
         title: r.title,
         message: r.message,
-        entityType: r.entity_type || r.link || 'inquiry',
+        entityType: r.entity_type || 'inquiry',
         entityId: r.entity_id,
-        isRead: Boolean(r.is_read ?? r.isRead ?? false),
-        createdAt: r.created_at || r.createdAt,
+        isRead: Boolean(r.is_read),
+        createdAt: r.created_at,
       },
     });
   } catch (error: any) {
