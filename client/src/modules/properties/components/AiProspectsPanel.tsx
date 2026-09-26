@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Sparkles, Loader2, Plus, Check, MapPin, TrendingUp } from 'lucide-react';
 import { IntelligenceService, DiscoveredCompany, DiscoveryRun } from '@/modules/core/services/intelligenceService';
-import { CompanyService } from '@/modules/core/services/companyService';
-import { FacilityService } from '@/modules/core/services/facilityService';
-import { InquiryService } from '@/modules/core/services/inquiryService';
+import { addProspectToCrm } from '@/modules/intelligence/utils/addProspectToCrm';
 import { Property } from '@/modules/core/types';
 import { Button } from '@/modules/core/components/ui/Button';
 import { cn } from '@/modules/core/lib/utils';
@@ -96,63 +94,18 @@ export const AiProspectsPanel: React.FC<AiProspectsPanelProps> = ({ property }) 
       const detailRes = await IntelligenceService.getDiscoveredCompany(company.id);
       const detail = detailRes.data;
 
-      const priority = (company.opportunityScore ?? 0) >= 70 ? 'High' : (company.opportunityScore ?? 0) >= 40 ? 'Medium' : 'Low';
-
-      const companyRes = await CompanyService.createCompany({
-        name: company.name,
-        industry: company.businessType || undefined,
-        address: company.address || undefined,
+      const result = await addProspectToCrm({
+        company,
+        detail,
         city: property.city,
         state: property.state,
-        website: detail?.website || undefined,
-        phone: detail?.phone || undefined,
-        priority,
-        prospectStage: 'New',
-        source: 'AI Discovery',
-        initialNotes: detail?.opportunityScore?.why
-          ? `AI-discovered prospect (score ${company.opportunityScore ?? 'n/a'}/100): ${detail.opportunityScore.why}`
-          : `AI-discovered prospect near ${property.name} (${company.distanceKm?.toFixed(1) ?? '?'} km away).`,
+        contextLabel: property.name,
       });
 
-      if (!companyRes.success || !companyRes.data) {
-        toastError('Add Failed', companyRes.error || `Could not add ${company.name} to the CRM.`);
-        return;
-      }
-
-      if (detail?.lat && detail?.lng) {
-        await FacilityService.createFacility({
-          companyId: companyRes.data.id,
-          companyName: company.name,
-          name: `${company.name} — Facility`,
-          type: 'Manufacturing Plant',
-          address: company.address || '',
-          city: property.city,
-          state: property.state,
-          latitude: detail.lat,
-          longitude: detail.lng,
-          status: 'Active',
-        });
-      }
-
-      const inquiryRes = await InquiryService.createInquiry({
-        companyId: companyRes.data.id,
-        companyName: company.name,
-        contactPhone: detail?.phone || undefined,
-        source: 'AI Discovery',
-        requirement: detail?.opportunityScore?.estimatedRequirement || undefined,
-        location: property.city,
-        industry: company.businessType || undefined,
-        priority,
-        leadScore: company.opportunityScore ?? undefined,
-        opportunityScore: company.opportunityScore ?? undefined,
-        stage: 'new',
-        status: 'Active',
-      });
-
-      if (!inquiryRes.success) {
+      if (!result.success) {
         toastError(
-          'Company Added, Inquiry Failed',
-          inquiryRes.error || `${company.name} was added as a company, but the inquiry could not be created.`
+          result.companyId ? 'Company Added, Inquiry Failed' : 'Add Failed',
+          result.error || `Could not add ${company.name} to the CRM.`
         );
         return;
       }

@@ -88,6 +88,14 @@ export function parseRoute(pathname: string): {
     return { view: 'property_detail', entityId: propMatch[1], isAuth: false, authType: 'login' };
   }
 
+  if (cleanPath === '/ai-discovery') {
+    return { view: 'ai_discovery', isAuth: false, authType: 'login' };
+  }
+  const aiProspectMatch = cleanPath.match(/^\/ai-discovery\/([a-zA-Z0-9_-]+)$/);
+  if (aiProspectMatch) {
+    return { view: 'ai_prospect_detail', entityId: aiProspectMatch[1], isAuth: false, authType: 'login' };
+  }
+
   if (cleanPath === '/proposals') {
     return { view: 'proposals', isAuth: false, authType: 'login' };
   }
@@ -187,6 +195,10 @@ export function pathToView(view: ActiveNavView, entityId?: string): string {
       return '/properties/new';
     case 'property_detail':
       return `/properties/${entityId || 'prop_1'}`;
+    case 'ai_discovery':
+      return '/ai-discovery';
+    case 'ai_prospect_detail':
+      return `/ai-discovery/${entityId || ''}`;
     case 'proposals':
       return '/proposals';
     case 'site_visits':

@@ -8,8 +8,15 @@ export interface DiscoveryRun {
   status: 'queued' | 'running' | 'done' | 'failed';
   companiesFound: number;
   apiCallsMade: number;
+  revenueEnrichmentStatus: 'not_started' | 'running' | 'done';
+  revenueEnrichedCount: number;
   createdAt: string;
   completedAt: string | null;
+}
+
+export interface BusinessTypeCount {
+  businessType: string | null;
+  count: number;
 }
 
 export interface DiscoveredCompany {
@@ -108,6 +115,35 @@ export class IntelligenceService {
       return json;
     } catch (err: any) {
       console.warn('IntelligenceService.getDiscoveryRun failed:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /** Kick off revenue research for every company in a run without a RevenueSnapshot yet. */
+  static async enrichRevenue(runId: number): Promise<{ success: boolean; data?: DiscoveryRun; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/discovery/runs/${runId}/enrich-revenue`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      console.warn('IntelligenceService.enrichRevenue failed:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /** Distinct business types across all discovered companies, with counts. */
+  static async getBusinessTypes(): Promise<{ success: boolean; data?: { items: BusinessTypeCount[] }; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/companies/business-types`, {
+        headers: getAuthHeaders(),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      console.warn('IntelligenceService.getBusinessTypes failed:', err);
       return { success: false, error: err.message };
     }
   }

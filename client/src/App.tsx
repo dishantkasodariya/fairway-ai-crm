@@ -27,6 +27,8 @@ import { TasksPage } from '@/modules/tasks/pages/TasksPage';
 import { PropertiesPage } from '@/modules/properties/pages/PropertiesPage';
 import { PropertyDetailPage } from '@/modules/properties/pages/PropertyDetailPage';
 import { NewPropertyPage } from '@/modules/properties/pages/NewPropertyPage';
+import { AiDiscoveryPage } from '@/modules/intelligence/pages/AiDiscoveryPage';
+import { AiProspectDetailPage } from '@/modules/intelligence/pages/AiProspectDetailPage';
 import { ProposalsPage } from '@/modules/proposals/pages/ProposalsPage';
 import { SiteVisitsPage } from '@/modules/site-visits/pages/SiteVisitsPage';
 import { ContactsPage } from '@/modules/contacts/pages/ContactsPage';
@@ -360,6 +362,33 @@ const AppRouter: React.FC = () => {
             onBack={() => handleNavigate('properties')}
             onNavigateToInquiry={(inqId) => handleNavigate('inquiry_detail', inqId)}
             onNavigateToMap={() => handleNavigate('map')}
+          />
+        );
+
+      case 'ai_discovery':
+        if (!canView('companies')) {
+          return (
+            <AccessRestrictedView
+              moduleName="AI Discovery"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
+        return <AiDiscoveryPage onSelectProspect={(id) => handleNavigate('ai_prospect_detail', String(id))} />;
+
+      case 'ai_prospect_detail':
+        if (!canView('companies')) {
+          return (
+            <AccessRestrictedView
+              moduleName="AI Discovery"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
+        return (
+          <AiProspectDetailPage
+            prospectId={Number(selectedEntityId)}
+            onBack={() => handleNavigate('ai_discovery')}
           />
         );
 
