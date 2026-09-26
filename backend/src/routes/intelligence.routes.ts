@@ -8,6 +8,9 @@ import {
   getDiscoveredCompany,
   researchRevenue,
   researchSignals,
+  enrichContacts,
+  getCompanyContacts,
+  draftMessage,
   getResearchJob,
 } from '../controllers/intelligence.controller.js';
 import { requirePermission } from '../middleware/permission.middleware.js';
@@ -22,6 +25,9 @@ router.get('/companies', requirePermission('companies', 'view'), listDiscoveredC
 router.get('/companies/:id', requirePermission('companies', 'view'), getDiscoveredCompany);
 router.post('/companies/:id/revenue-research', requirePermission('companies', 'edit'), researchRevenue);
 router.post('/companies/:id/signals-research', requirePermission('companies', 'edit'), researchSignals);
+router.post('/companies/:id/contacts-enrich', requirePermission('companies', 'edit'), enrichContacts);
+router.get('/companies/:id/contacts', requirePermission('companies', 'view'), getCompanyContacts);
+router.post('/contacts/:id/draft-message', requirePermission('companies', 'edit'), draftMessage);
 router.get('/jobs/:jobId', requirePermission('companies', 'view'), getResearchJob);
 
 export default router;

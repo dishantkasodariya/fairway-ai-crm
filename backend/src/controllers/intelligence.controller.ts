@@ -184,6 +184,42 @@ export const researchSignals = async (req: Request, res: Response): Promise<void
 };
 
 /**
+ * POST /api/intelligence/companies/:id/contacts-enrich
+ */
+export const enrichContacts = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const job = await callIntelligenceApi(`/v1/companies/${req.params.id}/contacts:enrich`, { method: 'POST', body: '{}' });
+    res.status(202).json({ success: true, data: toCamelCaseDeep(job) });
+  } catch (error: any) {
+    handleIntelligenceError(res, error, 'Failed to start contact enrichment');
+  }
+};
+
+/**
+ * GET /api/intelligence/companies/:id/contacts
+ */
+export const getCompanyContacts = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await callIntelligenceApi(`/v1/companies/${req.params.id}/contacts`);
+    res.status(200).json({ success: true, data: toCamelCaseDeep(result) });
+  } catch (error: any) {
+    handleIntelligenceError(res, error, 'Failed to fetch company contacts');
+  }
+};
+
+/**
+ * POST /api/intelligence/contacts/:id/draft-message
+ */
+export const draftMessage = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const draft = await callIntelligenceApi(`/v1/contacts/${req.params.id}/draft-message`, { method: 'POST', body: '{}' });
+    res.status(200).json({ success: true, data: toCamelCaseDeep(draft) });
+  } catch (error: any) {
+    handleIntelligenceError(res, error, 'Failed to draft outreach message');
+  }
+};
+
+/**
  * GET /api/intelligence/jobs/:jobId
  */
 export const getResearchJob = async (req: Request, res: Response): Promise<void> => {
