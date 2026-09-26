@@ -1,12 +1,17 @@
 import app from './app.js';
 import { config } from './config/index.js';
 import { initDatabase } from './config/db.js';
+import { startAiSignalsWatcher } from './jobs/aiSignalsWatcher.js';
 
 const PORT = config.port;
 
 const startServer = async () => {
   // Initialize PostgreSQL schema and seed data
   await initDatabase();
+
+  if (process.env.AI_SIGNALS_WATCHER_ENABLED !== 'false') {
+    startAiSignalsWatcher();
+  }
 
   const server = app.listen(PORT, () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
