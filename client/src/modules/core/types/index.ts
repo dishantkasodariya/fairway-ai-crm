@@ -387,6 +387,7 @@ export type NotificationType =
   | 'stage_changed'
   | 'proposal_updated'
   | 'site_visit_upcoming'
+  | 'ai_signal'
   | 'system';
 
 export interface Notification {
