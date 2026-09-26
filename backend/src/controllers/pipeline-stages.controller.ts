@@ -10,21 +10,21 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 export const getPipelineStages = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await query(`
-      SELECT 
+      SELECT
         id,
-        COALESCE(key, LOWER(code), id) AS key,
-        COALESCE(label, name, 'Stage') AS label,
+        key,
+        label,
         COALESCE(color, '#64748B') AS color,
         COALESCE(bg_color, 'bg-slate-50') AS bg_color,
         COALESCE(text_color, 'text-slate-700') AS text_color,
         COALESCE(border_color, 'border-slate-300') AS border_color,
         COALESCE(description, '') AS description,
-        COALESCE(stage_order, "orderIndex", 1) AS stage_order,
+        COALESCE(stage_order, 1) AS stage_order,
         COALESCE(is_system, true) AS is_system,
-        COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP) AS created_at,
-        COALESCE(updated_at, "updatedAt", CURRENT_TIMESTAMP) AS updated_at
+        created_at,
+        updated_at
       FROM pipeline_stages
-      ORDER BY COALESCE(stage_order, "orderIndex", 1) ASC, COALESCE(created_at, "createdAt", CURRENT_TIMESTAMP) ASC;
+      ORDER BY COALESCE(stage_order, 1) ASC, created_at ASC;
     `);
 
     const formatted = result.rows.map((r) => ({
@@ -72,8 +72,8 @@ export const createPipelineStage = async (req: AuthenticatedRequest, res: Respon
     const insertSql = `
       INSERT INTO pipeline_stages (
         id, key, label, color, bg_color, text_color, border_color, description, stage_order, is_system,
-        name, code, "orderIndex", "createdAt", "updatedAt"
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10, $11, $12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       RETURNING *;
     `;
 
@@ -86,9 +86,6 @@ export const createPipelineStage = async (req: AuthenticatedRequest, res: Respon
       textColor || 'text-slate-700',
       borderColor || 'border-slate-300',
       description || '',
-      stageOrder,
-      label,
-      cleanKey.toUpperCase(),
       stageOrder,
     ]);
 
@@ -128,7 +125,6 @@ export const updatePipelineStage = async (req: AuthenticatedRequest, res: Respon
     if (label !== undefined) {
       params.push(label);
       fields.push(`label = $${params.length}`);
-      fields.push(`name = $${params.length}`);
     }
     if (color !== undefined) {
       params.push(color);
@@ -153,7 +149,6 @@ export const updatePipelineStage = async (req: AuthenticatedRequest, res: Respon
     if (order !== undefined) {
       params.push(Number(order));
       fields.push(`stage_order = $${params.length}`);
-      fields.push(`"orderIndex" = $${params.length}`);
     }
 
     if (fields.length === 0) {
@@ -162,7 +157,6 @@ export const updatePipelineStage = async (req: AuthenticatedRequest, res: Respon
     }
 
     fields.push(`updated_at = CURRENT_TIMESTAMP`);
-    fields.push(`"updatedAt" = CURRENT_TIMESTAMP`);
 
     const sql = `
       UPDATE pipeline_stages 
@@ -183,14 +177,14 @@ export const updatePipelineStage = async (req: AuthenticatedRequest, res: Respon
       success: true,
       data: {
         id: r.id,
-        key: r.key || (r.code ? r.code.toLowerCase() : r.id),
-        label: r.label || r.name,
+        key: r.key,
+        label: r.label,
         color: r.color,
         bgColor: r.bg_color,
         textColor: r.text_color,
         borderColor: r.border_color,
         description: r.description,
-        order: Number(r.stage_order || r.orderIndex || 1),
+        order: Number(r.stage_order || 1),
         isSystem: Boolean(r.is_system),
       },
     });
