@@ -192,6 +192,10 @@ export const initDatabase = async () => {
         ['perm_10', 'Manage users & roles', 'Administration', 'Yes', 'Configurable', 'No', 'No', 'Add, edit, deactivate users and update role permissions.'],
         ['perm_11', 'View system audit logs', 'Administration', 'Yes', 'Limited', 'No', 'No', 'Inspect security and audit trail event logs.'],
         ['perm_12', 'Export data to Excel / CSV', 'Administration', 'Yes', 'Yes', 'Restricted', 'No', 'Export master tables and analytical reports.'],
+        ['perm_13', 'View all properties & warehouses', 'Properties & Warehouses', 'Yes', 'Yes', 'Assigned / All', 'View', 'Ability to browse warehouse park records and facility details.'],
+        ['perm_14', 'Create new property & warehouse', 'Properties & Warehouses', 'Yes', 'Yes', 'Yes', 'No', 'Ability to register new warehouse parks and facilities.'],
+        ['perm_15', 'Edit property information', 'Properties & Warehouses', 'Yes', 'Yes', 'Assigned / All', 'No', 'Update warehouse park details, coordinates, and specifications.'],
+        ['perm_16', 'Delete / Archive property', 'Properties & Warehouses', 'Yes', 'Yes', 'Restricted', 'No', 'Permanently delete or archive warehouse park records.'],
       ];
 
       for (const row of defaultMatrix) {
@@ -1269,6 +1273,37 @@ export const initDatabase = async () => {
 
     // Ensure all CRM schema columns, constraints, and matrix baseline are in sync
     await runAllSchemaFixes();
+
+    // runAllSchemaFixes() unconditionally drops role_permissions' primary key
+    // on every run (legacy Prisma-style cleanup) and never restores it, so
+    // this must come after it, not before - restore the PK, then backfill
+    // any permission rows added after the initial seed (e.g. Properties &
+    // Warehouses) that the empty-table-only seed block above never got to
+    // insert into an already-seeded table.
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conrelid = 'role_permissions'::regclass AND contype = 'p'
+        ) THEN
+          ALTER TABLE role_permissions ADD CONSTRAINT role_permissions_pkey PRIMARY KEY (id);
+        END IF;
+      END $$;
+    `);
+    const permissionsBackfill = [
+      ['perm_13', 'View all properties & warehouses', 'Properties & Warehouses', 'Yes', 'Yes', 'Assigned / All', 'View', 'Ability to browse warehouse park records and facility details.'],
+      ['perm_14', 'Create new property & warehouse', 'Properties & Warehouses', 'Yes', 'Yes', 'Yes', 'No', 'Ability to register new warehouse parks and facilities.'],
+      ['perm_15', 'Edit property information', 'Properties & Warehouses', 'Yes', 'Yes', 'Assigned / All', 'No', 'Update warehouse park details, coordinates, and specifications.'],
+      ['perm_16', 'Delete / Archive property', 'Properties & Warehouses', 'Yes', 'Yes', 'Restricted', 'No', 'Permanently delete or archive warehouse park records.'],
+    ];
+    for (const row of permissionsBackfill) {
+      await client.query(
+        `INSERT INTO role_permissions (id, capability, category, super_admin, admin, sales, viewer, description)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (id) DO NOTHING;`,
+        row
+      );
+    }
 
     client.release();
 

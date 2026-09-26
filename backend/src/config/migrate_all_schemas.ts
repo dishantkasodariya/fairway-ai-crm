@@ -413,6 +413,10 @@ export async function runAllSchemaFixes() {
       ['perm_10', 'Manage users & roles', 'Administration', 'Yes', 'Configurable', 'No', 'No', 'Add, edit, deactivate users and update role permissions.'],
       ['perm_11', 'View system audit logs', 'Administration', 'Yes', 'Limited', 'No', 'No', 'Inspect security and audit trail event logs.'],
       ['perm_12', 'Export data to Excel / CSV', 'Administration', 'Yes', 'Yes', 'Restricted', 'No', 'Export master tables and analytical reports.'],
+      ['perm_13', 'View all properties & warehouses', 'Properties & Warehouses', 'Yes', 'Yes', 'Assigned / All', 'View', 'Ability to browse warehouse park records and facility details.'],
+      ['perm_14', 'Create new property & warehouse', 'Properties & Warehouses', 'Yes', 'Yes', 'Yes', 'No', 'Ability to register new warehouse parks and facilities.'],
+      ['perm_15', 'Edit property information', 'Properties & Warehouses', 'Yes', 'Yes', 'Assigned / All', 'No', 'Update warehouse park details, coordinates, and specifications.'],
+      ['perm_16', 'Delete / Archive property', 'Properties & Warehouses', 'Yes', 'Yes', 'Restricted', 'No', 'Permanently delete or archive warehouse park records.'],
     ];
 
     for (const row of defaultMatrix) {
