@@ -27,6 +27,10 @@ interface ColumnMapping {
   followUpPlan?: string;
   remark3FollowUpPlan?: string;
   industry?: string;
+  opportunityScore?: string;
+  leadScore?: string;
+  annualTurnover?: string;
+  source?: string;
   [key: string]: string | undefined;
 }
 
@@ -149,6 +153,19 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
       const remark2NextAction = getVal(raw, mapping.remark2NextAction, mapping.nextAction, 'Remark 2 – Next Action', 'Next Action');
       const remark3FollowUp = getVal(raw, mapping.remark3FollowUpPlan, mapping.followUpPlan, 'Remark 3 – Follow-up Plan', 'Follow-up Plan');
       const industry = getVal(raw, mapping.industry, 'Industry', 'Industry Segment') || 'Logistics & Industrial Warehousing';
+      const opportunityScoreRaw = getVal(raw, mapping.opportunityScore, 'Opportunity Score');
+      const opportunityScore = opportunityScoreRaw !== '' && Number.isFinite(parseFloat(opportunityScoreRaw))
+        ? Math.round(parseFloat(opportunityScoreRaw))
+        : 90;
+      const leadScoreRaw = getVal(raw, mapping.leadScore, 'Lead Score');
+      const leadScore = leadScoreRaw !== '' && Number.isFinite(parseFloat(leadScoreRaw))
+        ? Math.round(parseFloat(leadScoreRaw))
+        : 85;
+      const revenueCrRaw = getVal(raw, mapping.annualTurnover, 'Revenue (Cr)', 'Annual Turnover');
+      const annualTurnover = revenueCrRaw
+        ? (Number.isFinite(parseFloat(revenueCrRaw)) ? `₹${parseFloat(revenueCrRaw)} Cr` : revenueCrRaw)
+        : '';
+      const source = getVal(raw, mapping.source, 'Source') || 'Excel Import';
 
       // Validation: Only skip if Company Name is completely empty
       if (!compName) {
@@ -197,10 +214,10 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
           await client.query(
             `INSERT INTO companies (
               id, name, legal_name, website, industry, status, address, city, state, pincode,
-              phone, email, assigned_owner_name, prospect_stage, priority, created_at, updated_at
+              phone, email, assigned_owner_name, prospect_stage, priority, annual_turnover, source, created_at, updated_at
             ) VALUES (
               $1, $2, $3, $4, $5, 'Active', $6, $7, 'Gujarat', '392130',
-              $8, $9, $10, 'Requirement Confirmed', 'High', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+              $8, $9, $10, 'Requirement Confirmed', 'High', $11, $12, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             );`,
             [
               companyId,
@@ -213,6 +230,8 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
               phone,
               email,
               enteredBy,
+              annualTurnover || null,
+              source,
             ]
           );
         }
@@ -286,10 +305,10 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
             status, next_action, next_follow_up_date, created_at, updated_at
           ) VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8,
-            'Excel Import', $9, $10, $11, $12, $13, $14,
-            $15, '2026-10-01', 60, $16, 6, 12,
-            '5 MT/sq.m', 500, true, 'High', 85, 90, $17,
-            'Active', $18, $19, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            $9, $10, $11, $12, $13, $14, $15,
+            $16, '2026-10-01', 60, $17, 6, 12,
+            '5 MT/sq.m', 500, true, 'High', $18, $19, $20,
+            'Active', $21, $22, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
           ) RETURNING *;
         `;
 
@@ -302,6 +321,7 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
           contactName || null,
           phone || null,
           email || null,
+          source,
           parsedInquiryDate,
           enteredBy,
           requirementDesc,
@@ -310,6 +330,8 @@ export const bulkImportInquiries = async (req: Request, res: Response): Promise<
           `${siteName} Corridor`,
           industry,
           budgetMonthlyINR,
+          leadScore,
+          opportunityScore,
           stage,
           nextAction,
           followUpDate,
