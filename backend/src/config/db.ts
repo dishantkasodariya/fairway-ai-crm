@@ -105,10 +105,18 @@ export const initDatabase = async () => {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
-      ALTER TABLE users ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
-      ALTER TABLE users ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
-      ALTER TABLE users ALTER COLUMN "createdAt" DROP NOT NULL;
-      ALTER TABLE users ALTER COLUMN "updatedAt" DROP NOT NULL;
+      DO $do$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'createdAt') THEN
+          ALTER TABLE users ALTER COLUMN "createdAt" SET DEFAULT CURRENT_TIMESTAMP;
+          ALTER TABLE users ALTER COLUMN "createdAt" DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'updatedAt') THEN
+          ALTER TABLE users ALTER COLUMN "updatedAt" SET DEFAULT CURRENT_TIMESTAMP;
+          ALTER TABLE users ALTER COLUMN "updatedAt" DROP NOT NULL;
+        END IF;
+      END
+      $do$;
     `);
     console.log('✅ Table "users" verified / updated in PostgreSQL.');
 
