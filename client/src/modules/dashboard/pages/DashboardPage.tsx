@@ -12,10 +12,12 @@ import {
   Clock,
   MapPin,
   Check,
+  Sparkles,
 } from 'lucide-react';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { TaskService } from '@/modules/core/services/taskService';
+import { IntelligenceService } from '@/modules/core/services/intelligenceService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { formatINR, formatSqFt } from '@/modules/core/utils/formatters';
 import { Button } from '@/modules/core/components/ui/Button';
@@ -47,6 +49,8 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   const [allInquiries, setAllInquiries] = useState<Inquiry[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [hotProspectsCount, setHotProspectsCount] = useState<number>(0);
+  const [discoveredCompaniesCount, setDiscoveredCompaniesCount] = useState<number>(0);
 
   // Fetch live PostgreSQL data
   const loadBackendData = useCallback(async () => {
@@ -77,6 +81,20 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
   useEffect(() => {
     loadBackendData();
   }, [loadBackendData]);
+
+  useEffect(() => {
+    IntelligenceService.listDiscoveredCompanies({ limit: 1 }).then((res) => {
+      if (res.success && res.data) setDiscoveredCompaniesCount(res.data.total);
+    });
+    IntelligenceService.listDiscoveredCompanies({ minScore: 70, limit: 1 }).then((res) => {
+      if (res.success && res.data) setHotProspectsCount(res.data.total);
+    });
+  }, []);
+
+  const aiSourcedLeadsCount = useMemo(
+    () => allInquiries.filter((i) => i.source === 'AI Discovery').length,
+    [allInquiries]
+  );
 
   // Filtered dataset
   const inquiries = useMemo(() => {
@@ -286,6 +304,72 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
             </div>
             <p className="text-xs text-foreground-muted mt-1 flex items-center justify-between gap-1">
               <span className="truncate">sq.ft. Ready to Lease</span>
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-foreground-muted group-hover:text-foreground transition-colors" />
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 2b. AI Prospect Intelligence tiles */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          onClick={() => onNavigate('ai_discovery')}
+          className="group p-4 sm:p-5 bg-surface border border-border hover:border-foreground/40 rounded-2xl transition-all cursor-pointer shadow-2xs select-none"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">
+              Hot AI Prospects
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-surface-muted text-foreground border border-border flex items-center justify-center transition-colors">
+              <Sparkles className="w-4 h-4 text-foreground" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight tabular-nums truncate">{hotProspectsCount}</div>
+            <p className="text-xs text-foreground-muted mt-1 flex items-center justify-between gap-1">
+              <span className="truncate">Score ≥ 70</span>
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-foreground-muted group-hover:text-foreground transition-colors" />
+            </p>
+          </div>
+        </div>
+
+        <div
+          onClick={() => onNavigate('ai_discovery')}
+          className="group p-4 sm:p-5 bg-surface border border-border hover:border-foreground/40 rounded-2xl transition-all cursor-pointer shadow-2xs select-none"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">
+              Companies Discovered
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-surface-muted text-foreground border border-border flex items-center justify-center transition-colors">
+              <Sparkles className="w-4 h-4 text-foreground" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight tabular-nums truncate">{discoveredCompaniesCount}</div>
+            <p className="text-xs text-foreground-muted mt-1 flex items-center justify-between gap-1">
+              <span className="truncate">By the Intelligence Engine</span>
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-foreground-muted group-hover:text-foreground transition-colors" />
+            </p>
+          </div>
+        </div>
+
+        <div
+          onClick={() => onNavigate('inquiries')}
+          className="group p-4 sm:p-5 bg-surface border border-border hover:border-foreground/40 rounded-2xl transition-all cursor-pointer shadow-2xs select-none"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wider">
+              AI-Sourced Leads
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-surface-muted text-foreground border border-border flex items-center justify-center transition-colors">
+              <Sparkles className="w-4 h-4 text-foreground" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight tabular-nums truncate">{aiSourcedLeadsCount}</div>
+            <p className="text-xs text-foreground-muted mt-1 flex items-center justify-between gap-1">
+              <span className="truncate">Added to the Pipeline</span>
               <ArrowUpRight className="w-3.5 h-3.5 shrink-0 text-foreground-muted group-hover:text-foreground transition-colors" />
             </p>
           </div>

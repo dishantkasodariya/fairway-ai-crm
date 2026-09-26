@@ -491,8 +491,9 @@ export const CompanyListView: React.FC<CompanyListViewProps> = ({
                 {initials}
               </div>
               <div className="min-w-0">
-                <span className="font-bold text-foreground group-hover/cell:text-primary transition-colors block truncate">
-                  {displayName}
+                <span className="font-bold text-foreground group-hover/cell:text-primary transition-colors flex items-center gap-1.5 min-w-0">
+                  <span className="truncate min-w-0">{displayName}</span>
+                  {comp.source === 'AI Discovery' && <Badge variant="primary" size="sm" className="shrink-0">AI</Badge>}
                 </span>
                 {displayLegal && (
                   <span className="text-[10px] text-foreground-muted font-normal block truncate">

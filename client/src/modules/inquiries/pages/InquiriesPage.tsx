@@ -675,9 +675,10 @@ export const InquiryListView: React.FC<InquiryListViewProps> = ({
             <button
               type="button"
               onClick={() => handleSelectInquiry(row.original)}
-              className="font-bold text-foreground hover:text-primary transition-colors truncate block text-left cursor-pointer text-xs w-full"
+              className="font-bold text-foreground hover:text-primary transition-colors text-left cursor-pointer text-xs w-full flex items-center gap-1.5 min-w-0"
             >
-              {row.original.companyName}
+              <span className="truncate min-w-0">{row.original.companyName}</span>
+              {row.original.source === 'AI Discovery' && <Badge variant="primary" size="sm" className="shrink-0">AI</Badge>}
             </button>
             {row.original.contactName ? (
               <span className="text-[11px] text-foreground-muted truncate block">

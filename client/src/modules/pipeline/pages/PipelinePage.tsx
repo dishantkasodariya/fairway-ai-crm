@@ -34,6 +34,7 @@ import { useAuth } from '@/modules/core/providers/AuthContext';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { Inquiry, PipelineStageKey, PipelineStageConfig } from '@/modules/core/types';
 import { formatINR, formatSqFt, formatRelativeDate, getPriorityBadge } from '@/modules/core/utils/formatters';
+import { Badge } from '@/modules/core/components/ui/Badge';
 import { Button } from '@/modules/core/components/ui/Button';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { LostReasonModal } from '@/modules/core/components/LostReasonModal';
@@ -75,8 +76,9 @@ const PipelineCardStatic: React.FC<PipelineCardStaticProps> = ({ inquiry, isOver
       </div>
 
       {/* Line 2: Company Name */}
-      <h4 className="text-xs font-bold text-foreground leading-snug truncate">
-        {inquiry.companyName}
+      <h4 className="text-xs font-bold text-foreground leading-snug flex items-center gap-1 min-w-0">
+        <span className="truncate min-w-0">{inquiry.companyName}</span>
+        {inquiry.source === 'AI Discovery' && <Badge variant="primary" size="sm" className="shrink-0">AI</Badge>}
       </h4>
 
       {/* Line 3: Commercial Specs */}
@@ -286,8 +288,9 @@ const DraggablePipelineCard: React.FC<DraggablePipelineCardProps> = ({
       </div>
 
       {/* Line 2: Company Name */}
-      <h4 className="text-xs font-bold text-foreground leading-snug truncate">
-        {inquiry.companyName}
+      <h4 className="text-xs font-bold text-foreground leading-snug flex items-center gap-1 min-w-0">
+        <span className="truncate min-w-0">{inquiry.companyName}</span>
+        {inquiry.source === 'AI Discovery' && <Badge variant="primary" size="sm" className="shrink-0">AI</Badge>}
       </h4>
 
       {/* Line 3: Commercial Specs */}
