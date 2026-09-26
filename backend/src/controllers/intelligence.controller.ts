@@ -208,6 +208,20 @@ export const getCompanyContacts = async (req: Request, res: Response): Promise<v
 };
 
 /**
+ * GET /api/intelligence/contacts
+ * Every enriched contact across every discovered company, for the AI
+ * Connections page.
+ */
+export const listAllContacts = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await callIntelligenceApi('/v1/contacts');
+    res.status(200).json({ success: true, data: toCamelCaseDeep(result) });
+  } catch (error: any) {
+    handleIntelligenceError(res, error, 'Failed to fetch contacts');
+  }
+};
+
+/**
  * POST /api/intelligence/contacts/:id/draft-message
  */
 export const draftMessage = async (req: Request, res: Response): Promise<void> => {

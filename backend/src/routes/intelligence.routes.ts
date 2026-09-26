@@ -10,6 +10,7 @@ import {
   researchSignals,
   enrichContacts,
   getCompanyContacts,
+  listAllContacts,
   draftMessage,
   getResearchJob,
 } from '../controllers/intelligence.controller.js';
@@ -27,6 +28,7 @@ router.post('/companies/:id/revenue-research', requirePermission('companies', 'e
 router.post('/companies/:id/signals-research', requirePermission('companies', 'edit'), researchSignals);
 router.post('/companies/:id/contacts-enrich', requirePermission('companies', 'edit'), enrichContacts);
 router.get('/companies/:id/contacts', requirePermission('companies', 'view'), getCompanyContacts);
+router.get('/contacts', requirePermission('companies', 'view'), listAllContacts);
 router.post('/contacts/:id/draft-message', requirePermission('companies', 'edit'), draftMessage);
 router.get('/jobs/:jobId', requirePermission('companies', 'view'), getResearchJob);
 

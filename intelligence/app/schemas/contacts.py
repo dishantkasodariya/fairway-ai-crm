@@ -23,6 +23,15 @@ class ContactsListOut(BaseModel):
     items: list[ContactOut]
 
 
+class ContactWithCompanyOut(ContactOut):
+    company_name: str
+    business_type: str | None
+
+
+class AllContactsListOut(BaseModel):
+    items: list[ContactWithCompanyOut]
+
+
 class OutreachDraftOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

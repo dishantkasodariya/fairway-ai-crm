@@ -19,6 +19,39 @@ export interface BusinessTypeCount {
   count: number;
 }
 
+export interface Contact {
+  id: number;
+  companyId: number;
+  name: string;
+  title: string | null;
+  email: string | null;
+  emailStatus: string | null;
+  phone: string | null;
+  linkedinUrl: string | null;
+  source: string;
+  confidence: string | null;
+  createdAt: string;
+}
+
+export interface ContactWithCompany extends Contact {
+  companyName: string;
+  businessType: string | null;
+}
+
+export interface OutreachDraft {
+  id: number;
+  contactId: number;
+  channel: 'linkedin' | 'email';
+  subject: string | null;
+  body: string;
+  generatedAt: string;
+}
+
+export interface DraftMessage {
+  linkedin: OutreachDraft;
+  email: OutreachDraft;
+}
+
 export interface DiscoveredCompany {
   id: number;
   name: string;
@@ -220,6 +253,59 @@ export class IntelligenceService {
     try {
       const res = await fetch(`${API_BASE_URL}/intelligence/jobs/${jobId}`, {
         headers: getAuthHeaders(),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /** Kick off Apollo contact enrichment for a company (requires a paid Apollo plan). */
+  static async enrichContacts(companyId: number): Promise<{ success: boolean; data?: { id: number; status: string }; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/companies/${companyId}/contacts-enrich`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  static async getCompanyContacts(companyId: number): Promise<{ success: boolean; data?: { items: Contact[] }; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/companies/${companyId}/contacts`, {
+        headers: getAuthHeaders(),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /** Every enriched contact across every discovered company. */
+  static async listAllContacts(): Promise<{ success: boolean; data?: { items: ContactWithCompany[] }; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/contacts`, {
+        headers: getAuthHeaders(),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /** One AgentRunner call producing a LinkedIn note + email, stored as two OutreachDraft rows. */
+  static async draftMessage(contactId: number): Promise<{ success: boolean; data?: DraftMessage; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/contacts/${contactId}/draft-message`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       });
       const json = await res.json();
       return json;

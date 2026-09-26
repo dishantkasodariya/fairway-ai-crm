@@ -29,6 +29,7 @@ import { PropertyDetailPage } from '@/modules/properties/pages/PropertyDetailPag
 import { NewPropertyPage } from '@/modules/properties/pages/NewPropertyPage';
 import { AiDiscoveryPage } from '@/modules/intelligence/pages/AiDiscoveryPage';
 import { AiProspectDetailPage } from '@/modules/intelligence/pages/AiProspectDetailPage';
+import { AiConnectionsPage } from '@/modules/intelligence/pages/AiConnectionsPage';
 import { ProposalsPage } from '@/modules/proposals/pages/ProposalsPage';
 import { SiteVisitsPage } from '@/modules/site-visits/pages/SiteVisitsPage';
 import { ContactsPage } from '@/modules/contacts/pages/ContactsPage';
@@ -391,6 +392,17 @@ const AppRouter: React.FC = () => {
             onBack={() => handleNavigate('ai_discovery')}
           />
         );
+
+      case 'ai_connections':
+        if (!canView('companies')) {
+          return (
+            <AccessRestrictedView
+              moduleName="AI Connections"
+              onGoBack={() => handleNavigate(getFirstAllowedView())}
+            />
+          );
+        }
+        return <AiConnectionsPage />;
 
       case 'proposals':
         if (!canView('proposals')) {

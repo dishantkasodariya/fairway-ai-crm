@@ -4,7 +4,14 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db.models import Company, Contact, Job, JobStatus, JobType, OpportunityScore, OutreachDraft
 from app.deps import get_db, require_api_key
-from app.schemas.contacts import ContactOut, ContactsListOut, DraftMessageOut, OutreachDraftOut
+from app.schemas.contacts import (
+    AllContactsListOut,
+    ContactOut,
+    ContactsListOut,
+    ContactWithCompanyOut,
+    DraftMessageOut,
+    OutreachDraftOut,
+)
 from app.schemas.jobs import JobOut
 from agents.outreach_agent import OutreachAgent
 from jobs.runner import dispatch_job
@@ -38,6 +45,29 @@ def enrich_contacts(
 def get_company_contacts(company_id: int, db: Session = Depends(get_db)):
     contacts = db.query(Contact).filter(Contact.company_id == company_id).order_by(Contact.id.asc()).all()
     return ContactsListOut(items=[ContactOut.model_validate(c) for c in contacts])
+
+
+@router.get("/contacts", response_model=AllContactsListOut)
+def list_all_contacts(db: Session = Depends(get_db)):
+    """Every enriched contact across every discovered company, for the AI
+    Connections page - not in PLAN.md's endpoint list verbatim, but needed
+    since that page's own description ("contacts across companies") has no
+    other backing endpoint."""
+    rows = (
+        db.query(Contact, Company.name, Company.business_type)
+        .join(Company, Company.id == Contact.company_id)
+        .order_by(Contact.id.desc())
+        .all()
+    )
+    items = [
+        ContactWithCompanyOut(
+            **ContactOut.model_validate(contact).model_dump(),
+            company_name=company_name,
+            business_type=business_type,
+        )
+        for contact, company_name, business_type in rows
+    ]
+    return AllContactsListOut(items=items)
 
 
 @router.post("/contacts/{contact_id}/draft-message", response_model=DraftMessageOut)

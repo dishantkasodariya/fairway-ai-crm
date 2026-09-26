@@ -72,6 +72,7 @@ export type ActiveNavView =
   | 'property_matching'
   | 'ai_discovery'
   | 'ai_prospect_detail'
+  | 'ai_connections'
   | 'proposals'
   | 'site_visits'
   | 'documents'
@@ -188,6 +189,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         return canView('properties');
       case 'ai_discovery':
       case 'ai_prospect_detail':
+      case 'ai_connections':
         return canView('companies');
       case 'proposals':
         return canView('proposals');
@@ -232,6 +234,7 @@ export const AppShell: React.FC<AppShellProps> = ({
     // { id: 'calls' as ActiveNavView, label: 'Calls', icon: <PhoneCall className="w-4 h-4" /> },
     { id: 'properties' as ActiveNavView, label: 'Warehouse Parks', icon: <Warehouse className="w-4 h-4" /> },
     { id: 'ai_discovery' as ActiveNavView, label: 'AI Discovery', icon: <Sparkles className="w-4 h-4" /> },
+    { id: 'ai_connections' as ActiveNavView, label: 'AI Connections', icon: <Sparkles className="w-4 h-4" /> },
     { id: 'proposals' as ActiveNavView, label: 'Proposals', icon: <FileSpreadsheet className="w-4 h-4" /> },
     { id: 'site_visits' as ActiveNavView, label: 'Site Visits', icon: <Calendar className="w-4 h-4" /> },
     // Hidden / commented out as requested (do not delete)

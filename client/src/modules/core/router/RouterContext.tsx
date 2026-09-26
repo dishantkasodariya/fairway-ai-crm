@@ -96,6 +96,10 @@ export function parseRoute(pathname: string): {
     return { view: 'ai_prospect_detail', entityId: aiProspectMatch[1], isAuth: false, authType: 'login' };
   }
 
+  if (cleanPath === '/ai-connections') {
+    return { view: 'ai_connections', isAuth: false, authType: 'login' };
+  }
+
   if (cleanPath === '/proposals') {
     return { view: 'proposals', isAuth: false, authType: 'login' };
   }
@@ -199,6 +203,8 @@ export function pathToView(view: ActiveNavView, entityId?: string): string {
       return '/ai-discovery';
     case 'ai_prospect_detail':
       return `/ai-discovery/${entityId || ''}`;
+    case 'ai_connections':
+      return '/ai-connections';
     case 'proposals':
       return '/proposals';
     case 'site_visits':
