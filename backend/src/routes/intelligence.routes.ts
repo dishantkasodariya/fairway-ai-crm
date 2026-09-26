@@ -2,7 +2,9 @@ import { Router } from 'express';
 import {
   startDiscoveryRun,
   getDiscoveryRun,
+  enrichRevenue,
   listDiscoveredCompanies,
+  getBusinessTypes,
   getDiscoveredCompany,
   researchRevenue,
   researchSignals,
@@ -14,6 +16,8 @@ const router = Router();
 
 router.post('/discovery/runs', requirePermission('companies', 'create'), startDiscoveryRun);
 router.get('/discovery/runs/:runId', requirePermission('companies', 'view'), getDiscoveryRun);
+router.post('/discovery/runs/:runId/enrich-revenue', requirePermission('companies', 'edit'), enrichRevenue);
+router.get('/companies/business-types', requirePermission('companies', 'view'), getBusinessTypes);
 router.get('/companies', requirePermission('companies', 'view'), listDiscoveredCompanies);
 router.get('/companies/:id', requirePermission('companies', 'view'), getDiscoveredCompany);
 router.post('/companies/:id/revenue-research', requirePermission('companies', 'edit'), researchRevenue);

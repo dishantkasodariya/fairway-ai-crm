@@ -94,6 +94,35 @@ export const getDiscoveryRun = async (req: Request, res: Response): Promise<void
 };
 
 /**
+ * POST /api/intelligence/discovery/runs/:runId/enrich-revenue
+ * Kicks off revenue research for every company in the run without a
+ * RevenueSnapshot yet. Poll GET .../discovery/runs/:runId for progress.
+ */
+export const enrichRevenue = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const run = await callIntelligenceApi(`/v1/discovery/runs/${req.params.runId}/enrich-revenue`, {
+      method: 'POST',
+      body: '{}',
+    });
+    res.status(202).json({ success: true, data: toCamelCaseDeep(run) });
+  } catch (error: any) {
+    handleIntelligenceError(res, error, 'Failed to start revenue enrichment');
+  }
+};
+
+/**
+ * GET /api/intelligence/companies/business-types
+ */
+export const getBusinessTypes = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await callIntelligenceApi('/v1/companies/business-types');
+    res.status(200).json({ success: true, data: toCamelCaseDeep(result) });
+  } catch (error: any) {
+    handleIntelligenceError(res, error, 'Failed to fetch business types');
+  }
+};
+
+/**
  * GET /api/intelligence/companies?discoveryRunId=&sortBy=&minScore=&search=&businessType=&minRevenueCr=&maxRevenueCr=&limit=&offset=
  */
 export const listDiscoveredCompanies = async (req: Request, res: Response): Promise<void> => {
