@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -46,6 +46,12 @@ class SignalType(str, enum.Enum):
 class JobType(str, enum.Enum):
     revenue_research = "revenue_research"
     signal_research = "signal_research"
+    contact_enrichment = "contact_enrichment"
+
+
+class OutreachChannel(str, enum.Enum):
+    linkedin = "linkedin"
+    email = "email"
 
 
 class JobStatus(str, enum.Enum):
@@ -122,6 +128,7 @@ class Company(Base):
         back_populates="company", uselist=False, cascade="all, delete-orphan"
     )
     jobs: Mapped[list["Job"]] = relationship(back_populates="company", cascade="all, delete-orphan")
+    contacts: Mapped[list["Contact"]] = relationship(back_populates="company", cascade="all, delete-orphan")
 
 
 class RevenueSnapshot(Base):
@@ -198,3 +205,41 @@ class Job(Base):
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     company: Mapped[Company] = relationship(back_populates="jobs")
+
+
+class Contact(Base):
+    __tablename__ = "contacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
+
+    name: Mapped[str] = mapped_column(String)
+    title: Mapped[str | None] = mapped_column(String, nullable=True)
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
+    email_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    linkedin_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    source: Mapped[str] = mapped_column(String, default="apollo")
+    confidence: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    company: Mapped[Company] = relationship(back_populates="contacts")
+    outreach_drafts: Mapped[list["OutreachDraft"]] = relationship(
+        back_populates="contact", cascade="all, delete-orphan"
+    )
+
+
+class OutreachDraft(Base):
+    __tablename__ = "outreach_drafts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact_id: Mapped[int] = mapped_column(ForeignKey("contacts.id"), index=True)
+
+    channel: Mapped[OutreachChannel] = mapped_column(Enum(OutreachChannel, name="outreach_channel"))
+    subject: Mapped[str | None] = mapped_column(String, nullable=True)
+    body: Mapped[str] = mapped_column(Text)
+
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    contact: Mapped[Contact] = relationship(back_populates="outreach_drafts")

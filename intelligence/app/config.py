@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     signals_cron_stale_days: int = 30
     signals_cron_interval_hours: int = 24
 
+    apollo_api_key: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
