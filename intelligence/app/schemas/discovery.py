@@ -21,5 +21,7 @@ class DiscoveryRunOut(BaseModel):
     status: str
     companies_found: int
     api_calls_made: int
+    revenue_enrichment_status: str
+    revenue_enriched_count: int
     created_at: datetime
     completed_at: datetime | None

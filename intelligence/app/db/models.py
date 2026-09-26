@@ -19,6 +19,12 @@ class DiscoveryRunStatus(str, enum.Enum):
     failed = "failed"
 
 
+class RevenueEnrichmentStatus(str, enum.Enum):
+    not_started = "not_started"
+    running = "running"
+    done = "done"
+
+
 class RevenueMethod(str, enum.Enum):
     reference_table = "reference_table"
     agent = "agent"
@@ -61,6 +67,16 @@ class DiscoveryRun(Base):
     )
     companies_found: Mapped[int] = mapped_column(Integer, default=0)
     api_calls_made: Mapped[int] = mapped_column(Integer, default=0)
+    revenue_enrichment_status: Mapped[RevenueEnrichmentStatus] = mapped_column(
+        Enum(
+            RevenueEnrichmentStatus,
+            name="revenue_enrichment_status",
+            native_enum=False,
+            create_constraint=False,
+        ),
+        default=RevenueEnrichmentStatus.not_started,
+    )
+    revenue_enriched_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
