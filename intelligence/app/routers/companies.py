@@ -4,7 +4,13 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.db.models import Company, OpportunityScore, RevenueSnapshot
 from app.deps import get_db, require_api_key
-from app.schemas.companies import CompanyDetailOut, CompanyListItemOut, CompanyListOut
+from app.schemas.companies import (
+    BusinessTypeCountOut,
+    BusinessTypesOut,
+    CompanyDetailOut,
+    CompanyListItemOut,
+    CompanyListOut,
+)
 
 router = APIRouter(prefix="/v1/companies", tags=["companies"], dependencies=[Depends(require_api_key)])
 
@@ -78,6 +84,21 @@ def list_companies(
         for company, _score, latest_revenue_cr, opp in rows
     ]
     return CompanyListOut(total=total, items=items)
+
+
+@router.get("/business-types", response_model=BusinessTypesOut)
+def get_business_types(db: Session = Depends(get_db)):
+    """Registered above /{company_id} - FastAPI matches routes in registration
+    order, so this must come first or it'd be swallowed by the path param route."""
+    rows = (
+        db.query(Company.business_type, func.count(Company.id))
+        .group_by(Company.business_type)
+        .order_by(func.count(Company.id).desc())
+        .all()
+    )
+    return BusinessTypesOut(
+        items=[BusinessTypeCountOut(business_type=bt, count=cnt) for bt, cnt in rows]
+    )
 
 
 @router.get("/{company_id}", response_model=CompanyDetailOut)

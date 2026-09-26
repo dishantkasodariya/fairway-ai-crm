@@ -86,3 +86,12 @@ class CompanyDetailOut(BaseModel):
 class CompanyListOut(BaseModel):
     total: int
     items: list[CompanyListItemOut]
+
+
+class BusinessTypeCountOut(BaseModel):
+    business_type: str | None
+    count: int
+
+
+class BusinessTypesOut(BaseModel):
+    items: list[BusinessTypeCountOut]
