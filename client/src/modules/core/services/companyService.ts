@@ -20,6 +20,7 @@ export interface CreateCompanyPayload {
   annualTurnover?: string;
   employeeCount?: string;
   gujaratPresence?: boolean;
+  source?: string;
   contactName?: string;
   contactDesignation?: string;
   contactPhone?: string;

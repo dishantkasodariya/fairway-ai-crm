@@ -24,7 +24,7 @@ export interface DiscoveredCompany {
   latestSignalFreshness: string | null;
 }
 
-export interface DiscoveredCompanyDetail extends DiscoveredCompany {
+export interface DiscoveredCompanyDetail extends Omit<DiscoveredCompany, 'opportunityScore'> {
   placeId: string | null;
   lat: number | null;
   lng: number | null;
@@ -53,7 +53,7 @@ export interface DiscoveredCompanyDetail extends DiscoveredCompany {
     sourceUrl: string | null;
     confidence: string | null;
   }>;
-  opportunityScoreDetail: {
+  opportunityScore: {
     score: number;
     why: string | null;
     estimatedRequirement: string | null;

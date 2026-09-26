@@ -43,6 +43,7 @@ export interface Company {
   annualTurnover?: string;
   employeeCount?: string;
   gujaratPresence?: boolean;
+  source?: string;
   notesCount?: number;
   facilitiesCount?: number;
   inquiriesCount?: number;
@@ -128,7 +129,8 @@ export type InquirySource =
   | 'Expo'
   | 'Referral'
   | 'Government Tender'
-  | 'Inbound Call';
+  | 'Inbound Call'
+  | 'AI Discovery';
 
 export type InquiryStatus = 'Active' | 'Won' | 'Lost' | 'Archived';
 

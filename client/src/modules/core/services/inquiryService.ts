@@ -66,7 +66,51 @@ export interface CreateInquiryStepperPayload {
   assignedSalespersonName: string;
 }
 
+export interface CreateInquiryPayload {
+  companyId?: string;
+  companyName?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  source?: string;
+  requirement?: string;
+  requiredAreaSqFt?: number;
+  location?: string;
+  targetCorridor?: string;
+  industry?: string;
+  priority?: string;
+  leadScore?: number;
+  opportunityScore?: number;
+  stage?: string;
+  status?: string;
+}
+
 export class InquiryService {
+  /**
+   * Direct inquiry creation - POST /api/inquiries (not the /stepper flow).
+   * Note: unlike getInquiries/getInquiryById, this endpoint's response is the
+   * raw DB row (snake_case), not the camelCased Inquiry shape - callers
+   * should only rely on `id` from the result.
+   */
+  static async createInquiry(payload: CreateInquiryPayload): Promise<{
+    success: boolean;
+    data?: { id: string } & Record<string, unknown>;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inquiries`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      console.warn('InquiryService.createInquiry failed:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   /**
    * Fetch inquiries from backend API with search, sorting, and pagination
    */
