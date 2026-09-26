@@ -10,6 +10,7 @@ alembic==1.20.0
 psycopg2-binary==2.9.13
 pydantic==2.13.5
 pydantic-settings==2.15.0
+apscheduler==3.11.0
 
 # Legacy discovery/mapping tools (still used by app.py / map_builder.py)
 requests==2.34.2

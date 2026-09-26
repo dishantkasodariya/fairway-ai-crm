@@ -24,6 +24,10 @@ class Settings(BaseSettings):
 
     api_key: str = "change_me"
 
+    signals_cron_batch_size: int = 30
+    signals_cron_stale_days: int = 30
+    signals_cron_interval_hours: int = 24
+
 
 @lru_cache
 def get_settings() -> Settings:
