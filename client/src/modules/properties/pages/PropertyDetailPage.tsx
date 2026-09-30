@@ -15,6 +15,7 @@ import {
   Edit3,
   ShieldCheck,
   Sparkles,
+  FileSignature,
 } from 'lucide-react';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { InquiryService } from '@/modules/core/services/inquiryService';
@@ -27,6 +28,7 @@ import { useToast } from '@/modules/core/providers/ToastContext';
 import { useAuth } from '@/modules/core/providers/AuthContext';
 import { NewPropertyPage } from './NewPropertyPage';
 import { AiProspectsPanel } from '../components/AiProspectsPanel';
+import { OccupancyPanel } from '../components/OccupancyPanel';
 
 export interface PropertyDetailViewProps {
   propertyId: string;
@@ -53,8 +55,9 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'facility' | 'inquiries' | 'prospects'>('facility');
+  const [activeTab, setActiveTab] = useState<'facility' | 'occupancy' | 'inquiries' | 'prospects'>('facility');
   const [areaUnit, setAreaUnit] = useState<'sqft' | 'sqm'>('sqft');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     InquiryService.getInquiries({ pageSize: 500 }).then((res) => {
@@ -67,7 +70,8 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
   useEffect(() => {
     let isMounted = true;
     const fetchProp = async () => {
-      setIsLoading(true);
+      // Only show the full-page loader on first load; space refreshes after a lease change are silent.
+      if (reloadKey === 0) setIsLoading(true);
       try {
         const res = await PropertyService.getPropertyById(propertyId);
         if (isMounted) {
@@ -88,7 +92,7 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [propertyId]);
+  }, [propertyId, reloadKey]);
 
   const handleDelete = async () => {
     if (!property) return;
@@ -358,12 +362,15 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
               Available Space
             </span>
             <span className="text-lg sm:text-xl font-extrabold text-foreground tracking-tight block">
-              {areaUnit === 'sqft'
-                ? formatSqFt(property.availableAreaSqFt)
-                : `${Math.round(property.availableAreaSqFt / 10.764).toLocaleString()} sq.m`}
+              {property.totalAreaSqFt <= 0
+                ? 'Area not set'
+                : areaUnit === 'sqft'
+                  ? formatSqFt(property.availableAreaSqFt)
+                  : `${Math.round(property.availableAreaSqFt / 10.764).toLocaleString()} sq.m`}
             </span>
             <span className="text-[11px] text-foreground-muted block truncate">
               Total: {formatSqFt(property.totalAreaSqFt)}
+              {property.heldAreaSqFt ? ` · ${formatSqFt(property.heldAreaSqFt)} on hold` : ''}
             </span>
           </div>
 
@@ -483,6 +490,20 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
         >
           <Building2 className="w-4 h-4" />
           <span>Facility Specifications & Amenities</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('occupancy')}
+          className={cn(
+            'px-4 sm:px-5 py-3 text-xs font-bold transition-all cursor-pointer rounded-none flex items-center gap-2 -mb-px',
+            activeTab === 'occupancy'
+              ? 'text-fairway-600 dark:text-fairway-400 border-b-2 border-fairway-600 dark:border-fairway-400 bg-fairway-500/5'
+              : 'text-foreground-muted hover:text-foreground border-b-2 border-transparent hover:bg-surface-muted/50'
+          )}
+        >
+          <FileSignature className="w-4 h-4" />
+          <span>Occupancy & Leases</span>
         </button>
 
         <button
@@ -725,6 +746,10 @@ export const PropertyDetailView: React.FC<PropertyDetailViewProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'occupancy' && (
+        <OccupancyPanel property={property} canEdit={canEditProp} onSpaceChanged={() => setReloadKey((k) => k + 1)} />
       )}
 
       {/* ================= TAB 3: AI-DISCOVERED PROSPECTS ================= */}

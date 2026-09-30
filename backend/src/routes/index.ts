@@ -24,6 +24,7 @@ import pipelineStagesRoutes from './pipeline-stages.routes.js';
 import notificationsRoutes from './notifications.routes.js';
 import callsRoutes from './calls.routes.js';
 import intelligenceRoutes from './intelligence.routes.js';
+import leasesRoutes from './leases.routes.js';
 
 const router = Router();
 
@@ -75,6 +76,7 @@ router.use('/pipeline-stages', authenticateJWT, pipelineStagesRoutes);
 router.use('/notifications', authenticateJWT, notificationsRoutes);
 router.use('/calls', authenticateJWT, callsRoutes);
 router.use('/intelligence', authenticateJWT, intelligenceRoutes);
+router.use('/leases', authenticateJWT, leasesRoutes);
 
 export default router;
 

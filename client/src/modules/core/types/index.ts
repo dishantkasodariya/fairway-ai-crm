@@ -293,6 +293,36 @@ export interface Property {
   description: string;
   managerUserId?: string | null;
   managerName?: string | null;
+  /** Occupied by tenants not (yet) entered as leases. */
+  baselineOccupiedSqFt?: number;
+  leasedAreaSqFt?: number;
+  heldAreaSqFt?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type LeaseStatus = 'active' | 'ended' | 'terminated';
+
+export interface Lease {
+  id: string;
+  inquiryId: string | null;
+  companyId: string | null;
+  companyName: string | null;
+  propertyId: string;
+  propertyName: string | null;
+  areaSqFt: number;
+  rentPerSqFtINR: number | null;
+  monthlyRentINR: number | null;
+  startDate: string;
+  endDate: string | null;
+  tenureYears: number | null;
+  lockInMonths: number | null;
+  escalationPercent: number | null;
+  status: LeaseStatus;
+  fromBaseline: boolean;
+  notes: string;
+  createdByUserId: string | null;
+  createdByUserName: string | null;
   createdAt: string;
   updatedAt: string;
 }

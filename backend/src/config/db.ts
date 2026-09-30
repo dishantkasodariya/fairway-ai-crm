@@ -1311,6 +1311,8 @@ export const initDatabase = async () => {
       CREATE INDEX IF NOT EXISTS idx_leases_property ON leases(property_id, status);
       CREATE INDEX IF NOT EXISTS idx_leases_company ON leases(company_id);
       CREATE INDEX IF NOT EXISTS idx_leases_end_date ON leases(end_date);
+      -- true when the lease records a tenant already counted in baseline_occupied_sq_ft
+      ALTER TABLE leases ADD COLUMN IF NOT EXISTS from_baseline BOOLEAN NOT NULL DEFAULT false;
 
       CREATE TABLE IF NOT EXISTS space_holds (
         id VARCHAR(255) PRIMARY KEY,

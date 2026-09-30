@@ -173,7 +173,17 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
 
   // Dimensions & Commercials
   const [totalAreaSqFt, setTotalAreaSqFt] = useState<number | ''>(initialProperty?.totalAreaSqFt ?? '');
-  const [availableAreaSqFt, setAvailableAreaSqFt] = useState<number | ''>(initialProperty?.availableAreaSqFt ?? '');
+  // Free space is calculated by the backend (total − existing tenants − leases − holds); only the
+  // "occupied by existing tenants" figure is typed here.
+  const leasedAreaSqFt = initialProperty?.leasedAreaSqFt || 0;
+  const heldAreaSqFt = initialProperty?.heldAreaSqFt || 0;
+  const [baselineOccupiedSqFt, setBaselineOccupiedSqFt] = useState<number | ''>(
+    initialProperty ? initialProperty.baselineOccupiedSqFt ?? 0 : 0
+  );
+  const availableAreaSqFt: number | '' =
+    totalAreaSqFt === ''
+      ? ''
+      : Math.max(0, Number(totalAreaSqFt) - (Number(baselineOccupiedSqFt) || 0) - leasedAreaSqFt - heldAreaSqFt);
   const [rentPerSqFtINR, setRentPerSqFtINR] = useState<number | ''>(initialProperty?.rentPerSqFtINR ?? '');
   const [depositMonths, setDepositMonths] = useState<number | ''>(initialProperty?.depositMonths ?? 3);
   const [leaseTermsYears, setLeaseTermsYears] = useState<number | ''>(initialProperty?.leaseTermsYears ?? 5);
@@ -254,9 +264,9 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
   const validateStep2 = () => {
     const errs: Record<string, string> = {};
     if (!totalAreaSqFt || Number(totalAreaSqFt) <= 0) errs.totalAreaSqFt = 'Valid total park area is required (sq.ft)';
-    if (!availableAreaSqFt || Number(availableAreaSqFt) <= 0) errs.availableAreaSqFt = 'Valid available space is required (sq.ft)';
-    if (totalAreaSqFt && availableAreaSqFt && Number(availableAreaSqFt) > Number(totalAreaSqFt)) {
-      errs.availableAreaSqFt = 'Available space cannot exceed total park area';
+    if (Number(baselineOccupiedSqFt) < 0) errs.baselineOccupiedSqFt = 'Cannot be negative';
+    if (totalAreaSqFt && Number(baselineOccupiedSqFt) + leasedAreaSqFt + heldAreaSqFt > Number(totalAreaSqFt)) {
+      errs.baselineOccupiedSqFt = `Existing tenants + leases (${formatSqFt(leasedAreaSqFt + heldAreaSqFt)} incl. holds) cannot exceed total area`;
     }
     if (!rentPerSqFtINR || Number(rentPerSqFtINR) <= 0) errs.rentPerSqFtINR = 'Valid base monthly rent is required (₹ / sq.ft)';
     if (!depositMonths || Number(depositMonths) <= 0) errs.depositMonths = 'Security deposit months is required';
@@ -346,7 +356,8 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
       state: state.trim(),
       pincode: pincode.trim(),
       totalAreaSqFt: Number(totalAreaSqFt),
-      availableAreaSqFt: Number(availableAreaSqFt),
+      availableAreaSqFt: Number(availableAreaSqFt) || 0,
+      baselineOccupiedSqFt: Number(baselineOccupiedSqFt) || 0,
       rentPerSqFtINR: Number(rentPerSqFtINR),
       depositMonths: Number(depositMonths),
       leaseTermsYears: Number(leaseTermsYears),
@@ -756,37 +767,35 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                 {errors.totalAreaSqFt && <p className="text-[11px] text-rose-500 font-medium">{errors.totalAreaSqFt}</p>}
               </div>
 
-              {/* Available Space with Helper */}
+              {/* Occupied by existing tenants (typed) → free space (calculated) */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1">
-                    <span>Available Space (sq.ft)</span>
-                    <span className="text-rose-500 font-bold">*</span>
-                  </label>
-                  {totalAreaSqFt && (
-                    <button
-                      type="button"
-                      onClick={() => setAvailableAreaSqFt(Number(totalAreaSqFt))}
-                      className="text-[10px] text-fairway-600 dark:text-fairway-400 font-bold hover:underline cursor-pointer"
-                    >
-                      = Same as Total
-                    </button>
-                  )}
-                </div>
+                <label htmlFor="baseline-occupied" className="text-xs font-semibold text-foreground">
+                  Occupied by existing tenants (sq.ft)
+                </label>
                 <input
+                  id="baseline-occupied"
                   type="number"
                   inputMode="numeric"
-                  placeholder="e.g. 125000"
-                  value={availableAreaSqFt}
+                  min={0}
+                  placeholder="0"
+                  value={baselineOccupiedSqFt}
                   onChange={(e) => {
-                    setAvailableAreaSqFt(e.target.value ? Number(e.target.value) : '');
-                    clearError('availableAreaSqFt');
+                    setBaselineOccupiedSqFt(e.target.value ? Number(e.target.value) : '');
+                    clearError('baselineOccupiedSqFt');
                   }}
                   className={`w-full bg-surface-muted/60 dark:bg-[#18202b] border ${
-                    errors.availableAreaSqFt ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
+                    errors.baselineOccupiedSqFt ? 'border-rose-500 ring-1 ring-rose-500' : 'border-border'
                   } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
-                {errors.availableAreaSqFt && <p className="text-[11px] text-rose-500 font-medium">{errors.availableAreaSqFt}</p>}
+                {errors.baselineOccupiedSqFt ? (
+                  <p className="text-[11px] text-rose-500 font-medium">{errors.baselineOccupiedSqFt}</p>
+                ) : (
+                  <p className="text-[11px] text-foreground-muted">
+                    Free space (calculated):{' '}
+                    <span className="font-bold text-foreground">{availableAreaSqFt === '' ? '—' : formatSqFt(Number(availableAreaSqFt))}</span>
+                    {leasedAreaSqFt + heldAreaSqFt > 0 && ` · after ${formatSqFt(leasedAreaSqFt)} leased + ${formatSqFt(heldAreaSqFt)} on hold`}
+                  </p>
+                )}
               </div>
 
               {/* Base Rent with Currency Symbol */}
