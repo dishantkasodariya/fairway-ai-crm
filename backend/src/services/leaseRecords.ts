@@ -2,17 +2,11 @@ import crypto from 'crypto';
 import { PoolClient } from 'pg';
 import { RECALCULATE_PROPERTY_SPACE_SQL } from '../config/db.js';
 import { recordStageChange } from './stageHistory.js';
+import { LeaseCapacityError, DealError } from './dealErrors.js';
+import { closeFollowUps } from './followUpLoop.js';
+import { BUSINESS_TODAY_SQL } from './businessDate.js';
 
-/** Thrown when a lease would take more space than the warehouse can give; maps to HTTP 409. */
-export class LeaseCapacityError extends Error {
-  status = 409;
-}
-/** Thrown for bad input or a missing record; carries its HTTP status. */
-export class DealError extends Error {
-  constructor(message: string, public status = 400) {
-    super(message);
-  }
-}
+export { LeaseCapacityError, DealError };
 
 export interface LeaseInput {
   propertyId: string;
@@ -169,12 +163,13 @@ export const winInquiryTx = async (
        won_property_id = $2, won_property_name = $3,
        won_final_value_monthly_inr = COALESCE($4, won_final_value_monthly_inr),
        won_comments = COALESCE($5, won_comments),
-       won_date = COALESCE($6, to_char(CURRENT_DATE, 'YYYY-MM-DD')),
+       won_date = COALESCE($6, to_char(${BUSINESS_TODAY_SQL}, 'YYYY-MM-DD')),
        closed_by_user_id = COALESCE($7, closed_by_user_id),
        updated_at = CURRENT_TIMESTAMP
      WHERE id = $1;`,
     [inquiry.id, terms.propertyId, lease.property_name, lease.monthly_rent_inr, terms.comments || null, terms.wonDate || null, userId || null]
   );
   await recordStageChange(inquiry.id, inquiry.stage, 'won', userId, `Lease ${leaseId} signed`, client);
+  await closeFollowUps(client, inquiry.id, 'Deal won');
   return { inquiryId: inquiry.id, leaseId };
 };

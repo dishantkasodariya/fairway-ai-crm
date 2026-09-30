@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { recordStageChange } from '../services/stageHistory.js';
 import { winInquiryTx, LeaseCapacityError, DealError } from '../services/leaseRecords.js';
 import { placeHold, releaseHolds, HoldResult } from '../services/spaceHolds.js';
+import { BUSINESS_TODAY_SQL } from '../services/businessDate.js';
 
 /** Stages at or beyond "proposal" — sending another proposal must not move a deal backwards. */
 const STAGES_FROM_PROPOSAL = ['proposal', 'site_visit', 'negotiation', 'won', 'lost'];
@@ -302,7 +303,7 @@ export const updateProposalStatus = async (req: Request, res: Response): Promise
         }
         const possession = /^\d{4}-\d{2}-\d{2}$/.test(row.possession_date || '')
           ? row.possession_date
-          : (await client.query("SELECT to_char(CURRENT_DATE, 'YYYY-MM-DD') AS d;")).rows[0].d;
+          : (await client.query(`SELECT to_char(${BUSINESS_TODAY_SQL}, 'YYYY-MM-DD') AS d;`)).rows[0].d;
         await winInquiryTx(
           client,
           row.inquiry_id,

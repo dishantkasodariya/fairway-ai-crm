@@ -10,6 +10,8 @@ import {
   getLostReasons,
   createLostReason,
   winInquiry,
+  createTouch,
+  getTouches,
 } from '../controllers/inquiries.controller.js';
 import { requirePermission } from '../middleware/permission.middleware.js';
 
@@ -24,6 +26,8 @@ router.post('/stepper', requirePermission('inquiries', 'create'), createInquiryS
 router.get('/:id', requirePermission('inquiries', 'view'), getInquiryById);
 router.put('/:id', requirePermission('inquiries', 'edit'), updateInquiry);
 router.post('/:id/win', requirePermission('inquiries', 'edit'), winInquiry);
+router.get('/:id/touches', requirePermission('inquiries', 'view'), getTouches);
+router.post('/:id/touches', requirePermission('inquiries', 'edit'), createTouch);
 router.delete('/:id', requirePermission('inquiries', 'delete'), deleteInquiry);
 
 export default router;

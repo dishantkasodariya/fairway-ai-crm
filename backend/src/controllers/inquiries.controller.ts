@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { recordStageChange } from '../services/stageHistory.js';
 import { winInquiryTx, LeaseCapacityError, DealError } from '../services/leaseRecords.js';
 import { releaseHolds } from '../services/spaceHolds.js';
+import { logTouch, closeFollowUps } from '../services/followUpLoop.js';
 
 /**
  * Helper to generate sequential Inquiry Number like INQ-1049
@@ -684,12 +685,68 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
 
     if (result.rows[0].stage === 'lost' && previousStage !== 'lost') {
       await releaseHolds({ inquiryId: result.rows[0].id }, 'Deal lost');
+      await closeFollowUps(pool, result.rows[0].id, 'Deal lost');
+      result.rows[0].next_follow_up_date = null;
     }
 
     res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
     console.error('Error updating inquiry:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to update inquiry' });
+  }
+};
+
+/**
+ * POST /api/inquiries/:id/touches  { channel, outcome, note }
+ * "I followed up": logs the touch and schedules the next check-in (5-day loop, park after 3 no-replies).
+ */
+export const createTouch = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await logTouch(client, String(req.params.id), req.body, req.user?.userId);
+    await client.query('COMMIT');
+    res.status(201).json({ success: true, data: result });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (error instanceof DealError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('Error logging touch:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to log the follow-up.' });
+  } finally {
+    client.release();
+  }
+};
+
+/** GET /api/inquiries/:id/touches — the deal's follow-up timeline, newest first. */
+export const getTouches = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await query(
+      `SELECT a.id, a.user_id, a.user_name, a.title, a.description, a.metadata, a.created_at
+       FROM activities a JOIN inquiries i ON i.id = a.inquiry_id
+       WHERE (i.id = $1 OR LOWER(i.inquiry_number) = LOWER($1)) AND a.activity_type = 'Touch'
+       ORDER BY a.created_at DESC;`,
+      [req.params.id]
+    );
+    res.status(200).json({
+      success: true,
+      data: result.rows.map((r) => ({
+        id: r.id,
+        userId: r.user_id,
+        userName: r.user_name,
+        title: r.title,
+        note: r.description || '',
+        channel: r.metadata?.channel || null,
+        outcome: r.metadata?.outcome || null,
+        touchNumber: r.metadata?.touchNumber || null,
+        noReplyStreak: r.metadata?.noReplyStreak ?? 0,
+        createdAt: r.created_at?.toISOString?.() ?? r.created_at,
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message || 'Failed to load follow-ups.' });
   }
 };
 
