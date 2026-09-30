@@ -1,6 +1,32 @@
 import { Inquiry } from '@/modules/core/types';
 import { API_BASE_URL, getAuthHeaders } from './api';
 
+export type TouchChannel = 'Call' | 'Email' | 'LinkedIn' | 'WhatsApp' | 'Meeting';
+export type TouchOutcome = 'reached_out' | 'no_reply' | 'interested' | 'not_now' | 'not_interested';
+
+export interface TouchResult {
+  activityId: string;
+  touchNumber: number;
+  noReplyStreak: number;
+  stage: string;
+  status: string;
+  nextFollowUp: { taskId: string; dueDate: string; description: string } | null;
+  suggestLost: boolean;
+}
+
+export interface Touch {
+  id: string;
+  userId: string;
+  userName: string;
+  title: string;
+  note: string;
+  channel: TouchChannel | null;
+  outcome: TouchOutcome | null;
+  touchNumber: number | null;
+  noReplyStreak: number;
+  createdAt: string;
+}
+
 export interface CreateInquiryStepperPayload {
   inquiryData: {
     requirement?: string;
@@ -237,6 +263,33 @@ export class InquiryService {
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /** "I followed up" — logs the touch and schedules the next check-in on the server. */
+  static async logTouch(id: string, payload: { channel: TouchChannel; outcome: TouchOutcome; note?: string }): Promise<{
+    success: boolean;
+    data?: TouchResult;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inquiries/${id}/touches`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  static async getTouches(id: string): Promise<{ success: boolean; data?: Touch[]; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inquiries/${id}/touches`, { headers: getAuthHeaders() });
       return await res.json();
     } catch (err: any) {
       return { success: false, error: err.message };

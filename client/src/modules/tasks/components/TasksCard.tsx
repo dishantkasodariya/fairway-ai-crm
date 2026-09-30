@@ -181,6 +181,11 @@ export const TasksCard: React.FC<TasksCardProps> = ({
               >
                 {t.description}
               </p>
+              {isDone && t.completedNotes && (
+                <p className="text-[11px] text-foreground-muted leading-snug line-clamp-2" title={t.completedNotes}>
+                  <span className="font-semibold text-foreground">Outcome:</span> {t.completedNotes}
+                </p>
+              )}
 
               {(t.companyName || t.inquiryNumber) && (
                 <div

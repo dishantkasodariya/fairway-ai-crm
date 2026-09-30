@@ -192,6 +192,11 @@ export const TasksList: React.FC<TasksListProps> = ({
               >
                 {t.description}
               </div>
+              {isDone && t.completedNotes && (
+                <div className="text-[11px] text-foreground-muted leading-snug line-clamp-2" title={t.completedNotes}>
+                  <span className="font-semibold text-foreground">Outcome:</span> {t.completedNotes}
+                </div>
+              )}
 
               {/* Company & Inquiry Reference in one clear line */}
               {(t.companyName || t.inquiryNumber) && (

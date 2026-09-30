@@ -398,16 +398,19 @@ export const toggleTaskStatus = async (req: Request, res: Response): Promise<voi
     const currentStatus = check.rows[0].status;
     const newStatus = (currentStatus && currentStatus.toString().toLowerCase() === 'completed') ? 'Pending' : 'Completed';
 
+    // The dashboard's "complete with notes" sends completedNotes; it used to be silently dropped.
+    const completedNotes = typeof req.body?.completedNotes === 'string' && req.body.completedNotes.trim() ? req.body.completedNotes.trim() : null;
     const sql = `
       UPDATE tasks SET
         status = $1,
         completed_at = CASE WHEN $1 = 'Completed' THEN CURRENT_TIMESTAMP ELSE NULL END,
+        completed_notes = CASE WHEN $1 = 'Completed' THEN COALESCE($3, completed_notes) ELSE completed_notes END,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
       RETURNING *;
     `;
 
-    const result = await query(sql, [newStatus, id]);
+    const result = await query(sql, [newStatus, id, completedNotes]);
     const row = result.rows[0];
 
     res.status(200).json({

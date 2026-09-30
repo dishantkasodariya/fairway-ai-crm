@@ -26,9 +26,11 @@ import {
   UserCheck,
   ChevronRight,
   Check,
+  MessageSquareReply,
 } from 'lucide-react';
 import { cn } from '@/modules/core/lib/utils';
-import { InquiryService } from '@/modules/core/services/inquiryService';
+import { InquiryService, Touch, TouchResult } from '@/modules/core/services/inquiryService';
+import { LogTouchModal } from '@/modules/core/components/LogTouchModal';
 import { TaskService } from '@/modules/core/services/taskService';
 import { ProposalService } from '@/modules/core/services/proposalService';
 import { SiteVisitsService } from '@/modules/core/services/siteVisitsService';
@@ -111,10 +113,12 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
   const [activities, setActivities] = useState<Activity[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [pipelineStages, setPipelineStages] = useState<PipelineStageConfig[]>([]);
+  const [touches, setTouches] = useState<Touch[]>([]);
+  const [isTouchModalOpen, setIsTouchModalOpen] = useState(false);
 
   const refreshData = async () => {
     try {
-      const [inqRes, propRes, visitRes, taskRes, actRes, catalogRes, stagesRes] = await Promise.allSettled([
+      const [inqRes, propRes, visitRes, taskRes, actRes, catalogRes, stagesRes, touchRes] = await Promise.allSettled([
         InquiryService.getInquiryById(inquiryId),
         ProposalService.getProposals({ inquiryId }),
         SiteVisitsService.getSiteVisits({ inquiryId }),
@@ -122,7 +126,12 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
         ActivityService.getActivities({ inquiryId }),
         PropertyService.getProperties(),
         PipelineStageService.getPipelineStages(),
+        InquiryService.getTouches(inquiryId),
       ]);
+
+      if (touchRes.status === 'fulfilled' && touchRes.value.success && touchRes.value.data) {
+        setTouches(touchRes.value.data);
+      }
 
       let loadedInquiry: Inquiry | undefined;
       let loadedProps: Property[] = [];
@@ -221,7 +230,20 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
   });
 
   // Active Tab for Right-hand Activity Hub
-  const [activityTab, setActivityTab] = useState<'tasks' | 'visits' | 'proposals'>('tasks');
+  const [activityTab, setActivityTab] = useState<'touches' | 'tasks' | 'visits' | 'proposals'>('touches');
+
+  const handleTouchLogged = async (result: TouchResult) => {
+    await refreshData();
+    if (result.suggestLost) return; // the Lost form opens next
+    const next = result.nextFollowUp;
+    if (result.status === 'Parked' && next) {
+      success('Lead parked', `We'll remind the owner on ${formatDate(next.dueDate)}.`);
+    } else if (next) {
+      success('Follow-up saved', `Next check-in ${formatDate(next.dueDate)}: ${next.description}`);
+    } else {
+      success('Follow-up saved');
+    }
+  };
 
   // Clean 1-line owner options with 2-letter uppercase initials in a circular badge (identical to CompanyDetailPage)
   const ownerComboboxOptions = useMemo<ComboboxOption[]>(() => {
@@ -555,12 +577,23 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto">
               {canEdit && (
                 <>
+                  {inquiry.stage !== 'won' && inquiry.stage !== 'lost' && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => setIsTouchModalOpen(true)}
+                      leftIcon={<MessageSquareReply className="w-3.5 h-3.5" />}
+                      className="flex-1 sm:flex-initial h-9 text-xs font-bold rounded-xl shadow-xs whitespace-nowrap justify-center"
+                    >
+                      I followed up
+                    </Button>
+                  )}
                   <Button
                     size="sm"
-                    variant="primary"
+                    variant="outline"
                     onClick={() => setIsProposalModalOpen(true)}
                     leftIcon={<FileSpreadsheet className="w-3.5 h-3.5" />}
-                    className="flex-1 sm:flex-initial h-9 text-xs font-bold rounded-xl shadow-xs whitespace-nowrap justify-center"
+                    className="flex-1 sm:flex-initial h-9 text-xs font-semibold rounded-xl whitespace-nowrap justify-center"
                   >
                     Draft Proposal
                   </Button>
@@ -991,21 +1024,33 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
             <div className="flex items-center border-b border-border bg-surface-muted/40 p-1 gap-1 overflow-x-auto no-scrollbar">
               <button
                 type="button"
+                onClick={() => setActivityTab('touches')}
+                className={cn(
+                  "flex-auto shrink-0 py-1.5 px-1.5 text-[11px] font-bold rounded-lg transition-all text-center cursor-pointer select-none whitespace-nowrap",
+                  activityTab === 'touches'
+                    ? "bg-surface text-foreground shadow-xs border border-border"
+                    : "text-foreground-muted hover:text-foreground"
+                )}
+              >
+                Follow-ups ({touches.length})
+              </button>
+              <button
+                type="button"
                 onClick={() => setActivityTab('tasks')}
                 className={cn(
-                  "flex-1 min-w-0 py-1.5 px-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all text-center cursor-pointer select-none whitespace-nowrap truncate",
+                  "flex-auto shrink-0 py-1.5 px-1.5 text-[11px] font-bold rounded-lg transition-all text-center cursor-pointer select-none whitespace-nowrap",
                   activityTab === 'tasks'
                     ? "bg-surface text-foreground shadow-xs border border-border"
                     : "text-foreground-muted hover:text-foreground"
                 )}
               >
-                Follow-ups ({tasks.length})
+                Tasks ({tasks.filter((t) => t.status === 'Pending').length})
               </button>
               <button
                 type="button"
                 onClick={() => setActivityTab('visits')}
                 className={cn(
-                  "flex-1 min-w-0 py-1.5 px-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all text-center cursor-pointer select-none whitespace-nowrap truncate",
+                  "flex-auto shrink-0 py-1.5 px-1.5 text-[11px] font-bold rounded-lg transition-all text-center cursor-pointer select-none whitespace-nowrap",
                   activityTab === 'visits'
                     ? "bg-surface text-foreground shadow-xs border border-border"
                     : "text-foreground-muted hover:text-foreground"
@@ -1017,7 +1062,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
                 type="button"
                 onClick={() => setActivityTab('proposals')}
                 className={cn(
-                  "flex-1 min-w-0 py-1.5 px-2 text-[11px] sm:text-xs font-bold rounded-lg transition-all text-center cursor-pointer select-none whitespace-nowrap truncate",
+                  "flex-auto shrink-0 py-1.5 px-1.5 text-[11px] font-bold rounded-lg transition-all text-center cursor-pointer select-none whitespace-nowrap",
                   activityTab === 'proposals'
                     ? "bg-surface text-foreground shadow-xs border border-border"
                     : "text-foreground-muted hover:text-foreground"
@@ -1026,6 +1071,45 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
                 Proposals ({proposals.length})
               </button>
             </div>
+
+            {/* Touch log: every follow-up and what happened, newest first */}
+            {activityTab === 'touches' && (
+              <div className="p-3.5 sm:p-4 space-y-3">
+                {inquiry.nextFollowUpDate && inquiry.stage !== 'won' && inquiry.stage !== 'lost' && (
+                  <div className={cn(
+                    'rounded-xl border px-3 py-2 text-xs',
+                    inquiry.status === 'Parked' ? 'border-border bg-surface-muted/50' : 'border-fairway-600/30 bg-fairway-600/5'
+                  )}>
+                    <div className="font-bold text-foreground">
+                      {inquiry.status === 'Parked' ? 'Parked · ' : ''}Next check-in {formatRelativeDate(inquiry.nextFollowUpDate)}
+                      <span className="font-normal text-foreground-muted"> ({formatDate(inquiry.nextFollowUpDate)})</span>
+                    </div>
+                    {inquiry.nextAction && <p className="text-foreground-muted mt-0.5">{inquiry.nextAction}</p>}
+                  </div>
+                )}
+                {touches.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-foreground-muted bg-surface-muted/30 rounded-xl border border-dashed border-border">
+                    No follow-ups logged yet. Use "I followed up" after you reach out.
+                  </div>
+                ) : (
+                  <ol className="space-y-2">
+                    {touches.map((t) => (
+                      <li key={t.id} className="p-3 bg-surface rounded-xl border border-border text-xs shadow-2xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-foreground">{t.title}</span>
+                          <span className="text-[10px] text-foreground-muted whitespace-nowrap">{formatRelativeDate(t.createdAt)}</span>
+                        </div>
+                        {t.note && <p className="text-foreground-muted mt-1 leading-snug">{t.note}</p>}
+                        <p className="text-[10px] text-foreground-muted mt-1">
+                          #{t.touchNumber} · {t.userName}
+                          {t.outcome === 'no_reply' && t.noReplyStreak > 0 ? ` · unanswered ${t.noReplyStreak} of 3` : ''}
+                        </p>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            )}
 
             {/* Tab 1: Tasks / Follow-ups */}
             {activityTab === 'tasks' && (
@@ -1194,6 +1278,15 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
         inquiryNumber={inquiry.inquiryNumber}
         companyName={inquiry.companyName}
         onConfirm={handleConfirmLost}
+      />
+
+      <LogTouchModal
+        isOpen={isTouchModalOpen}
+        onClose={() => setIsTouchModalOpen(false)}
+        inquiryId={inquiry.id}
+        companyName={inquiry.companyName}
+        onLogged={handleTouchLogged}
+        onSuggestLost={() => setIsLostModalOpen(true)}
       />
 
       {/* Won Celebration Modal */}

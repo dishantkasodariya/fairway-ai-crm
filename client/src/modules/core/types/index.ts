@@ -132,7 +132,8 @@ export type InquirySource =
   | 'Inbound Call'
   | 'AI Discovery';
 
-export type InquiryStatus = 'Active' | 'Won' | 'Lost' | 'Archived';
+/** Parked = no reply after 3 follow-ups, or "not now"; it comes back on its next follow-up date. */
+export type InquiryStatus = 'Active' | 'Parked' | 'Won' | 'Lost' | 'Archived';
 
 export interface Inquiry {
   id: string;

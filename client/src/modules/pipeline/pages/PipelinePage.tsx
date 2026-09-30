@@ -14,6 +14,7 @@ import {
   Trash2,
   Warehouse,
   Layers,
+  MessageSquareReply,
 } from 'lucide-react';
 import {
   DndContext,
@@ -39,6 +40,7 @@ import { Button } from '@/modules/core/components/ui/Button';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { LostReasonModal } from '@/modules/core/components/LostReasonModal';
 import { WonCelebrationModal } from '@/modules/core/components/WonCelebrationModal';
+import { LogTouchModal } from '@/modules/core/components/LogTouchModal';
 import { EditInquiryModal } from '@/modules/inquiries/components/EditInquiryModal';
 import { InquiryService } from '@/modules/core/services/inquiryService';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
@@ -138,6 +140,7 @@ interface DraggablePipelineCardProps {
   onEditInquiry: (inq: Inquiry) => void;
   onDeleteInquiry: (inq: Inquiry) => void;
   onMoveStage: (inq: Inquiry, stageKey: PipelineStageKey) => void;
+  onLogTouch: (inq: Inquiry) => void;
   stages: PipelineStageConfig[];
 }
 
@@ -151,6 +154,7 @@ const DraggablePipelineCard: React.FC<DraggablePipelineCardProps> = ({
   onEditInquiry,
   onDeleteInquiry,
   onMoveStage,
+  onLogTouch,
   stages,
 }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -231,6 +235,20 @@ const DraggablePipelineCard: React.FC<DraggablePipelineCardProps> = ({
 
                 {canEdit && (
                   <>
+                    {inquiry.stage !== 'won' && inquiry.stage !== 'lost' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onToggleMenu(null);
+                          onLogTouch(inquiry);
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-fairway-700 dark:text-fairway-300 hover:bg-surface-muted transition-colors cursor-pointer"
+                      >
+                        <MessageSquareReply className="w-3.5 h-3.5" />
+                        <span>I followed up</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => {
@@ -351,6 +369,7 @@ interface DroppablePipelineColumnProps {
   onEditInquiry: (inq: Inquiry) => void;
   onDeleteInquiry: (inq: Inquiry) => void;
   onMoveStage: (inq: Inquiry, stageKey: PipelineStageKey) => void;
+  onLogTouch: (inq: Inquiry) => void;
   stages: PipelineStageConfig[];
 }
 
@@ -365,6 +384,7 @@ const DroppablePipelineColumn: React.FC<DroppablePipelineColumnProps> = ({
   onEditInquiry,
   onDeleteInquiry,
   onMoveStage,
+  onLogTouch,
   stages,
 }) => {
   const { setNodeRef, isOver } = useDroppable({
@@ -432,6 +452,7 @@ const DroppablePipelineColumn: React.FC<DroppablePipelineColumnProps> = ({
               onEditInquiry={onEditInquiry}
               onDeleteInquiry={onDeleteInquiry}
               onMoveStage={onMoveStage}
+              onLogTouch={onLogTouch}
               stages={stages}
             />
           ))
@@ -479,6 +500,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
   const [editingInquiry, setEditingInquiry] = useState<Inquiry | null>(null);
   const [lostTargetInquiry, setLostTargetInquiry] = useState<Inquiry | null>(null);
   const [wonTargetInquiry, setWonTargetInquiry] = useState<Inquiry | null>(null);
+  const [touchTargetInquiry, setTouchTargetInquiry] = useState<Inquiry | null>(null);
   const [inquiryToDelete, setInquiryToDelete] = useState<Inquiry | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -997,6 +1019,7 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
                   onEditInquiry={setEditingInquiry}
                   onDeleteInquiry={promptDeleteInquiry}
                   onMoveStage={handleMoveStage}
+                  onLogTouch={setTouchTargetInquiry}
                   stages={stages}
                 />
               );
@@ -1065,6 +1088,26 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
               error('Update Failed', err.message || 'Failed to mark inquiry as lost');
             }
           }}
+        />
+      )}
+
+      {touchTargetInquiry && (
+        <LogTouchModal
+          isOpen={!!touchTargetInquiry}
+          onClose={() => setTouchTargetInquiry(null)}
+          inquiryId={touchTargetInquiry.id}
+          companyName={touchTargetInquiry.companyName}
+          onLogged={async (result) => {
+            const company = touchTargetInquiry.companyName;
+            await refreshData();
+            if (result.suggestLost) return;
+            const next = result.nextFollowUp;
+            success(
+              result.status === 'Parked' ? 'Lead parked' : 'Follow-up saved',
+              next ? `${company}: next check-in ${formatRelativeDate(next.dueDate)}.` : company
+            );
+          }}
+          onSuggestLost={() => setLostTargetInquiry(touchTargetInquiry)}
         />
       )}
 
