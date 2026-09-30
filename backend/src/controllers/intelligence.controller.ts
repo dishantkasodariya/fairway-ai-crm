@@ -9,7 +9,7 @@ import { config } from '../config/index.js';
 
 const snakeToCamel = (key: string): string => key.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
 
-const toCamelCaseDeep = (value: any): any => {
+export const toCamelCaseDeep = (value: any): any => {
   if (Array.isArray(value)) {
     return value.map(toCamelCaseDeep);
   }
@@ -21,7 +21,7 @@ const toCamelCaseDeep = (value: any): any => {
   return value;
 };
 
-class IntelligenceApiError extends Error {
+export class IntelligenceApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
     super(message);
@@ -29,7 +29,7 @@ class IntelligenceApiError extends Error {
   }
 }
 
-async function callIntelligenceApi(path: string, options: RequestInit = {}): Promise<any> {
+export async function callIntelligenceApi(path: string, options: RequestInit = {}): Promise<any> {
   if (!config.intelligenceApiUrl) {
     throw new IntelligenceApiError(503, 'Intelligence API is not configured (set INTELLIGENCE_API_URL)');
   }

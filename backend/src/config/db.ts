@@ -1332,6 +1332,9 @@ export const initDatabase = async () => {
       CREATE INDEX IF NOT EXISTS idx_space_holds_inquiry ON space_holds(inquiry_id);
 
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS baseline_occupied_sq_ft NUMERIC(12, 2);
+      -- Which intelligence (AI Discovery) company a CRM company came from, so a prospect is never added twice.
+      ALTER TABLE companies ADD COLUMN IF NOT EXISTS intelligence_company_id INTEGER;
+      CREATE INDEX IF NOT EXISTS idx_companies_intelligence_id ON companies(intelligence_company_id);
       -- One-time backfill (only rows never set): whatever was hand-typed as occupied becomes the baseline,
       -- so no displayed "available" number changes when the calculation takes over.
       UPDATE properties

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { query, pool } from '../config/db.js';
 import crypto from 'crypto';
+import { PoolClient } from 'pg';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { recordStageChange } from '../services/stageHistory.js';
 import { winInquiryTx, LeaseCapacityError, DealError } from '../services/leaseRecords.js';
@@ -850,7 +851,17 @@ export const deleteInquiry = async (req: Request, res: Response): Promise<void> 
  */
 export const createInquiry = async (req: Request, res: Response): Promise<void> => {
   try {
-    const b = req.body;
+    const row = await insertInquiryRecord(req.body);
+    res.status(201).json({ success: true, data: row });
+  } catch (error: any) {
+    console.error('Error creating inquiry:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to create inquiry' });
+  }
+};
+
+/** Inserts an inquiry with the same defaults as POST /api/inquiries; usable inside a transaction. */
+export const insertInquiryRecord = async (b: any, db: Pick<PoolClient, 'query'> = pool): Promise<any> => {
+  {
     const id = b.id || `inq_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const inquiryNumber = b.inquiryNumber || (await generateInquiryNumber());
 
@@ -911,10 +922,7 @@ export const createInquiry = async (req: Request, res: Response): Promise<void> 
       b.nextFollowUpDate || '',
     ];
 
-    const result = await query(sql, values);
-    res.status(201).json({ success: true, data: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error creating inquiry:', error);
-    res.status(500).json({ success: false, error: error.message || 'Failed to create inquiry' });
+    const result = await db.query(sql, values);
+    return result.rows[0];
   }
 };

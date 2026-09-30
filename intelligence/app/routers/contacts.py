@@ -6,6 +6,7 @@ from app.db.models import Company, Contact, Job, JobStatus, JobType, Opportunity
 from app.deps import get_db, require_api_key
 from app.schemas.contacts import (
     AllContactsListOut,
+    ContactCreate,
     ContactOut,
     ContactsListOut,
     ContactWithCompanyOut,
@@ -45,6 +46,35 @@ def enrich_contacts(
 def get_company_contacts(company_id: int, db: Session = Depends(get_db)):
     contacts = db.query(Contact).filter(Contact.company_id == company_id).order_by(Contact.id.asc()).all()
     return ContactsListOut(items=[ContactOut.model_validate(c) for c in contacts])
+
+
+@router.post("/companies/{company_id}/contacts", response_model=ContactOut, status_code=201)
+def create_manual_contact(company_id: int, body: ContactCreate, db: Session = Depends(get_db)):
+    """Add a key person by hand. Marked source="manual" so it is never mistaken for Apollo data."""
+    company = db.query(Company).filter(Company.id == company_id).one_or_none()
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    clean = {k: (v.strip() if isinstance(v, str) else v) or None for k, v in body.model_dump().items()}
+    if not clean["name"]:
+        raise HTTPException(status_code=422, detail="Name is required")
+    if not (clean["email"] or clean["phone"] or clean["linkedin_url"]):
+        raise HTTPException(status_code=422, detail="Add at least one way to reach them: email, phone or LinkedIn")
+
+    contact = Contact(company_id=company_id, source="manual", confidence="manual", **clean)
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+@router.delete("/contacts/{contact_id}", status_code=204)
+def delete_contact(contact_id: int, db: Session = Depends(get_db)):
+    contact = db.query(Contact).filter(Contact.id == contact_id).one_or_none()
+    if contact is None:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    db.delete(contact)
+    db.commit()
 
 
 @router.get("/contacts", response_model=AllContactsListOut)
