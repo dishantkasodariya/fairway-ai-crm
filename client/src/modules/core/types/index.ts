@@ -291,6 +291,8 @@ export interface Property {
   amenities: string[];
   suitableIndustries: string[];
   description: string;
+  managerUserId?: string | null;
+  managerName?: string | null;
   createdAt: string;
   updatedAt: string;
 }

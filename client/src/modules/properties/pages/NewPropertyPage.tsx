@@ -30,6 +30,7 @@ import { DatePicker } from '@/modules/core/components/ui/DatePicker';
 import { Property, PropertyStatus } from '@/modules/core/types';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { useToast } from '@/modules/core/providers/ToastContext';
+import { useAuth } from '@/modules/core/providers/AuthContext';
 import { formatINR, formatSqFt } from '@/modules/core/utils/formatters';
 
 export interface NewPropertyPageProps {
@@ -154,6 +155,12 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
   const [name, setName] = useState(initialProperty?.name || '');
   const [code, setCode] = useState(initialProperty?.code || generateRandomCode('SAN'));
   const [status, setStatus] = useState<PropertyStatus | ''>(initialProperty?.status || 'Available');
+  const { users } = useAuth();
+  const [managerUserId, setManagerUserId] = useState<string>(initialProperty?.managerUserId || '');
+  const managerOptions = useMemo<ComboboxOption[]>(
+    () => [{ value: '', label: 'Unassigned' }, ...users.map((u) => ({ value: u.id, label: u.name }))],
+    [users]
+  );
 
   // Location
   const [corridor, setCorridor] = useState(initialProperty?.corridor || 'Sanand Industrial Corridor');
@@ -367,6 +374,9 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
       ],
       suitableIndustries,
       description: description.trim(),
+      // '' (not null) so choosing "Unassigned" actually clears it — the backend COALESCEs nulls away.
+      managerUserId,
+      managerName: users.find((u) => u.id === managerUserId)?.name || '',
     };
 
     try {
@@ -576,6 +586,19 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   }`}
                 />
                 {errors.status && <p className="text-[11px] text-rose-500 font-medium">{errors.status}</p>}
+              </div>
+
+              {/* Warehouse Manager — suggested owner for AI prospects discovered near this warehouse */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground">Warehouse Manager</label>
+                <Combobox
+                  options={managerOptions}
+                  value={managerUserId}
+                  onChange={setManagerUserId}
+                  placeholder="Unassigned"
+                  triggerClassName="rounded-xl h-10 bg-surface-muted/60 dark:bg-[#18202b]"
+                />
+                <p className="text-[11px] text-foreground-muted">New AI-discovered leads near this warehouse are suggested to this person.</p>
               </div>
 
               {/* Corridor */}

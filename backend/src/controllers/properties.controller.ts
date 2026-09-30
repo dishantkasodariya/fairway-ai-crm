@@ -37,6 +37,8 @@ const mapPropertyRow = (row: any) => ({
   amenities: typeof row.amenities === 'string' ? JSON.parse(row.amenities) : (row.amenities || []),
   suitableIndustries: typeof row.suitable_industries === 'string' ? JSON.parse(row.suitable_industries) : (row.suitable_industries || []),
   description: row.description || '',
+  managerUserId: row.manager_user_id || null,
+  managerName: row.manager_name || null,
   createdAt: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
   updatedAt: row.updated_at ? row.updated_at.toISOString() : new Date().toISOString(),
 });
@@ -228,13 +230,16 @@ export const createProperty = async (req: Request, res: Response): Promise<void>
       amenities,
       suitableIndustries,
       description,
+      managerUserId,
+      managerName,
     } = req.body;
 
     const finalLocation = location || req.body.address || corridor || city || 'Gujarat Industrial Belt';
     const finalCorridor = corridor || finalLocation;
     const finalCity = city || 'Ahmedabad';
 
-    if (!name || !totalAreaSqFt || !rentPerSqFtINR) {
+    // 0 is a legitimate "not known yet" value for a real warehouse whose area/rent haven't been entered.
+    if (!name || totalAreaSqFt === undefined || totalAreaSqFt === null || rentPerSqFtINR === undefined || rentPerSqFtINR === null) {
       res.status(400).json({ success: false, error: 'Name, totalAreaSqFt, and rentPerSqFtINR are required.' });
       return;
     }
@@ -249,14 +254,14 @@ export const createProperty = async (req: Request, res: Response): Promise<void>
         availability_date, clear_height_ft, docks_count, fire_systems, power_kva,
         parking_slots, truck_access, flooring_capacity_mt, cctv_security, green_building_cert,
         latitude, longitude, photos, brochure_url, status, amenities, suitable_industries,
-        description, created_at, updated_at
+        description, manager_user_id, manager_name, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8,
         $9, $10, $11, $12, $13,
         $14, $15, $16, $17, $18,
         $19, $20, $21, $22, $23,
         $24, $25, $26, $27, $28, $29, $30,
-        $31, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        $31, $32, $33, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       ) RETURNING *;
     `;
 
@@ -270,7 +275,7 @@ export const createProperty = async (req: Request, res: Response): Promise<void>
       state || 'Gujarat',
       pincode || '392130',
       totalAreaSqFt,
-      availableAreaSqFt || totalAreaSqFt,
+      availableAreaSqFt ?? totalAreaSqFt,
       rentPerSqFtINR,
       depositMonths || 3,
       leaseTermsYears || 5,
@@ -292,6 +297,8 @@ export const createProperty = async (req: Request, res: Response): Promise<void>
       JSON.stringify(amenities || []),
       JSON.stringify(suitableIndustries || []),
       description || '',
+      managerUserId || null,
+      managerName || null,
     ];
 
     const result = await query(sql, values);
@@ -339,6 +346,8 @@ export const updateProperty = async (req: Request, res: Response): Promise<void>
       amenities,
       suitableIndustries,
       description,
+      managerUserId,
+      managerName,
     } = req.body;
 
     const sql = `
@@ -372,6 +381,8 @@ export const updateProperty = async (req: Request, res: Response): Promise<void>
         amenities = COALESCE($27, amenities),
         suitable_industries = COALESCE($28, suitable_industries),
         description = COALESCE($29, description),
+        manager_user_id = COALESCE($31, manager_user_id),
+        manager_name = COALESCE($32, manager_name),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $30
       RETURNING *;
@@ -408,6 +419,8 @@ export const updateProperty = async (req: Request, res: Response): Promise<void>
       suitableIndustries ? JSON.stringify(suitableIndustries) : null,
       description,
       id,
+      managerUserId,
+      managerName,
     ];
 
     const result = await query(sql, values);

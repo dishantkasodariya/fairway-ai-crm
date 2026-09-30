@@ -598,6 +598,8 @@ export async function runAllSchemaFixes() {
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS amenities JSONB DEFAULT '[]';
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS suitable_industries JSONB DEFAULT '[]';
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS manager_user_id VARCHAR(255);
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS manager_name VARCHAR(255);
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
     `);
