@@ -370,7 +370,10 @@ export const EditInquiryModal: React.FC<EditInquiryModalProps> = ({
               Pipeline Stage
             </label>
             <Combobox
-              options={pipelineStages.map((stg) => ({
+              // Won / Lost have their own flows (lease terms, lost reason) — only offered here if already current.
+              options={pipelineStages
+                .filter((stg) => (stg.key !== 'won' && stg.key !== 'lost') || stg.key === inquiry?.stage)
+                .map((stg) => ({
                 value: stg.key,
                 label: stg.label,
                 icon: (

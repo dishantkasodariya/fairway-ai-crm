@@ -1073,27 +1073,13 @@ export const PipelineKanbanView: React.FC<PipelineKanbanViewProps> = ({
         <WonCelebrationModal
           isOpen={!!wonTargetInquiry}
           onClose={() => setWonTargetInquiry(null)}
-          inquiryNumber={wonTargetInquiry.inquiryNumber}
-          companyName={wonTargetInquiry.companyName}
+          inquiry={wonTargetInquiry}
           defaultPropertyId={wonTargetInquiry.wonPropertyId || wonTargetInquiry.matchedPropertyIds?.[0]}
-          defaultMonthlyRent={wonTargetInquiry.wonFinalValueMonthlyINR || wonTargetInquiry.budgetMonthlyINR}
-          onConfirm={async (data) => {
-            try {
-              await InquiryService.updateInquiry(wonTargetInquiry.id, {
-                stage: 'won',
-                status: 'Won',
-                wonPropertyId: data.wonPropertyId,
-                wonPropertyName: data.wonPropertyName,
-                wonFinalValueMonthlyINR: data.wonFinalValueMonthlyINR,
-                wonComments: data.wonComments,
-                wonDate: data.wonDate,
-              } as any);
-              await refreshData();
-              setWonTargetInquiry(null);
-              success('Deal Won!', `Congratulations on converting ${wonTargetInquiry.companyName}!`);
-            } catch (err: any) {
-              error('Update Failed', err.message || 'Failed to mark inquiry as won');
-            }
+          onWon={async (result) => {
+            const company = wonTargetInquiry.companyName;
+            setWonTargetInquiry(null);
+            await refreshData();
+            success('Deal Won!', `${company} · ${result.areaSqFt.toLocaleString('en-IN')} sq ft leased at ${result.propertyName}.`);
           }}
         />
       )}

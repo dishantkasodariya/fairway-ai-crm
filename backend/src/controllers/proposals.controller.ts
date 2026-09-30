@@ -1,7 +1,12 @@
 import { Request, Response } from 'express';
-import { query } from '../config/db.js';
+import { query, pool } from '../config/db.js';
 import crypto from 'crypto';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+import { recordStageChange } from '../services/stageHistory.js';
+import { winInquiryTx, LeaseCapacityError, DealError } from '../services/leaseRecords.js';
+
+/** Stages at or beyond "proposal" — sending another proposal must not move a deal backwards. */
+const STAGES_FROM_PROPOSAL = ['proposal', 'site_visit', 'negotiation', 'won', 'lost'];
 
 /**
  * Helper to generate sequential Proposal Number like PR-1044
@@ -233,9 +238,15 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
 
     const result = await query(sql, values);
 
-    // If linked to an inquiry, also update the inquiry stage to 'proposal_sent'
+    // Linked inquiry moves to the real 'proposal' pipeline stage (was the non-existent 'proposal_sent',
+    // which dropped the card off the Kanban board).
     if (inquiryId) {
-      await query("UPDATE inquiries SET stage = 'proposal_sent', updated_at = CURRENT_TIMESTAMP WHERE id = $1;", [inquiryId]);
+      const inq = await query('SELECT stage FROM inquiries WHERE id = $1;', [inquiryId]);
+      const fromStage = inq.rows[0]?.stage;
+      if (inq.rows[0] && !STAGES_FROM_PROPOSAL.includes(fromStage)) {
+        await query("UPDATE inquiries SET stage = 'proposal', updated_at = CURRENT_TIMESTAMP WHERE id = $1;", [inquiryId]);
+        await recordStageChange(inquiryId, fromStage, 'proposal', (req as AuthenticatedRequest).user?.userId, `Proposal ${result.rows[0].proposal_number} sent`);
+      }
     }
 
     res.status(201).json({ success: true, data: mapProposalRow(result.rows[0]) });
@@ -250,41 +261,71 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
  * Update proposal status (Draft, Sent, Viewed, Negotiation, Accepted, Rejected, Expired)
  */
 export const updateProposalStatus = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!status) {
+    res.status(400).json({ success: false, error: 'Status is required.' });
+    return;
+  }
+
+  const client = await pool.connect();
   try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    if (!status) {
-      res.status(400).json({ success: false, error: 'Status is required.' });
-      return;
-    }
-
-    const sql = `
-      UPDATE proposals SET
-        status = $1,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $2
-      RETURNING *;
-    `;
-
-    const result = await query(sql, [status, id]);
+    await client.query('BEGIN');
+    const result = await client.query(
+      'UPDATE proposals SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *;',
+      [status, id]
+    );
 
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       res.status(404).json({ success: false, error: 'Proposal not found.' });
       return;
     }
 
     const row = result.rows[0];
 
-    // If accepted, also mark inquiry negotiation/won
+    // An accepted proposal is a signed deal: mark the inquiry Won and record the lease from the
+    // proposal's own terms, in the same transaction (was stage 'deal_won', not a real stage).
     if (status === 'Accepted' && row.inquiry_id) {
-      await query("UPDATE inquiries SET stage = 'deal_won', status = 'Won', updated_at = CURRENT_TIMESTAMP WHERE id = $1;", [row.inquiry_id]);
+      const inq = await client.query('SELECT stage FROM inquiries WHERE id = $1;', [row.inquiry_id]);
+      if (inq.rows[0] && inq.rows[0].stage !== 'won') {
+        if (!row.property_id || !(parseFloat(row.proposed_area_sq_ft) > 0)) {
+          throw new DealError('This proposal has no warehouse or area, so no lease can be recorded. Use "Mark as Won" on the deal instead.');
+        }
+        const possession = /^\d{4}-\d{2}-\d{2}$/.test(row.possession_date || '')
+          ? row.possession_date
+          : (await client.query("SELECT to_char(CURRENT_DATE, 'YYYY-MM-DD') AS d;")).rows[0].d;
+        await winInquiryTx(
+          client,
+          row.inquiry_id,
+          {
+            propertyId: row.property_id,
+            areaSqFt: parseFloat(row.proposed_area_sq_ft),
+            startDate: possession,
+            rentPerSqFtINR: row.base_rent_per_sq_ft_inr !== null ? parseFloat(row.base_rent_per_sq_ft_inr) : null,
+            tenureYears: row.lease_tenure_years,
+            lockInMonths: row.lock_in_months,
+            escalationPercent: row.escalation_percent_per_year !== null ? parseFloat(row.escalation_percent_per_year) : null,
+            comments: `Proposal ${row.proposal_number} accepted.`,
+          },
+          (req as AuthenticatedRequest).user?.userId
+        );
+      }
     }
 
+    await client.query('COMMIT');
     res.status(200).json({ success: true, data: mapProposalRow(row) });
   } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (error instanceof LeaseCapacityError || error instanceof DealError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
     console.error('Error updating proposal status:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to update proposal status.' });
+  } finally {
+    client.release();
   }
 };
 

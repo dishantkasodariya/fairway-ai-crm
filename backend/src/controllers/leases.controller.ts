@@ -1,7 +1,7 @@
 import { Response } from 'express';
-import crypto from 'crypto';
 import { pool, query, RECALCULATE_PROPERTY_SPACE_SQL } from '../config/db.js';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+import { insertLease, LeaseInput, LeaseCapacityError, DealError } from '../services/leaseRecords.js';
 
 const LEASE_SELECT = `
   SELECT l.*,
@@ -34,12 +34,6 @@ const mapLeaseRow = (row: any) => ({
   createdAt: row.created_at?.toISOString?.() ?? row.created_at,
   updatedAt: row.updated_at?.toISOString?.() ?? row.updated_at,
 });
-
-const userName = async (userId?: string) => {
-  if (!userId) return null;
-  const r = await query('SELECT name FROM users WHERE id = $1;', [userId]);
-  return r.rows[0]?.name || null;
-};
 
 /** GET /api/leases?propertyId=&companyId=&inquiryId=&status= */
 export const getLeases = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -84,112 +78,20 @@ export const getLeaseById = async (req: AuthenticatedRequest, res: Response): Pr
  * "occupied by existing tenants" figure, so the baseline shrinks instead of free space.
  */
 export const createLease = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  const {
-    inquiryId, companyId, companyName, propertyId, areaSqFt, rentPerSqFtINR,
-    startDate, endDate, tenureYears, lockInMonths, escalationPercent, notes, fromBaseline,
-  } = req.body;
-
-  const area = Number(areaSqFt);
-  if (!propertyId || !startDate || !Number.isFinite(area) || area <= 0) {
-    res.status(400).json({ success: false, error: 'propertyId, startDate and a positive areaSqFt are required.' });
-    return;
-  }
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-
-    const propRes = await client.query(
-      'SELECT id, name, available_area_sq_ft, baseline_occupied_sq_ft FROM properties WHERE id = $1 FOR UPDATE;',
-      [propertyId]
-    );
-    const property = propRes.rows[0];
-    if (!property) {
-      await client.query('ROLLBACK');
-      res.status(404).json({ success: false, error: 'Warehouse not found.' });
-      return;
-    }
-
-    const holdsRes = inquiryId
-      ? await client.query(
-          `SELECT COALESCE(SUM(area_sq_ft), 0) AS held FROM space_holds WHERE inquiry_id = $1 AND property_id = $2 AND status = 'active';`,
-          [inquiryId, propertyId]
-        )
-      : { rows: [{ held: 0 }] };
-    const convertibleHold = parseFloat(holdsRes.rows[0].held) || 0;
-    const available = parseFloat(property.available_area_sq_ft) || 0;
-    const baseline = parseFloat(property.baseline_occupied_sq_ft) || 0;
-
-    if (fromBaseline) {
-      if (area > baseline) {
-        await client.query('ROLLBACK');
-        res.status(409).json({
-          success: false,
-          error: `${property.name} only has ${baseline.toLocaleString('en-IN')} sq ft recorded as occupied by existing tenants.`,
-        });
-        return;
-      }
-      await client.query(
-        'UPDATE properties SET baseline_occupied_sq_ft = baseline_occupied_sq_ft - $1 WHERE id = $2;',
-        [area, propertyId]
-      );
-    } else if (area > available + convertibleHold) {
-      await client.query('ROLLBACK');
-      res.status(409).json({
-        success: false,
-        error: `${property.name} has only ${(available + convertibleHold).toLocaleString('en-IN')} sq ft free${convertibleHold ? ' (including space held for this deal)' : ''}. This lease needs ${area.toLocaleString('en-IN')} sq ft.`,
-      });
-      return;
-    }
-
-    let resolvedCompanyName = companyName || null;
-    if (companyId && !resolvedCompanyName) {
-      const c = await client.query('SELECT name FROM companies WHERE id = $1;', [companyId]);
-      resolvedCompanyName = c.rows[0]?.name || null;
-    }
-
-    const rent = rentPerSqFtINR === undefined || rentPerSqFtINR === null || rentPerSqFtINR === '' ? null : Number(rentPerSqFtINR);
-    const leaseId = `lease_${crypto.randomUUID().replace(/-/g, '').slice(0, 10)}`;
-    const createdByName = await userName(req.user?.userId);
-
-    await client.query(
-      `INSERT INTO leases (
-        id, inquiry_id, company_id, company_name, property_id, property_name, area_sq_ft,
-        rent_per_sq_ft_inr, monthly_rent_inr, start_date, end_date, tenure_years, lock_in_months,
-        escalation_percent, status, notes, from_baseline, created_by_user_id, created_by_user_name
-      ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10::date,
-        COALESCE($11::date, CASE WHEN $12::numeric IS NOT NULL
-          THEN ($10::date + make_interval(months => round($12::numeric * 12)::int) - INTERVAL '1 day')::date END),
-        $12, $13,
-        $14, 'active', $15, $16, $17, $18
-      );`,
-      [
-        leaseId, inquiryId || null, companyId || null, resolvedCompanyName, propertyId, property.name, area,
-        rent, rent !== null ? rent * area : null, startDate, endDate || null,
-        tenureYears === undefined || tenureYears === null || tenureYears === '' ? null : Number(tenureYears),
-        lockInMonths === undefined || lockInMonths === null || lockInMonths === '' ? null : Number(lockInMonths),
-        escalationPercent === undefined || escalationPercent === null || escalationPercent === '' ? null : Number(escalationPercent),
-        notes || null, !!fromBaseline, req.user?.userId || null, createdByName,
-      ]
-    );
-
-    if (inquiryId) {
-      await client.query(
-        `UPDATE space_holds SET status = 'converted', released_at = CURRENT_TIMESTAMP, reason = 'Lease signed'
-         WHERE inquiry_id = $1 AND property_id = $2 AND status = 'active';`,
-        [inquiryId, propertyId]
-      );
-    }
-
-    await client.query(RECALCULATE_PROPERTY_SPACE_SQL, [propertyId]);
+    const leaseId = await insertLease(client, req.body as LeaseInput, req.user?.userId);
     await client.query('COMMIT');
 
     const created = await query(`${LEASE_SELECT} WHERE l.id = $1;`, [leaseId]);
     res.status(201).json({ success: true, data: mapLeaseRow(created.rows[0]) });
   } catch (error: any) {
     await client.query('ROLLBACK').catch(() => {});
+    if (error instanceof LeaseCapacityError || error instanceof DealError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
     console.error('Error creating lease:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to create lease.' });
   } finally {

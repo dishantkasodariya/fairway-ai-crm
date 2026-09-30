@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { query, pool } from '../config/db.js';
 import crypto from 'crypto';
+import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+import { recordStageChange } from '../services/stageHistory.js';
+import { winInquiryTx, LeaseCapacityError, DealError } from '../services/leaseRecords.js';
 
 /**
  * Helper to generate sequential Inquiry Number like INQ-1049
@@ -580,6 +583,19 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
       wonDate,
     } = req.body;
 
+    const current = await query('SELECT id, stage FROM inquiries WHERE id = $1 OR LOWER(inquiry_number) = LOWER($1);', [id]);
+    if (current.rows.length === 0) {
+      res.status(404).json({ success: false, error: 'Inquiry not found' });
+      return;
+    }
+    const previousStage = current.rows[0].stage;
+    // A deal only becomes Won together with its lease (POST /inquiries/:id/win), so the
+    // warehouse's space can never disagree with the pipeline.
+    if (stage === 'won' && previousStage !== 'won') {
+      res.status(400).json({ success: false, error: 'Use "Mark as Won" to record the lease terms; a deal cannot be set to Won without them.' });
+      return;
+    }
+
     const sql = `
       UPDATE inquiries SET
         requirement = COALESCE($1, requirement),
@@ -657,10 +673,49 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
+    await recordStageChange(
+      result.rows[0].id,
+      previousStage,
+      result.rows[0].stage,
+      (req as AuthenticatedRequest).user?.userId,
+      result.rows[0].stage === 'lost' ? lostReason || null : null
+    );
+
     res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
     console.error('Error updating inquiry:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to update inquiry' });
+  }
+};
+
+/**
+ * POST /api/inquiries/:id/win
+ * Marks the deal Won and records its lease atomically (takes the space out of the warehouse,
+ * converts any space held for this deal, writes stage history).
+ */
+export const winInquiry = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { inquiryId, leaseId } = await winInquiryTx(client, String(req.params.id), req.body, req.user?.userId);
+    await client.query('COMMIT');
+
+    const inquiry = await query('SELECT * FROM inquiries WHERE id = $1;', [inquiryId]);
+    const lease = await query(
+      `SELECT l.*, to_char(l.start_date, 'YYYY-MM-DD') AS start_date, to_char(l.end_date, 'YYYY-MM-DD') AS end_date FROM leases l WHERE l.id = $1;`,
+      [leaseId]
+    );
+    res.status(200).json({ success: true, data: { inquiry: inquiry.rows[0], lease: lease.rows[0] } });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    if (error instanceof LeaseCapacityError || error instanceof DealError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('Error marking inquiry won:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to mark the deal as won.' });
+  } finally {
+    client.release();
   }
 };
 

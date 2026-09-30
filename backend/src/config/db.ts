@@ -1336,6 +1336,11 @@ export const initDatabase = async () => {
         WHERE baseline_occupied_sq_ft IS NULL;
     `);
     await client.query(RECALCULATE_ALL_PROPERTY_SPACE_SQL);
+    // Proposals used to write stage keys that aren't pipeline stages, so those cards vanished from the board.
+    await client.query(`
+      UPDATE inquiries SET stage = 'proposal' WHERE stage = 'proposal_sent';
+      UPDATE inquiries SET stage = 'won' WHERE stage = 'deal_won';
+    `);
     console.log('✅ Leases, space holds and calculated warehouse space verified in PostgreSQL.');
 
     // runAllSchemaFixes() unconditionally drops role_permissions' primary key

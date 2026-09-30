@@ -217,6 +217,33 @@ export class InquiryService {
   }
 
   /**
+   * Mark a deal Won and record its lease in one step (POST /inquiries/:id/win).
+   * Fails with a readable error (409) if the warehouse doesn't have the space.
+   */
+  static async winInquiry(id: string, payload: {
+    propertyId: string;
+    areaSqFt: number;
+    startDate: string;
+    rentPerSqFtINR?: number;
+    tenureYears?: number;
+    lockInMonths?: number;
+    escalationPercent?: number;
+    wonDate?: string;
+    comments?: string;
+  }): Promise<{ success: boolean; data?: { inquiry: any; lease: any }; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/inquiries/${id}/win`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
    * Delete inquiry
    */
   static async deleteInquiry(id: string): Promise<{ success: boolean; error?: string }> {

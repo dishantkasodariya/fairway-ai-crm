@@ -286,12 +286,18 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
   };
 
   // Lost Confirmation
+  // Same fields the Pipeline saves — the reason used to be stuffed into specialRequirements.
   const handleConfirmLost = async (data: { lostReason: string; lostComments: string; lostDate: string; closedByUserId: string }) => {
     try {
-      await InquiryService.updateInquiry(inquiry.id, {
+      const res = await InquiryService.updateInquiry(inquiry.id, {
         stage: 'lost',
-        specialRequirements: `Lost Reason: ${data.lostReason}. Notes: ${data.lostComments}`,
-      });
+        status: 'Lost',
+        lostReason: data.lostReason,
+        lostComments: data.lostComments,
+        lostDate: data.lostDate,
+        closedByUserId: data.closedByUserId,
+      } as any);
+      if (res && res.success === false) throw new Error(res.error || 'Could not record lost deal');
       await refreshData();
       success('Opportunity Marked Lost', `Reason recorded: ${data.lostReason}`);
     } catch (err: any) {
@@ -299,18 +305,10 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
     }
   };
 
-  // Won Confirmation
-  const handleConfirmWon = async (data: { wonPropertyId: string; wonPropertyName: string; wonFinalValueMonthlyINR: number; wonComments: string; wonDate: string }) => {
-    try {
-      await InquiryService.updateInquiry(inquiry.id, {
-        stage: 'won',
-        budgetMonthlyINR: data.wonFinalValueMonthlyINR,
-      });
-      await refreshData();
-      success('Deal Won!', `Lease finalized for ${data.wonPropertyName}`);
-    } catch (err: any) {
-      error('Update Failed', err.message || 'Could not record won deal');
-    }
+  // Won: the modal records the lease on the server itself; just refresh here.
+  const handleWon = async (result: { propertyName: string; areaSqFt: number }) => {
+    await refreshData();
+    success('Deal Won!', `${result.areaSqFt.toLocaleString('en-IN')} sq ft leased at ${result.propertyName}.`);
   };
 
   // Proposal Creation
@@ -1198,11 +1196,9 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
       <WonCelebrationModal
         isOpen={isWonModalOpen}
         onClose={() => setIsWonModalOpen(false)}
-        inquiryNumber={inquiry.inquiryNumber}
-        companyName={inquiry.companyName}
+        inquiry={inquiry}
         defaultPropertyId={propertyMatches[0]?.property.id}
-        defaultMonthlyRent={inquiry.budgetMonthlyINR}
-        onConfirm={handleConfirmWon}
+        onWon={handleWon}
       />
 
       {/* Draft Proposal Modal */}
