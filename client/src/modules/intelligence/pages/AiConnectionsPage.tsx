@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Sparkles, Link2, Mail, Copy, ExternalLink, Loader2 } from 'lucide-react';
+import { Sparkles, Link2, Mail } from 'lucide-react';
 import {
   ColumnDef,
   useTable,
@@ -14,22 +14,19 @@ import { DataGridColumnHeader } from '@/components/reui/data-grid/data-grid-colu
 import { DataGridScrollArea } from '@/components/reui/data-grid/data-grid-scroll-area';
 import { DataGridTable } from '@/components/reui/data-grid/data-grid-table';
 import { Card } from '@/modules/core/components/ui/Card';
-import { Button } from '@/modules/core/components/ui/Button';
-import { Modal } from '@/modules/core/components/ui/Modal';
 import { useToast } from '@/modules/core/providers/ToastContext';
-import { IntelligenceService, ContactWithCompany, DraftMessage } from '@/modules/core/services/intelligenceService';
+import { IntelligenceService, ContactWithCompany } from '@/modules/core/services/intelligenceService';
+import { OutreachDraftModal } from '../components/OutreachDraftModal';
 
 type Channel = 'linkedin' | 'email';
 
 export const AiConnectionsPage: React.FC = () => {
-  const { error: toastError, success } = useToast();
+  const { error: toastError } = useToast();
   const [contacts, setContacts] = useState<ContactWithCompany[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [activeContact, setActiveContact] = useState<ContactWithCompany | null>(null);
   const [activeChannel, setActiveChannel] = useState<Channel>('linkedin');
-  const [draft, setDraft] = useState<DraftMessage | null>(null);
-  const [isDrafting, setIsDrafting] = useState(false);
 
   const loadContacts = () => {
     setIsLoading(true);
@@ -45,48 +42,9 @@ export const AiConnectionsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openDraft = async (contact: ContactWithCompany, channel: Channel) => {
+  const openDraft = (contact: ContactWithCompany, channel: Channel) => {
     setActiveContact(contact);
     setActiveChannel(channel);
-    setDraft(null);
-    setIsDrafting(true);
-    try {
-      const res = await IntelligenceService.draftMessage(contact.id);
-      if (!res.success || !res.data) {
-        toastError('Draft Failed', res.error || 'Could not draft a message for this contact.');
-        setActiveContact(null);
-        return;
-      }
-      setDraft(res.data);
-    } finally {
-      setIsDrafting(false);
-    }
-  };
-
-  const closeModal = () => {
-    setActiveContact(null);
-    setDraft(null);
-  };
-
-  const activeDraft = draft ? (activeChannel === 'linkedin' ? draft.linkedin : draft.email) : null;
-
-  const handleCopy = () => {
-    if (!activeDraft) return;
-    const text = activeChannel === 'email' && activeDraft.subject
-      ? `Subject: ${activeDraft.subject}\n\n${activeDraft.body}`
-      : activeDraft.body;
-    navigator.clipboard.writeText(text);
-    success('Copied', 'Draft copied to clipboard.');
-  };
-
-  const handleOpen = () => {
-    if (!activeContact) return;
-    if (activeChannel === 'linkedin' && activeContact.linkedinUrl) {
-      window.open(activeContact.linkedinUrl, '_blank', 'noopener,noreferrer');
-    } else if (activeChannel === 'email' && activeContact.email) {
-      const subject = activeDraft?.subject ? `?subject=${encodeURIComponent(activeDraft.subject)}` : '';
-      window.location.href = `mailto:${activeContact.email}${subject}`;
-    }
   };
 
   const columns = useMemo<ColumnDef<DataGridFeatures, ContactWithCompany>[]>(
@@ -194,39 +152,13 @@ export const AiConnectionsPage: React.FC = () => {
         </div>
       )}
 
-      <Modal
+      <OutreachDraftModal
         isOpen={activeContact !== null}
-        onClose={closeModal}
-        title={activeContact ? `${activeChannel === 'linkedin' ? 'LinkedIn' : 'Email'} draft for ${activeContact.name}` : ''}
-        description={activeContact?.companyName}
-        maxWidth="lg"
-        footer={
-          activeDraft && (
-            <>
-              <Button type="button" variant="outline" size="sm" onClick={handleCopy} leftIcon={<Copy className="w-3.5 h-3.5" />}>
-                Copy
-              </Button>
-              <Button type="button" size="sm" onClick={handleOpen} leftIcon={<ExternalLink className="w-3.5 h-3.5" />}>
-                {activeChannel === 'linkedin' ? 'Open LinkedIn Profile' : 'Open in Email Client'}
-              </Button>
-            </>
-          )
-        }
-      >
-        {isDrafting ? (
-          <div className="py-10 text-center">
-            <Loader2 className="w-6 h-6 text-fairway-600 animate-spin mx-auto" />
-            <p className="text-xs text-foreground-muted mt-2">Drafting message…</p>
-          </div>
-        ) : activeDraft ? (
-          <div className="space-y-2">
-            {activeChannel === 'email' && activeDraft.subject && (
-              <p className="text-sm font-semibold text-foreground">Subject: {activeDraft.subject}</p>
-            )}
-            <p className="text-sm text-foreground whitespace-pre-wrap">{activeDraft.body}</p>
-          </div>
-        ) : null}
-      </Modal>
+        onClose={() => setActiveContact(null)}
+        contact={activeContact}
+        companyName={activeContact?.companyName || ''}
+        channel={activeChannel}
+      />
     </div>
   );
 };

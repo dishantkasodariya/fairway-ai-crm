@@ -390,6 +390,7 @@ const AppRouter: React.FC = () => {
           <AiProspectDetailPage
             prospectId={Number(selectedEntityId)}
             onBack={() => handleNavigate('ai_discovery')}
+            onOpenInquiry={(id) => handleNavigate('inquiry_detail', id)}
           />
         );
 

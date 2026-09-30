@@ -1,104 +1,30 @@
-import { CompanyService } from '@/modules/core/services/companyService';
-import { FacilityService } from '@/modules/core/services/facilityService';
-import { InquiryService } from '@/modules/core/services/inquiryService';
-import { DiscoveredCompany, DiscoveredCompanyDetail } from '@/modules/core/services/intelligenceService';
-
-export const priorityFromScore = (score: number | null | undefined): 'High' | 'Medium' | 'Low' => {
-  const s = score ?? 0;
-  if (s >= 70) return 'High';
-  if (s >= 40) return 'Medium';
-  return 'Low';
-};
+import { IntelligenceService, AddToCrmResult } from '@/modules/core/services/intelligenceService';
 
 export interface AddProspectToCrmParams {
-  company: DiscoveredCompany;
-  detail?: DiscoveredCompanyDetail;
-  city?: string;
-  state?: string;
-  /** Used in the fallback note when there's no opportunity-score "why" text, e.g. a property name. */
-  contextLabel?: string;
+  /** Intelligence (AI Discovery) company id. */
+  companyId: number;
+  /** Key person to put on the deal. */
+  contactId?: number;
+  /** Add another deal even though the company already has an open one. */
+  allowSecondInquiry?: boolean;
 }
 
-export interface AddProspectToCrmResult {
+export interface AddProspectToCrmOutcome {
   success: boolean;
   error?: string;
-  companyId?: string;
+  /** The company already has an open deal; nothing was created. */
+  alreadyOpen?: boolean;
+  data?: AddToCrmResult;
 }
 
 /**
- * Add an AI-discovered company to the CRM as a Company + (if it has
- * coordinates) a Facility + a real Inquiry on the Pipeline board's "new"
- * stage. Shared between AiProspectsPanel and the AI Discovery module so the
- * three-call sequence and source/score wiring only lives in one place.
+ * Add an AI-discovered company to the CRM. The server does it in one transaction and never
+ * duplicates: it reuses an existing CRM company (same link, website or cleaned-up name), refuses a
+ * second open deal, and assigns the manager of the nearest warehouse as the owner.
  */
-export async function addProspectToCrm({
-  company,
-  detail,
-  city,
-  state,
-  contextLabel,
-}: AddProspectToCrmParams): Promise<AddProspectToCrmResult> {
-  const priority = priorityFromScore(company.opportunityScore);
-
-  const companyRes = await CompanyService.createCompany({
-    name: company.name,
-    industry: company.businessType || undefined,
-    address: company.address || undefined,
-    city,
-    state,
-    website: detail?.website || undefined,
-    phone: detail?.phone || undefined,
-    priority,
-    prospectStage: 'New',
-    source: 'AI Discovery',
-    initialNotes: detail?.opportunityScore?.why
-      ? `AI-discovered prospect (score ${company.opportunityScore ?? 'n/a'}/100): ${detail.opportunityScore.why}`
-      : contextLabel
-        ? `AI-discovered prospect near ${contextLabel} (${company.distanceKm?.toFixed(1) ?? '?'} km away).`
-        : `AI-discovered prospect (score ${company.opportunityScore ?? 'n/a'}/100).`,
-  });
-
-  if (!companyRes.success || !companyRes.data) {
-    return { success: false, error: companyRes.error || `Could not add ${company.name} to the CRM.` };
-  }
-
-  if (detail?.lat && detail?.lng) {
-    await FacilityService.createFacility({
-      companyId: companyRes.data.id,
-      companyName: company.name,
-      name: `${company.name} — Facility`,
-      type: 'Manufacturing Plant',
-      address: company.address || '',
-      city,
-      state,
-      latitude: detail.lat,
-      longitude: detail.lng,
-      status: 'Active',
-    });
-  }
-
-  const inquiryRes = await InquiryService.createInquiry({
-    companyId: companyRes.data.id,
-    companyName: company.name,
-    contactPhone: detail?.phone || undefined,
-    source: 'AI Discovery',
-    requirement: detail?.opportunityScore?.estimatedRequirement || undefined,
-    location: city,
-    industry: company.businessType || undefined,
-    priority,
-    leadScore: company.opportunityScore ?? undefined,
-    opportunityScore: company.opportunityScore ?? undefined,
-    stage: 'new',
-    status: 'Active',
-  });
-
-  if (!inquiryRes.success) {
-    return {
-      success: false,
-      error: inquiryRes.error || `${company.name} was added as a company, but the inquiry could not be created.`,
-      companyId: companyRes.data.id,
-    };
-  }
-
-  return { success: true, companyId: companyRes.data.id };
+export async function addProspectToCrm({ companyId, contactId, allowSecondInquiry }: AddProspectToCrmParams): Promise<AddProspectToCrmOutcome> {
+  const res = await IntelligenceService.addToCrm(companyId, { contactId, allowSecondInquiry });
+  if (res.success && res.data) return { success: true, data: res.data };
+  const error = typeof res.error === 'string' ? res.error : 'Could not add the company to the CRM.';
+  return { success: false, error, alreadyOpen: /already has an open deal/i.test(error) };
 }

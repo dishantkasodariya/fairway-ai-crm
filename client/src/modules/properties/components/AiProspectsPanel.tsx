@@ -91,27 +91,20 @@ export const AiProspectsPanel: React.FC<AiProspectsPanelProps> = ({ property }) 
   const handleAddToCrm = async (company: DiscoveredCompany) => {
     setAddingIds((prev) => new Set(prev).add(company.id));
     try {
-      const detailRes = await IntelligenceService.getDiscoveredCompany(company.id);
-      const detail = detailRes.data;
-
-      const result = await addProspectToCrm({
-        company,
-        detail,
-        city: property.city,
-        state: property.state,
-        contextLabel: property.name,
-      });
+      const result = await addProspectToCrm({ companyId: company.id });
 
       if (!result.success) {
-        toastError(
-          result.companyId ? 'Company Added, Inquiry Failed' : 'Add Failed',
-          result.error || `Could not add ${company.name} to the CRM.`
-        );
+        if (result.alreadyOpen) setAddedIds((prev) => new Set(prev).add(company.id));
+        toastError(result.alreadyOpen ? 'Already in the CRM' : 'Add Failed', result.error || `Could not add ${company.name} to the CRM.`);
         return;
       }
 
       setAddedIds((prev) => new Set(prev).add(company.id));
-      success('Added to CRM', `${company.name} is now on the Pipeline board's New Lead column.`);
+      const d = result.data!;
+      success(
+        'Added to CRM',
+        `${d.inquiryNumber} on the New Lead column${d.owner ? `, owned by ${d.owner.managerName}` : ''}${d.companyCreated ? '' : ` (existing company ${d.companyName})`}.`
+      );
     } catch (err: any) {
       toastError('Add Failed', err.message || `Could not add ${company.name} to the CRM.`);
     } finally {

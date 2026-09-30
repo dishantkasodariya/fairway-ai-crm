@@ -313,6 +313,86 @@ export class IntelligenceService {
       return { success: false, error: err.message };
     }
   }
+
+  /** Is this prospect already in the CRM (and with which open deal), and who would own it? */
+  static async getCrmStatus(companyId: number): Promise<{ success: boolean; data?: CrmStatus; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/companies/${companyId}/crm-status`, { headers: getAuthHeaders() });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /** Server-side Add to CRM: reuses an existing company, refuses a second open deal (409), assigns the owner. */
+  static async addToCrm(
+    companyId: number,
+    payload: { contactId?: number; allowSecondInquiry?: boolean } = {}
+  ): Promise<{ success: boolean; data?: AddToCrmResult; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/companies/${companyId}/add-to-crm`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  static async createManualContact(
+    companyId: number,
+    payload: { name: string; title?: string; email?: string; phone?: string; linkedinUrl?: string }
+  ): Promise<{ success: boolean; data?: Contact; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/companies/${companyId}/contacts`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  static async deleteContact(contactId: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/contacts/${contactId}`, { method: 'DELETE', headers: getAuthHeaders() });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+}
+
+export interface WarehouseOwner {
+  propertyId: string;
+  propertyName: string;
+  corridor: string | null;
+  city: string | null;
+  distanceKm: number;
+  managerUserId: string;
+  managerName: string;
+}
+
+export interface CrmStatus {
+  inCrm: boolean;
+  company: { id: string; name: string; matchedBy: 'link' | 'website' | 'name' } | null;
+  openInquiry: { id: string; inquiryNumber: string; stage: string; ownerName: string } | null;
+  suggestedOwner: WarehouseOwner | null;
+}
+
+export interface AddToCrmResult {
+  companyId: string;
+  companyName: string;
+  companyCreated: boolean;
+  matchedBy: 'link' | 'website' | 'name' | null;
+  inquiryId: string;
+  inquiryNumber: string;
+  owner: WarehouseOwner | null;
+  contactName: string | null;
 }
 
 export default IntelligenceService;
