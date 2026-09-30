@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { recordStageChange } from '../services/stageHistory.js';
 import { winInquiryTx, LeaseCapacityError, DealError } from '../services/leaseRecords.js';
+import { releaseHolds } from '../services/spaceHolds.js';
 
 /**
  * Helper to generate sequential Inquiry Number like INQ-1049
@@ -681,6 +682,10 @@ export const updateInquiry = async (req: Request, res: Response): Promise<void> 
       result.rows[0].stage === 'lost' ? lostReason || null : null
     );
 
+    if (result.rows[0].stage === 'lost' && previousStage !== 'lost') {
+      await releaseHolds({ inquiryId: result.rows[0].id }, 'Deal lost');
+    }
+
     res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
     console.error('Error updating inquiry:', error);
@@ -764,6 +769,9 @@ export const createLostReason = async (req: Request, res: Response): Promise<voi
 export const deleteInquiry = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+    // Holds cascade-delete with the inquiry, which would skip recalculating warehouse space.
+    const target = await query('SELECT id FROM inquiries WHERE id = $1 OR LOWER(inquiry_number) = LOWER($1);', [id]);
+    if (target.rows[0]) await releaseHolds({ inquiryId: target.rows[0].id }, 'Deal deleted');
     const result = await query(
       'DELETE FROM inquiries WHERE id = $1 OR LOWER(inquiry_number) = LOWER($1) RETURNING id;',
       [id]

@@ -52,6 +52,7 @@ import { TimePicker } from '@/modules/core/components/ui/TimePicker';
 import { LostReasonModal } from '@/modules/core/components/LostReasonModal';
 import { WonCelebrationModal } from '@/modules/core/components/WonCelebrationModal';
 import { Combobox, ComboboxOption } from '@/modules/core/components/ui/combobox-1';
+import { CapacityCheckPanel } from '../components/CapacityCheckPanel';
 
 const getMatchChipInfo = (detail: string) => {
   const isCheck = detail.startsWith('✓');
@@ -99,7 +100,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
 }) => {
   const { canEditModule, currentUser, users } = useAuth();
   const canEdit = canEditModule('inquiries');
-  const { success, error } = useToast();
+  const { success, error, toast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [inquiry, setInquiry] = useState<Inquiry | undefined>(undefined);
@@ -354,13 +355,15 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
         return;
       }
 
-      if (inquiry.stage !== 'proposal' && inquiry.stage !== 'negotiation' && inquiry.stage !== 'won') {
-        await InquiryService.updateInquiry(inquiry.id, { stage: 'proposal' });
-      }
-
+      // The server moves the deal to 'proposal' (never backwards) and holds the space.
       setIsProposalModalOpen(false);
       await refreshData();
-      success('Proposal Created & Sent', `Delivered commercial proposal for ${prop.name}`);
+      const hold = (res as { hold?: { held: boolean; areaSqFt: number; message?: string } | null }).hold;
+      if (hold && !hold.held && hold.message) {
+        toast('Proposal sent — space NOT on hold', { message: hold.message, type: 'warning' });
+      } else {
+        success('Proposal Created & Sent', `${formatSqFt(proposalForm.proposedAreaSqFt)} at ${prop.name} is now on hold for this deal.`);
+      }
     } catch (err: any) {
       error('Proposal Error', err.message || 'Failed communicating with backend');
     }
@@ -746,6 +749,7 @@ export const InquiryDetailView: React.FC<InquiryDetailViewProps> = ({
             </CardHeader>
 
             <div className="p-3 sm:p-4 space-y-3">
+              <CapacityCheckPanel areaSqFt={inquiry.requiredAreaSqFt} inquiryId={inquiry.id} refreshKey={proposals.length + inquiry.stage} />
               {propertyMatches.length === 0 ? (
                 <div className="py-12 text-center text-xs text-foreground-muted">
                   No matching warehouse properties currently available for this requirement.

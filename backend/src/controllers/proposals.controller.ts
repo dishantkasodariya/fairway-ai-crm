@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 import { recordStageChange } from '../services/stageHistory.js';
 import { winInquiryTx, LeaseCapacityError, DealError } from '../services/leaseRecords.js';
+import { placeHold, releaseHolds, HoldResult } from '../services/spaceHolds.js';
 
 /** Stages at or beyond "proposal" — sending another proposal must not move a deal backwards. */
 const STAGES_FROM_PROPOSAL = ['proposal', 'site_visit', 'negotiation', 'won', 'lost'];
@@ -249,7 +250,13 @@ export const createProposal = async (req: Request, res: Response): Promise<void>
       }
     }
 
-    res.status(201).json({ success: true, data: mapProposalRow(result.rows[0]) });
+    // Hold the proposed space so it can't be offered twice (released on reject/expire/lost).
+    let hold: HoldResult | null = null;
+    if (inquiryId && propertyId && Number(proposedAreaSqFt) > 0) {
+      hold = await placeHold({ inquiryId, proposalId: result.rows[0].id, propertyId, areaSqFt: Number(proposedAreaSqFt) });
+    }
+
+    res.status(201).json({ success: true, data: mapProposalRow(result.rows[0]), hold });
   } catch (error: any) {
     console.error('Error creating proposal:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to create proposal.' });
@@ -312,6 +319,10 @@ export const updateProposalStatus = async (req: Request, res: Response): Promise
           (req as AuthenticatedRequest).user?.userId
         );
       }
+    }
+
+    if (status === 'Rejected' || status === 'Expired') {
+      await releaseHolds({ proposalId: row.id }, `Proposal ${row.proposal_number} ${status.toLowerCase()}`, client);
     }
 
     await client.query('COMMIT');
@@ -415,6 +426,8 @@ export const deleteProposal = async (req: AuthenticatedRequest, res: Response): 
       return;
     }
 
+    // The FK only nulls space_holds.proposal_id, which would leave the space held forever.
+    await releaseHolds({ proposalId: String(id) }, 'Proposal deleted');
     const result = await query('DELETE FROM proposals WHERE id = $1 RETURNING id;', [id]);
 
     if (result.rows.length === 0) {

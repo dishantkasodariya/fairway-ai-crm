@@ -178,6 +178,67 @@ export const getIndustries = async (req: Request, res: Response): Promise<void> 
 };
 
 /**
+ * GET /api/properties/capacity?areaSqFt=&inquiryId=
+ * Which warehouses can take a requirement right now. Space already held for this deal counts as
+ * usable for it. If no single warehouse fits, suggests a split across the most free space.
+ */
+export const getCapacity = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const area = Number(req.query.areaSqFt);
+    if (!(area > 0)) {
+      res.status(400).json({ success: false, error: 'areaSqFt must be a positive number.' });
+      return;
+    }
+    const inquiryId = req.query.inquiryId ? String(req.query.inquiryId) : null;
+
+    const result = await query(
+      `SELECT p.id, p.name, p.city, p.total_area_sq_ft, p.available_area_sq_ft,
+         COALESCE((SELECT SUM(h.area_sq_ft) FROM space_holds h
+                   WHERE h.property_id = p.id AND h.status = 'active' AND h.inquiry_id = $1), 0) AS held_for_deal
+       FROM properties p
+       WHERE COALESCE(p.total_area_sq_ft, 0) > 0;`,
+      [inquiryId]
+    );
+
+    const warehouses = result.rows
+      .map((r) => {
+        const free = parseFloat(r.available_area_sq_ft) || 0;
+        const heldForDeal = parseFloat(r.held_for_deal) || 0;
+        return {
+          id: r.id,
+          name: r.name,
+          city: r.city,
+          totalAreaSqFt: parseFloat(r.total_area_sq_ft) || 0,
+          freeSqFt: free,
+          heldForThisDealSqFt: heldForDeal,
+          usableSqFt: free + heldForDeal,
+          fits: free + heldForDeal >= area,
+        };
+      })
+      .sort((a, b) => b.usableSqFt - a.usableSqFt);
+
+    const fitsAny = warehouses.some((w) => w.fits);
+    let split: { parts: { id: string; name: string; useSqFt: number }[]; coveredSqFt: number; shortfallSqFt: number } | null = null;
+    if (!fitsAny) {
+      let remaining = area;
+      const parts: { id: string; name: string; useSqFt: number }[] = [];
+      for (const w of warehouses) {
+        if (remaining <= 0 || w.usableSqFt <= 0) continue;
+        const use = Math.min(remaining, w.usableSqFt);
+        parts.push({ id: w.id, name: w.name, useSqFt: use });
+        remaining -= use;
+      }
+      split = { parts, coveredSqFt: area - remaining, shortfallSqFt: remaining };
+    }
+
+    res.status(200).json({ success: true, data: { requiredSqFt: area, fitsAny, warehouses, split } });
+  } catch (error: any) {
+    console.error('Error checking capacity:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to check capacity.' });
+  }
+};
+
+/**
  * GET /api/properties/:id
  */
 export const getPropertyById = async (req: Request, res: Response): Promise<void> => {

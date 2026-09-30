@@ -93,6 +93,34 @@ export class PropertyService {
   static async deleteProperty(id: string): Promise<ApiResponse<any>> {
     return api.delete(`/properties/${id}`);
   }
+
+  /**
+   * Which warehouses can take a requirement now (space held for this deal counts as usable),
+   * with a split suggestion when none fits alone. GET /api/properties/capacity
+   */
+  static async getCapacity(areaSqFt: number, inquiryId?: string): Promise<ApiResponse<CapacityCheck>> {
+    const params = new URLSearchParams({ areaSqFt: String(areaSqFt) });
+    if (inquiryId) params.append('inquiryId', inquiryId);
+    return api.get<CapacityCheck>(`/properties/capacity?${params.toString()}`);
+  }
+}
+
+export interface CapacityWarehouse {
+  id: string;
+  name: string;
+  city: string;
+  totalAreaSqFt: number;
+  freeSqFt: number;
+  heldForThisDealSqFt: number;
+  usableSqFt: number;
+  fits: boolean;
+}
+
+export interface CapacityCheck {
+  requiredSqFt: number;
+  fitsAny: boolean;
+  warehouses: CapacityWarehouse[];
+  split: { parts: { id: string; name: string; useSqFt: number }[]; coveredSqFt: number; shortfallSqFt: number } | null;
 }
 
 export default PropertyService;

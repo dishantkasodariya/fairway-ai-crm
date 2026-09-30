@@ -8,6 +8,7 @@ import {
   createProperty,
   updateProperty,
   deleteProperty,
+  getCapacity,
 } from '../controllers/properties.controller.js';
 import { requirePermission } from '../middleware/permission.middleware.js';
 
@@ -16,6 +17,7 @@ const router = Router();
 router.get('/dd/active', requirePermission('properties', 'view'), getPropertiesDropdownActive);
 router.get('/corridors', requirePermission('properties', 'view'), getCorridors);
 router.get('/industries', requirePermission('properties', 'view'), getIndustries);
+router.get('/capacity', requirePermission('properties', 'view'), getCapacity);
 router.get('/', requirePermission('properties', 'view'), getProperties);
 router.get('/:id', requirePermission('properties', 'view'), getPropertyById);
 router.post('/', requirePermission('properties', 'create'), createProperty);

@@ -29,6 +29,7 @@ const PROPOSAL_PRIORITY: Record<string, number> = { Accepted: 0, Negotiation: 1,
 
 export const WonCelebrationModal: React.FC<WonCelebrationModalProps> = ({ isOpen, onClose, inquiry, defaultPropertyId, onWon }) => {
   const [properties, setProperties] = useState<Property[]>([]);
+  const [heldForDeal, setHeldForDeal] = useState<Record<string, number>>({});
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -52,11 +53,15 @@ export const WonCelebrationModal: React.FC<WonCelebrationModalProps> = ({ isOpen
 
     (async () => {
       try {
-        const [propRes, propsalRes] = await Promise.all([
+        const [propRes, propsalRes, capRes] = await Promise.all([
           PropertyService.getProperties(),
           ProposalService.getProposals({ inquiryId: inquiry.id }),
+          PropertyService.getCapacity(1, inquiry.id),
         ]);
         if (!isMounted) return;
+        setHeldForDeal(
+          Object.fromEntries((capRes.success && capRes.data ? capRes.data.warehouses : []).map((w) => [w.id, w.heldForThisDealSqFt]))
+        );
 
         const props = propRes.success && Array.isArray(propRes.data) ? propRes.data : [];
         const candidates = (propsalRes.success ? propsalRes.data : [])
@@ -98,8 +103,9 @@ export const WonCelebrationModal: React.FC<WonCelebrationModalProps> = ({ isOpen
   const selected = properties.find((p) => p.id === propertyId);
   const area = Number(areaSqFt) || 0;
   const monthly = area && rent ? area * Number(rent) : 0;
-  // The server also counts space already held for this deal, so this is a warning, not a block.
-  const looksShort = !!selected && area > (selected.availableAreaSqFt || 0);
+  const heldHere = selected ? heldForDeal[selected.id] || 0 : 0;
+  const usable = (selected?.availableAreaSqFt || 0) + heldHere;
+  const looksShort = !!selected && area > usable;
 
   const propertyOptions: ComboboxOption[] = useMemo(
     () =>
@@ -194,14 +200,19 @@ export const WonCelebrationModal: React.FC<WonCelebrationModalProps> = ({ isOpen
 
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface-muted/50 px-3 py-2 text-xs">
             <span className="text-foreground-muted">
-              {selected ? <>Free at {selected.name}: <span className="font-semibold text-foreground">{formatSqFt(selected.availableAreaSqFt)}</span></> : 'No warehouse selected'}
+              {selected ? (
+                <>
+                  Free at {selected.name}: <span className="font-semibold text-foreground">{formatSqFt(selected.availableAreaSqFt)}</span>
+                  {heldHere > 0 && <> + <span className="font-semibold text-foreground">{formatSqFt(heldHere)}</span> on hold for this deal</>}
+                </>
+              ) : 'No warehouse selected'}
             </span>
             {monthly > 0 && <span className="font-semibold text-foreground">{formatINR(monthly)} / month</span>}
           </div>
           {looksShort && (
             <p className="flex items-start gap-1.5 text-[11px] text-amber-700 dark:text-amber-400">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
-              More than the free space. It will only go through if space is already on hold for this deal.
+              Only {formatSqFt(usable)} is available for this deal at {selected?.name}. Pick another warehouse or reduce the area.
             </p>
           )}
 
