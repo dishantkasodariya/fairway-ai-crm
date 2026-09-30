@@ -181,3 +181,13 @@ Each step below = one commit on `feature/ai-prospect-intelligence`. A step is do
 | Step | Status | Commit |
 |---|---|---|
 | Pre: AI Discovery browse-all + server-side pagination | done | 6fdca0c |
+| A1 Real warehouse + manager field (Olpad = `prop_03c74628`, area not set yet) | done | a5f987b |
+| A2 Leases + holds tables, calculated free space (baselines backfilled, no numbers changed) | done | 0d13c24 |
+| A3 Leases API + Occupancy & Leases tab + edit form "occupied by existing tenants" | done | dc51c45 |
+| A4 Won = lease (`POST /inquiries/:id/win`, proposal Accept), stage history, stage-key fixes | done | b2e738f |
+| A5 Space holds on proposals + capacity check (split suggestion) | done | 6933228 |
+
+Notes carried forward:
+- A won card still shows "N days overdue" from its old `next_follow_up_date` → B1 clears follow-ups on won/lost.
+- Holds idle for 30 days and proposals past `expiry_date` are released by the B4 daily job.
+- "Fairway Warehouse – Olpad" shows in property matches with 0 sq ft until its real area is entered.
