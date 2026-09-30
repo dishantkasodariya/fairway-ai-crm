@@ -417,6 +417,9 @@ export async function runAllSchemaFixes() {
       ['perm_14', 'Create new property & warehouse', 'Properties & Warehouses', 'Yes', 'Yes', 'Yes', 'No', 'Ability to register new warehouse parks and facilities.'],
       ['perm_15', 'Edit property information', 'Properties & Warehouses', 'Yes', 'Yes', 'Assigned / All', 'No', 'Update warehouse park details, coordinates, and specifications.'],
       ['perm_16', 'Delete / Archive property', 'Properties & Warehouses', 'Yes', 'Yes', 'Restricted', 'No', 'Permanently delete or archive warehouse park records.'],
+      ['perm_17', 'View all inquiries & leads', 'Inquiries & Leads', 'Yes', 'Yes', 'Assigned / All', 'View', 'Browse inquiries, deal details and follow-up history.'],
+      ['perm_18', 'Edit inquiries & log follow-ups', 'Inquiries & Leads', 'Yes', 'Yes', 'Assigned / All', 'No', 'Update deal details, log follow-ups, draft proposals and schedule visits.'],
+      ['perm_19', 'Delete / Archive inquiries', 'Inquiries & Leads', 'Yes', 'Yes', 'Restricted', 'No', 'Permanently delete or archive inquiries.'],
     ];
 
     for (const row of defaultMatrix) {
