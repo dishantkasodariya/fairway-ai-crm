@@ -55,6 +55,8 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   const [isStarting, setIsStarting] = useState(false);
   const [isEnriching, setIsEnriching] = useState(false);
   const [businessTypes, setBusinessTypes] = useState<BusinessTypeCount[]>([]);
+  const [hasResults, setHasResults] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
 
   const [search, setSearch] = useState('');
   const [businessTypeFilter, setBusinessTypeFilter] = useState('all');
@@ -94,17 +96,20 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     });
   }, []);
 
-  const loadResults = async (runId: number) => {
+  const loadResults = async (runId?: number) => {
     const res = await IntelligenceService.listDiscoveredCompanies({
       discoveryRunId: runId,
       sortBy,
       minScore: minScore !== 'all' ? Number(minScore) : undefined,
       search: search || undefined,
       businessType: businessTypeFilter !== 'all' ? businessTypeFilter : undefined,
-      limit: 200,
+      limit: pagination.pageSize,
+      offset: pagination.pageIndex * pagination.pageSize,
     });
     if (res.success && res.data) {
       setProspects(res.data.items);
+      setTotalCount(res.data.total);
+      setHasResults(true);
     }
   };
 
@@ -119,6 +124,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     setIsStarting(true);
     setProspects([]);
     setRowSelection({});
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
     try {
       const res = await IntelligenceService.startDiscoveryRun({ lat: latNum, lng: lngNum, radiusKm });
       if (!res.success || !res.data) {
@@ -178,11 +184,19 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     }
   };
 
-  // Re-run the results query when a filter changes (only once a run has completed).
+  // Re-run the results query (server-side paginated) whenever a filter or page changes, on
+  // mount, scoped to the active run if a fresh search just completed, otherwise across every
+  // already-discovered company.
   useEffect(() => {
-    if (run && run.status === 'done') {
-      loadResults(run.id);
+    if (!run || run.status === 'done') {
+      loadResults(run?.status === 'done' ? run.id : undefined);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, businessTypeFilter, minScore, sortBy, pagination.pageIndex, pagination.pageSize]);
+
+  // A filter change can leave the current page out of range; jump back to page 1.
+  useEffect(() => {
+    setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, businessTypeFilter, minScore, sortBy]);
 
@@ -276,6 +290,8 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
     enableRowSelection: true,
+    manualPagination: true,
+    pageCount: Math.max(1, Math.ceil((totalCount || 0) / (pagination.pageSize || 10))),
   });
 
   const selectedCount = Object.keys(rowSelection).length;
@@ -374,7 +390,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         </Card>
       )}
 
-      {!isSearching && run?.status === 'done' && (
+      {!isSearching && hasResults && (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -429,7 +445,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
           </div>
 
           <Card className="p-0 border border-border bg-surface shadow-xs rounded-xl overflow-hidden">
-            <DataGrid table={table} recordCount={prospects.length} tableLayout={{ columnsResizable: true, headerSticky: true }} onRowClick={(row) => onSelectProspect(row.id)}>
+            <DataGrid table={table} recordCount={totalCount} tableLayout={{ columnsResizable: true, headerSticky: true }} onRowClick={(row) => onSelectProspect(row.id)}>
               <DataGridContainer className="w-full">
                 <DataGridScrollArea className="w-full overflow-auto max-h-[calc(100vh-420px)]" orientation="both">
                   <DataGridTable />
@@ -441,7 +457,11 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
 
           {prospects.length === 0 && (
             <div className="py-10 text-center">
-              <p className="text-xs text-foreground-muted">No companies found within {run.radiusKm}km of this location.</p>
+              <p className="text-xs text-foreground-muted">
+                {run?.status === 'done'
+                  ? `No companies found within ${run.radiusKm}km of this location.`
+                  : 'No discovered companies match these filters yet.'}
+              </p>
             </div>
           )}
         </>
