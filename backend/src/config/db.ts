@@ -53,6 +53,15 @@ export const pool = new Pool({
 
 export const query = (text: string, params?: any[]) => pool.query(text, params);
 
+const AVAILABLE_AREA_EXPR = `GREATEST(0,
+  COALESCE(p.total_area_sq_ft, 0)
+  - COALESCE(p.baseline_occupied_sq_ft, 0)
+  - COALESCE((SELECT SUM(l.area_sq_ft) FROM leases l WHERE l.property_id = p.id AND l.status = 'active'), 0)
+  - COALESCE((SELECT SUM(h.area_sq_ft) FROM space_holds h WHERE h.property_id = p.id AND h.status = 'active'), 0))`;
+
+export const RECALCULATE_ALL_PROPERTY_SPACE_SQL = `UPDATE properties p SET available_area_sq_ft = ${AVAILABLE_AREA_EXPR};`;
+export const RECALCULATE_PROPERTY_SPACE_SQL = `UPDATE properties p SET available_area_sq_ft = ${AVAILABLE_AREA_EXPR}, updated_at = CURRENT_TIMESTAMP WHERE p.id = $1;`;
+
 /**
  * Initializes PostgreSQL database and tables.
  */
@@ -1273,6 +1282,59 @@ export const initDatabase = async () => {
 
     // Ensure all CRM schema columns, constraints, and matrix baseline are in sync
     await runAllSchemaFixes();
+
+    // Lead-to-lease space model: a warehouse's free space is calculated as
+    // total - baseline_occupied (tenants not yet entered as leases) - active leases - active holds.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS leases (
+        id VARCHAR(255) PRIMARY KEY,
+        inquiry_id VARCHAR(255) REFERENCES inquiries(id) ON DELETE SET NULL,
+        company_id VARCHAR(255) REFERENCES companies(id) ON DELETE SET NULL,
+        company_name VARCHAR(255),
+        property_id VARCHAR(255) NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
+        property_name VARCHAR(255),
+        area_sq_ft NUMERIC(12, 2) NOT NULL CHECK (area_sq_ft > 0),
+        rent_per_sq_ft_inr NUMERIC(10, 2),
+        monthly_rent_inr NUMERIC(14, 2),
+        start_date DATE NOT NULL,
+        end_date DATE,
+        tenure_years NUMERIC(5, 2),
+        lock_in_months INT,
+        escalation_percent NUMERIC(5, 2),
+        status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'ended', 'terminated')),
+        notes TEXT,
+        created_by_user_id VARCHAR(255),
+        created_by_user_name VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_leases_property ON leases(property_id, status);
+      CREATE INDEX IF NOT EXISTS idx_leases_company ON leases(company_id);
+      CREATE INDEX IF NOT EXISTS idx_leases_end_date ON leases(end_date);
+
+      CREATE TABLE IF NOT EXISTS space_holds (
+        id VARCHAR(255) PRIMARY KEY,
+        inquiry_id VARCHAR(255) REFERENCES inquiries(id) ON DELETE CASCADE,
+        proposal_id VARCHAR(255) REFERENCES proposals(id) ON DELETE SET NULL,
+        property_id VARCHAR(255) NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+        area_sq_ft NUMERIC(12, 2) NOT NULL CHECK (area_sq_ft > 0),
+        status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'released', 'converted')),
+        reason TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        released_at TIMESTAMP WITH TIME ZONE
+      );
+      CREATE INDEX IF NOT EXISTS idx_space_holds_property ON space_holds(property_id, status);
+      CREATE INDEX IF NOT EXISTS idx_space_holds_inquiry ON space_holds(inquiry_id);
+
+      ALTER TABLE properties ADD COLUMN IF NOT EXISTS baseline_occupied_sq_ft NUMERIC(12, 2);
+      -- One-time backfill (only rows never set): whatever was hand-typed as occupied becomes the baseline,
+      -- so no displayed "available" number changes when the calculation takes over.
+      UPDATE properties
+        SET baseline_occupied_sq_ft = GREATEST(COALESCE(total_area_sq_ft, 0) - COALESCE(available_area_sq_ft, 0), 0)
+        WHERE baseline_occupied_sq_ft IS NULL;
+    `);
+    await client.query(RECALCULATE_ALL_PROPERTY_SPACE_SQL);
+    console.log('✅ Leases, space holds and calculated warehouse space verified in PostgreSQL.');
 
     // runAllSchemaFixes() unconditionally drops role_permissions' primary key
     // on every run (legacy Prisma-style cleanup) and never restores it, so

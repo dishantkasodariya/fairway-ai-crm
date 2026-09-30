@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { query } from '../config/db.js';
 import crypto from 'crypto';
+import { PROPERTY_WITH_SPACE_SELECT, fetchPropertyWithSpace, recalculatePropertySpace } from '../services/spaceService.js';
 
 /**
  * Helper to map database property row to camelCase frontend interface
@@ -16,6 +17,9 @@ const mapPropertyRow = (row: any) => ({
   pincode: row.pincode || '',
   totalAreaSqFt: parseFloat(row.total_area_sq_ft) || 0,
   availableAreaSqFt: parseFloat(row.available_area_sq_ft) || 0,
+  baselineOccupiedSqFt: parseFloat(row.baseline_occupied_sq_ft) || 0,
+  leasedAreaSqFt: parseFloat(row.leased_area_sq_ft) || 0,
+  heldAreaSqFt: parseFloat(row.held_area_sq_ft) || 0,
   rentPerSqFtINR: parseFloat(row.rent_per_sq_ft_inr) || 0,
   depositMonths: parseInt(row.deposit_months, 10) || 3,
   leaseTermsYears: parseInt(row.lease_terms_years, 10) || 5,
@@ -85,7 +89,7 @@ export const getProperties = async (req: Request, res: Response): Promise<void> 
   try {
     const { corridor, status, search, minArea, maxRent } = req.query;
 
-    let sql = 'SELECT * FROM properties WHERE 1=1';
+    let sql = `SELECT * FROM (${PROPERTY_WITH_SPACE_SELECT}) properties WHERE 1=1`;
     const params: any[] = [];
 
     if (corridor && corridor !== 'all') {
@@ -179,14 +183,14 @@ export const getIndustries = async (req: Request, res: Response): Promise<void> 
 export const getPropertyById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const result = await query('SELECT * FROM properties WHERE id = $1 OR code = $1;', [id]);
+    const row = await fetchPropertyWithSpace(String(id));
 
-    if (result.rows.length === 0) {
+    if (!row) {
       res.status(404).json({ success: false, error: 'Property not found.' });
       return;
     }
 
-    res.status(200).json({ success: true, data: mapPropertyRow(result.rows[0]) });
+    res.status(200).json({ success: true, data: mapPropertyRow(row) });
   } catch (error: any) {
     console.error('Error fetching property by id:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to fetch property.' });
@@ -302,7 +306,13 @@ export const createProperty = async (req: Request, res: Response): Promise<void>
     ];
 
     const result = await query(sql, values);
-    res.status(201).json({ success: true, data: mapPropertyRow(result.rows[0]) });
+    await query(
+      `UPDATE properties SET baseline_occupied_sq_ft = GREATEST(COALESCE(total_area_sq_ft, 0) - COALESCE(available_area_sq_ft, 0), 0) WHERE id = $1;`,
+      [propId]
+    );
+    await recalculatePropertySpace(propId);
+    const created = await fetchPropertyWithSpace(propId);
+    res.status(201).json({ success: true, data: mapPropertyRow(created || result.rows[0]) });
   } catch (error: any) {
     console.error('Error creating property:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to create property.' });
@@ -348,8 +358,11 @@ export const updateProperty = async (req: Request, res: Response): Promise<void>
       description,
       managerUserId,
       managerName,
+      baselineOccupiedSqFt,
     } = req.body;
 
+    // available_area_sq_ft is never written directly. An explicit baseline wins; otherwise a typed
+    // "available" figure is translated into the baseline that yields it given current leases/holds.
     const sql = `
       UPDATE properties SET
         name = COALESCE($1, name),
@@ -359,7 +372,14 @@ export const updateProperty = async (req: Request, res: Response): Promise<void>
         state = COALESCE($5, state),
         pincode = COALESCE($6, pincode),
         total_area_sq_ft = COALESCE($7, total_area_sq_ft),
-        available_area_sq_ft = COALESCE($8, available_area_sq_ft),
+        baseline_occupied_sq_ft = CASE
+          WHEN $33::numeric IS NOT NULL THEN GREATEST($33::numeric, 0)
+          WHEN $8::numeric IS NOT NULL THEN GREATEST(0,
+            COALESCE($7::numeric, total_area_sq_ft) - $8::numeric
+            - COALESCE((SELECT SUM(l.area_sq_ft) FROM leases l WHERE l.property_id = properties.id AND l.status = 'active'), 0)
+            - COALESCE((SELECT SUM(h.area_sq_ft) FROM space_holds h WHERE h.property_id = properties.id AND h.status = 'active'), 0))
+          ELSE baseline_occupied_sq_ft
+        END,
         rent_per_sq_ft_inr = COALESCE($9, rent_per_sq_ft_inr),
         deposit_months = COALESCE($10, deposit_months),
         lease_terms_years = COALESCE($11, lease_terms_years),
@@ -421,6 +441,7 @@ export const updateProperty = async (req: Request, res: Response): Promise<void>
       id,
       managerUserId,
       managerName,
+      baselineOccupiedSqFt ?? null,
     ];
 
     const result = await query(sql, values);
@@ -429,7 +450,9 @@ export const updateProperty = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    res.status(200).json({ success: true, data: mapPropertyRow(result.rows[0]) });
+    await recalculatePropertySpace(result.rows[0].id);
+    const updated = await fetchPropertyWithSpace(result.rows[0].id);
+    res.status(200).json({ success: true, data: mapPropertyRow(updated) });
   } catch (error: any) {
     console.error('Error updating property:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to update property.' });
