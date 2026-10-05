@@ -130,7 +130,9 @@ export type InquirySource =
   | 'Referral'
   | 'Government Tender'
   | 'Inbound Call'
-  | 'AI Discovery';
+  | 'AI Discovery'
+  /** Created automatically 12 months before a lease ends. */
+  | 'Renewal';
 
 /** Parked = no reply after 3 follow-ups, or "not now"; it comes back on its next follow-up date. */
 export type InquiryStatus = 'Active' | 'Parked' | 'Won' | 'Lost' | 'Archived';

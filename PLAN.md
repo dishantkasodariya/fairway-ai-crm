@@ -198,7 +198,8 @@ Each step below = one commit on `feature/ai-prospect-intelligence`. A step is do
 | C3 Discovery UI by warehouse (picker, filter, Warehouse column), property panel shows known prospects | done | 46b3aea |
 | C4 One account for many sites: 17 accounts / 23 sites grouped (822 rows → 799 accounts); CRM status + Add to CRM account-aware | done | f6cea47 |
 | C5 Monthly discovery per managed warehouse (off: `DISCOVERY_CRON_ENABLED`), manager notified; signals research nearest-first | done | eb1afa2 |
-| D1 AI attribution report (`GET /api/reports/ai-attribution`) + Dashboard "What AI Discovery delivered" | done | (this commit) |
+| D1 AI attribution report (`GET /api/reports/ai-attribution`) + Dashboard "What AI Discovery delivered" | done | 0aaa82f |
+| D2 Renewal leads 12 months out + 6-month reminder (in the 08:00 job); renewal win re-takes the tenant's space | done | (this commit) |
 
 Notes carried forward:
 - A won card still shows "N days overdue" from its old `next_follow_up_date` → B1 clears follow-ups on won/lost.
@@ -224,5 +225,11 @@ Notes carried forward:
   in the hundreds of calls per warehouse per month — that's why it stays off until Bhavya turns it on.
 - Security (pre-existing, not touched): backend/.env.example is committed with what looks like a real production
   DATABASE_URL password and JWT_SECRET — rotate them and replace with placeholders.
+- D2 judgement calls: renewal owner = the original deal's salesperson, else the warehouse manager; leases typed in
+  without a CRM company get no renewal lead (Today's Renewals still lists them); the 6-month reminder is skipped
+  when the renewal lead was itself created inside 6 months; winning a renewal at the same warehouse closes the old
+  lease ("Renewed by lease ...") and the new lease takes its space; the attribution comparison excludes renewals.
+- Not automated (needs a decision): a lease whose end date passes stays `active` (tenant may be holding over), so
+  its space is not freed until someone ends it on the warehouse's Occupancy & Leases tab.
 - Open data questions: Amit Patel was set as Olpad's manager as a placeholder; Neogen Chemicals exists twice in the
   CRM (comp_e82dd44f / comp_725eaa7a, each with a deal) from the old client-side Add to CRM — merge or keep?

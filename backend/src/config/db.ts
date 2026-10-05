@@ -1316,6 +1316,10 @@ export const initDatabase = async () => {
       CREATE INDEX IF NOT EXISTS idx_leases_end_date ON leases(end_date);
       -- true when the lease records a tenant already counted in baseline_occupied_sq_ft
       ALTER TABLE leases ADD COLUMN IF NOT EXISTS from_baseline BOOLEAN NOT NULL DEFAULT false;
+      -- Renewal lead created for this lease (12 months before it ends) and the 6-month reminder task.
+      ALTER TABLE leases ADD COLUMN IF NOT EXISTS renewal_inquiry_id VARCHAR(255) REFERENCES inquiries(id) ON DELETE SET NULL;
+      ALTER TABLE leases ADD COLUMN IF NOT EXISTS renewal_reminder_task_id VARCHAR(255);
+      CREATE INDEX IF NOT EXISTS idx_leases_renewal_inquiry ON leases(renewal_inquiry_id);
 
       CREATE TABLE IF NOT EXISTS space_holds (
         id VARCHAR(255) PRIMARY KEY,

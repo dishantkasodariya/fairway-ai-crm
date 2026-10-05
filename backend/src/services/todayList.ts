@@ -126,6 +126,7 @@ export const buildTodayList = async (): Promise<{ today: string; sections: Today
             (${BUSINESS_TODAY_SQL} - i.created_at::date) AS age_days, count(*) OVER () AS total
      FROM inquiries i
      WHERE i.stage = 'new' AND COALESCE(i.status, 'Active') = 'Active'
+       AND COALESCE(i.source, '') <> 'Renewal' -- renewals have their own section
        AND NOT EXISTS (SELECT 1 FROM activities a WHERE a.inquiry_id = i.id AND a.activity_type = 'Touch')
        AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.inquiry_id = i.id AND t.status = 'Pending')
        AND NOT (i.next_follow_up_date ~ '^\\d{4}-\\d{2}-\\d{2}$' AND i.next_follow_up_date::date <= ${BUSINESS_TODAY_SQL})
@@ -226,23 +227,30 @@ export const buildTodayList = async (): Promise<{ today: string; sections: Today
     console.warn('[today] prospects unavailable:', err.message);
   }
 
-  // 6. Leases ending within the renewal window.
+  // 6. Leases ending within the renewal window, unless their renewal is already decided (won/lost).
+  //    Items open the renewal lead when the daily job has created one (services/renewals.ts).
   const renewalRows = (await pool.query(
     `SELECT l.id, l.company_id, l.company_name, l.property_id, l.property_name, l.area_sq_ft, l.inquiry_id,
             to_char(l.end_date, 'YYYY-MM-DD') AS end_date, (l.end_date - ${BUSINESS_TODAY_SQL}) AS days_left,
-            p.manager_user_id, p.manager_name
+            p.manager_user_id, p.manager_name,
+            r.id AS renewal_id, r.inquiry_number AS renewal_number, r.salesperson_id AS renewal_owner_id,
+            r.salesperson_name AS renewal_owner_name
      FROM leases l JOIN properties p ON p.id = l.property_id
+     LEFT JOIN inquiries r ON r.id = l.renewal_inquiry_id
      WHERE l.status = 'active' AND l.end_date IS NOT NULL
        AND l.end_date <= ${BUSINESS_TODAY_SQL} + make_interval(months => $1)
+       AND (r.id IS NULL OR r.stage NOT IN ('won', 'lost'))
      ORDER BY l.end_date ASC;`,
     [TODAY_RULES.RENEWAL_WINDOW_MONTHS]
   )).rows;
   const renewals: TodayItem[] = renewalRows.map((r) => ({
     type: 'renewal' as const, key: `lease:${r.id}`,
     title: `${r.company_name || 'Tenant'} · lease ends ${r.end_date}`,
-    detail: `${Number(r.area_sq_ft).toLocaleString('en-IN')} sq ft at ${r.property_name} — ${Math.max(0, Math.round(Number(r.days_left) / 30))} month(s) left. Start the renewal conversation.`,
-    dueDate: r.end_date, propertyId: r.property_id, inquiryId: r.inquiry_id || undefined, companyName: r.company_name || undefined,
-    ownerId: r.manager_user_id || null, ownerName: r.manager_name || 'Unassigned', ownerIsSuggested: false,
+    detail: `${Number(r.area_sq_ft).toLocaleString('en-IN')} sq ft at ${r.property_name} — ${Math.max(0, Math.round(Number(r.days_left) / 30))} month(s) left. ${r.renewal_id ? `Renewal lead ${r.renewal_number} is open.` : 'Start the renewal conversation.'}`,
+    dueDate: r.end_date, propertyId: r.property_id, companyName: r.company_name || undefined,
+    inquiryId: r.renewal_id || r.inquiry_id || undefined, inquiryNumber: r.renewal_number || undefined,
+    ownerId: r.renewal_owner_id || r.manager_user_id || null,
+    ownerName: (r.renewal_owner_id ? r.renewal_owner_name : r.manager_name) || 'Unassigned', ownerIsSuggested: false,
   }));
 
   return {

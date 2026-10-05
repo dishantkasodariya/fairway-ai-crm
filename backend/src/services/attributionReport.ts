@@ -107,7 +107,8 @@ export async function buildAttributionReport(period: { from?: string | null; to?
   const [order, leads] = await Promise.all([stageOrder(), pool.query(LEADS_SQL, [from, to]).then((r) => r.rows)]);
 
   const aiLeads = leads.filter((l: any) => l.source === AI_SOURCE);
-  const otherLeads = leads.filter((l: any) => l.source !== AI_SOURCE);
+  // Comparison = other ways of winning new tenants; renewals of existing tenants aren't new business.
+  const otherLeads = leads.filter((l: any) => l.source !== AI_SOURCE && l.source !== 'Renewal');
   const aiIds = aiLeads.map((l: any) => l.id);
 
   // Leases signed from AI-sourced deals (terminated ones excluded — that space came back).

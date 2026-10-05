@@ -3,6 +3,7 @@ import { query } from '../config/db.js';
 import { buildTodayList, TODAY_RULES } from '../services/todayList.js';
 import { releaseHolds } from '../services/spaceHolds.js';
 import { BUSINESS_TZ, BUSINESS_TODAY_SQL } from '../services/businessDate.js';
+import { runRenewals } from '../services/renewals.js';
 
 /**
  * Releases space held for deals that went quiet for HOLD_RELEASE_AFTER_DAYS, and for proposals whose
@@ -34,8 +35,10 @@ export async function releaseStaleHolds(): Promise<number> {
 }
 
 /** One morning notification per person who has something on the Today list. Idempotent per day. */
-export async function runTodayDigest(): Promise<{ notified: number; released: number }> {
+export async function runTodayDigest(): Promise<{ notified: number; released: number; renewals: Awaited<ReturnType<typeof runRenewals>> }> {
   const released = await releaseStaleHolds();
+  // Renewal leads/reminders first, so today's list and digest already include them.
+  const renewals = await runRenewals();
   const { today, sections } = await buildTodayList();
 
   const perOwner = new Map<string, number>();
@@ -64,7 +67,7 @@ export async function runTodayDigest(): Promise<{ notified: number; released: nu
     );
     notified += result.rowCount || 0;
   }
-  return { notified, released };
+  return { notified, released, renewals };
 }
 
 export function startTodayDigest(): void {
@@ -72,7 +75,12 @@ export function startTodayDigest(): void {
     '0 8 * * *',
     () => {
       runTodayDigest()
-        .then((r) => console.log(`[todayDigest] ${r.notified} notification(s), ${r.released} hold(s) released`))
+        .then((r) =>
+          console.log(
+            `[todayDigest] ${r.notified} notification(s), ${r.released} hold(s) released, ` +
+              `${r.renewals.leadsCreated} renewal lead(s), ${r.renewals.remindersCreated} renewal reminder(s)`
+          )
+        )
         .catch((err) => console.error('[todayDigest] run failed:', err.message));
     },
     { timezone: BUSINESS_TZ }

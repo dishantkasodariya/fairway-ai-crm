@@ -52,7 +52,16 @@ export const insertLease = async (client: PoolClient, input: LeaseInput, userId?
         )).rows[0].held
       ) || 0
     : 0;
-  const available = parseFloat(property.available_area_sq_ft) || 0;
+  // A renewal deal re-takes the tenant's current space at this warehouse: that lease is closed below.
+  const renewedLeases = input.inquiryId
+    ? (await client.query(
+        `SELECT id, area_sq_ft FROM leases
+         WHERE renewal_inquiry_id = $1 AND property_id = $2 AND status = 'active' FOR UPDATE;`,
+        [input.inquiryId, input.propertyId]
+      )).rows
+    : [];
+  const renewedArea = renewedLeases.reduce((sum: number, l: any) => sum + (parseFloat(l.area_sq_ft) || 0), 0);
+  const available = (parseFloat(property.available_area_sq_ft) || 0) + renewedArea;
   const baseline = parseFloat(property.baseline_occupied_sq_ft) || 0;
 
   if (input.fromBaseline) {
@@ -64,7 +73,7 @@ export const insertLease = async (client: PoolClient, input: LeaseInput, userId?
     await client.query('UPDATE properties SET baseline_occupied_sq_ft = baseline_occupied_sq_ft - $1 WHERE id = $2;', [area, input.propertyId]);
   } else if (area > available + convertibleHold) {
     throw new LeaseCapacityError(
-      `${property.name} has only ${(available + convertibleHold).toLocaleString('en-IN')} sq ft free${convertibleHold ? ' (including space held for this deal)' : ''}. This lease needs ${area.toLocaleString('en-IN')} sq ft.`
+      `${property.name} has only ${(available + convertibleHold).toLocaleString('en-IN')} sq ft free${convertibleHold || renewedArea ? ' (including space this deal already holds or is renewing)' : ''}. This lease needs ${area.toLocaleString('en-IN')} sq ft.`
     );
   }
 
@@ -102,6 +111,14 @@ export const insertLease = async (client: PoolClient, input: LeaseInput, userId?
       `UPDATE space_holds SET status = 'converted', released_at = CURRENT_TIMESTAMP, reason = 'Lease signed'
        WHERE inquiry_id = $1 AND property_id = $2 AND status = 'active';`,
       [input.inquiryId, input.propertyId]
+    );
+  }
+  if (renewedLeases.length) {
+    await client.query(
+      `UPDATE leases SET status = 'ended', updated_at = CURRENT_TIMESTAMP,
+         notes = CONCAT_WS(E'\n', NULLIF(notes, ''), $2::text)
+       WHERE id = ANY($1::text[]);`,
+      [renewedLeases.map((l: any) => l.id), `Renewed by lease ${leaseId}.`]
     );
   }
   await client.query(RECALCULATE_PROPERTY_SPACE_SQL, [input.propertyId]);
