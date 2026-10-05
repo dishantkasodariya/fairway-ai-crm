@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -68,6 +68,9 @@ class DiscoveryRun(Base):
     warehouse_lat: Mapped[float] = mapped_column(Float)
     warehouse_lng: Mapped[float] = mapped_column(Float)
     radius_km: Mapped[float] = mapped_column(Float)
+    # CRM warehouse (properties.id, e.g. "prop_03c74628") this run searched around.
+    # Lives in another database, so there's no FK — null for ad-hoc point searches.
+    property_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     status: Mapped[DiscoveryRunStatus] = mapped_column(
         Enum(DiscoveryRunStatus, name="discovery_run_status"), default=DiscoveryRunStatus.queued
     )
@@ -129,6 +132,28 @@ class Company(Base):
     )
     jobs: Mapped[list["Job"]] = relationship(back_populates="company", cascade="all, delete-orphan")
     contacts: Mapped[list["Contact"]] = relationship(back_populates="company", cascade="all, delete-orphan")
+    warehouse_links: Mapped[list["CompanyWarehouseLink"]] = relationship(
+        back_populates="company", cascade="all, delete-orphan"
+    )
+
+
+class CompanyWarehouseLink(Base):
+    """A company found near a CRM warehouse. One company row can be near several
+    warehouses (one link each) instead of being discovered twice."""
+
+    __tablename__ = "company_warehouse_links"
+    __table_args__ = (UniqueConstraint("company_id", "property_id", name="uq_company_warehouse"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    property_id: Mapped[str] = mapped_column(String, index=True)
+    discovery_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("discovery_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    company: Mapped[Company] = relationship(back_populates="warehouse_links")
 
 
 class RevenueSnapshot(Base):
