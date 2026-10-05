@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Notification } from '@/modules/core/types';
 import { NotificationService } from '@/modules/core/services/notificationService';
 
@@ -16,9 +16,24 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const isFetchingRef = useRef<boolean>(false);
+  const lastFetchRef = useRef<number>(0);
 
   const refreshNotifications = async () => {
+    // Avoid concurrent overlapping requests
+    if (isFetchingRef.current) return;
+
     try {
+      const token = localStorage.getItem('fairway_token') || localStorage.getItem('fw_auth_token');
+      if (!token) {
+        setNotifications([]);
+        setUnreadCount(0);
+        return;
+      }
+
+      isFetchingRef.current = true;
+      lastFetchRef.current = Date.now();
+
       const res = await NotificationService.getNotifications();
       if (res.success && res.data) {
         setNotifications(res.data);
@@ -26,13 +41,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     } catch (err) {
       console.warn('Failed to refresh notifications from API:', err);
+    } finally {
+      isFetchingRef.current = false;
     }
   };
 
   useEffect(() => {
     refreshNotifications();
-    const interval = setInterval(refreshNotifications, 20000); // 20-second real-time sync
-    const handleFocus = () => refreshNotifications();
+    const interval = setInterval(refreshNotifications, 30000); // 30-second real-time sync
+
+    const handleFocus = () => {
+      // Throttle window focus refresh: only refresh if last fetch was > 15 seconds ago
+      if (Date.now() - lastFetchRef.current > 15000) {
+        refreshNotifications();
+      }
+    };
+
     window.addEventListener('focus', handleFocus);
     return () => {
       clearInterval(interval);

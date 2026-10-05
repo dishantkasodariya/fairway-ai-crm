@@ -3,6 +3,9 @@ import { query } from '../config/db.js';
 import crypto from 'crypto';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
 
+let lastSyncTimestamp = 0;
+let isSyncing = false;
+
 /**
  * Synchronize notifications table with real-time CRM events:
  * - Active upcoming site visits from tasks
@@ -11,6 +14,14 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
  * - Active commercial proposals
  */
 const syncRealTimeNotifications = async (): Promise<void> => {
+  const now = Date.now();
+  if (isSyncing || now - lastSyncTimestamp < 30000) {
+    return;
+  }
+
+  isSyncing = true;
+  lastSyncTimestamp = now;
+
   try {
     // 1. Delete legacy hardcoded seed notifications that point to dummy IDs
     await query(`
@@ -118,6 +129,8 @@ const syncRealTimeNotifications = async (): Promise<void> => {
     }
   } catch (err: any) {
     console.warn('Real-time notifications sync note:', err.message);
+  } finally {
+    isSyncing = false;
   }
 };
 
@@ -127,10 +140,19 @@ const syncRealTimeNotifications = async (): Promise<void> => {
  */
 export const getNotifications = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    if (!req.user) {
+      res.json({
+        success: true,
+        data: [],
+        unreadCount: 0,
+      });
+      return;
+    }
+
     const userId = req.user?.userId;
 
-    // Automatically synchronize real-time CRM events before returning
-    await syncRealTimeNotifications();
+    // Trigger CRM real-time events synchronization in background (non-blocking)
+    syncRealTimeNotifications().catch(() => {});
 
     const sql = `
       SELECT

@@ -33,6 +33,26 @@ export const authenticateJWT = (
   });
 };
 
+export const optionalAuthenticateJWT = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  const authHeader = req.headers.authorization;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = verifyToken(token);
+      req.user = decoded;
+    } catch {
+      // Optional auth: ignore invalid tokens
+    }
+  }
+
+  next();
+};
+
 export const authorizeRoles = (...allowedRoles: string[]) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
