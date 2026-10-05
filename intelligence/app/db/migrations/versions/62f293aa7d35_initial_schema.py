@@ -127,3 +127,6 @@ def downgrade() -> None:
     op.drop_table('companies')
     op.drop_table('discovery_runs')
     # ### end Alembic commands ###
+    # drop_table leaves Postgres enum types behind; without this a later upgrade fails with "already exists".
+    for enum_name in ('signal_type', 'revenue_method', 'job_status', 'job_type', 'discovery_run_status'):
+        op.execute(f'DROP TYPE IF EXISTS {enum_name}')

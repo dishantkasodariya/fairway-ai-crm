@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -18,7 +19,9 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-outreach_channel_enum = sa.Enum("linkedin", "email", name="outreach_channel")
+# create_type=False: the type is created explicitly (checkfirst) before the table,
+# so create_table must not try to create it again ("type already exists" on a fresh DB).
+outreach_channel_enum = postgresql.ENUM("linkedin", "email", name="outreach_channel", create_type=False)
 
 
 def _existing_tables(bind) -> set[str]:
