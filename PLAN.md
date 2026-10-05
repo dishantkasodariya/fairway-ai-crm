@@ -186,8 +186,21 @@ Each step below = one commit on `feature/ai-prospect-intelligence`. A step is do
 | A3 Leases API + Occupancy & Leases tab + edit form "occupied by existing tenants" | done | dc51c45 |
 | A4 Won = lease (`POST /inquiries/:id/win`, proposal Accept), stage history, stage-key fixes | done | b2e738f |
 | A5 Space holds on proposals + capacity check (split suggestion) | done | 6933228 |
+| Fix: Inquiries & Leads had no view/edit/delete permission rows (admins couldn't edit deals in the UI) | done | 865f45e |
+| B1 Touch logging + 5-day re-ask, park after 3 no-replies, IST business dates | done | 9826948 |
+| B2 "I followed up" UI, Follow-ups timeline, task outcome notes | done | 2d0e05d |
+| B3a Server-side Add to CRM (no duplicates, owner = nearest warehouse manager), manual contacts | done | 57d5065 |
+| B3b Prospect page: CRM status, key people, draft messages | done | 4ed5381 |
+| B4 Today list + 08:00 IST digest + stale-hold release | done | dbef117 |
+| B5 AI Discovery search debounce/stale-response fix (+ revenue rounding) | done | (this commit) |
 
 Notes carried forward:
 - A won card still shows "N days overdue" from its old `next_follow_up_date` → B1 clears follow-ups on won/lost.
 - Holds idle for 30 days and proposals past `expiry_date` are released by the B4 daily job.
 - "Fairway Warehouse – Olpad" shows in property matches with 0 sq ft until its real area is entered.
+- Phase B judgement calls (confirm with Bhavya): "Interested" schedules a 3-day "confirm requirement" task rather than
+  jumping to Req. Confirmed; Today's prospect threshold is score >= 50 (nobody scores 70 yet, max 63); unassigned
+  deals show a *suggested* owner instead of being bulk-reassigned; expired proposals only free their space, their
+  status is not changed automatically.
+- Open data questions: Amit Patel was set as Olpad's manager as a placeholder; Neogen Chemicals exists twice in the
+  CRM (comp_e82dd44f / comp_725eaa7a, each with a deal) from the old client-side Add to CRM — merge or keep?

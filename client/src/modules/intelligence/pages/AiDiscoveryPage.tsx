@@ -59,6 +59,9 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   const [totalCount, setTotalCount] = useState(0);
 
   const [search, setSearch] = useState('');
+  // The box updates `search` per keystroke; the query only uses this settled value.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const latestRequestRef = useRef(0);
   const [businessTypeFilter, setBusinessTypeFilter] = useState('all');
   const [minScore, setMinScore] = useState('all');
   const [sortBy, setSortBy] = useState<'score' | 'recency' | 'revenue' | 'distance'>('score');
@@ -96,16 +99,24 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     });
   }, []);
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const loadResults = async (runId?: number) => {
+    const requestId = ++latestRequestRef.current;
     const res = await IntelligenceService.listDiscoveredCompanies({
       discoveryRunId: runId,
       sortBy,
       minScore: minScore !== 'all' ? Number(minScore) : undefined,
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       businessType: businessTypeFilter !== 'all' ? businessTypeFilter : undefined,
       limit: pagination.pageSize,
       offset: pagination.pageIndex * pagination.pageSize,
     });
+    // A slower, older request must not overwrite newer results (typing "chem" used to show "c"'s 481 rows).
+    if (requestId !== latestRequestRef.current) return;
     if (res.success && res.data) {
       setProspects(res.data.items);
       setTotalCount(res.data.total);
@@ -192,13 +203,13 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
       loadResults(run?.status === 'done' ? run.id : undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, businessTypeFilter, minScore, sortBy, pagination.pageIndex, pagination.pageSize]);
+  }, [debouncedSearch, businessTypeFilter, minScore, sortBy, pagination.pageIndex, pagination.pageSize]);
 
   // A filter change can leave the current page out of range; jump back to page 1.
   useEffect(() => {
     setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, businessTypeFilter, minScore, sortBy]);
+  }, [debouncedSearch, businessTypeFilter, minScore, sortBy]);
 
   const columns = useMemo<ColumnDef<DataGridFeatures, DiscoveredCompany>[]>(
     () => [
@@ -263,7 +274,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         header: ({ column }) => <DataGridColumnHeader column={column} title="Revenue (Cr)" />,
         cell: ({ row }) => (
           <span className="text-xs text-foreground-muted">
-            {row.original.latestRevenueCr !== null ? `₹${row.original.latestRevenueCr} Cr` : '—'}
+            {row.original.latestRevenueCr !== null ? `₹${Number(row.original.latestRevenueCr.toFixed(2)).toLocaleString('en-IN')} Cr` : '—'}
           </span>
         ),
         size: 120,
