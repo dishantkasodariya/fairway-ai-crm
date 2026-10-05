@@ -68,6 +68,15 @@ class WarehouseLinkOut(BaseModel):
     discovery_run_id: int | None
 
 
+class SiteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    address: str | None
+    distance_km: float | None
+
+
 class CompanyDetailOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -93,6 +102,10 @@ class CompanyDetailOut(BaseModel):
     signals: list[SignalOut] = []
     opportunity_score: OpportunityScoreOut | None = None
     warehouse_links: list[WarehouseLinkOut] = []
+    # Multi-site accounts: a parent lists its other sites; a site points at its account.
+    parent_company_id: int | None = None
+    parent: SiteOut | None = None
+    sites: list[SiteOut] = []
 
 
 class CompanyListOut(BaseModel):

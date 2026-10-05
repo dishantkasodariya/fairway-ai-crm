@@ -72,6 +72,13 @@ export interface DiscoveredCompany {
   warehouseCount: number;
 }
 
+export interface ProspectSite {
+  id: number;
+  name: string;
+  address: string | null;
+  distanceKm: number | null;
+}
+
 export interface WarehouseLink {
   propertyId: string;
   distanceKm: number | null;
@@ -83,6 +90,10 @@ export interface DiscoveredCompanyDetail
   placeId: string | null;
   /** Warehouses this company is near, nearest first. */
   warehouseLinks: WarehouseLink[];
+  /** Multi-site accounts: a site points at its account; the account lists its other sites. */
+  parentCompanyId: number | null;
+  parent: ProspectSite | null;
+  sites: ProspectSite[];
   lat: number | null;
   lng: number | null;
   phone: string | null;
@@ -402,7 +413,8 @@ export interface WarehouseOwner {
 export interface CrmStatus {
   inCrm: boolean;
   company: { id: string; name: string; matchedBy: 'link' | 'website' | 'name' } | null;
-  openInquiry: { id: string; inquiryNumber: string; stage: string; ownerName: string } | null;
+  /** companyName: the CRM company holding the deal — may be another site of the same account. */
+  openInquiry: { id: string; inquiryNumber: string; stage: string; ownerName: string; companyName: string } | null;
   suggestedOwner: WarehouseOwner | null;
 }
 

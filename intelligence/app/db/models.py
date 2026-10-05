@@ -111,6 +111,11 @@ class Company(Base):
     business_type_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     site_count: Mapped[int] = mapped_column(Integer, default=1)
+    # Set on a site of a multi-site company ("... Gate 5A") to the account's main row;
+    # null for standalone companies and for the parent itself. See discovery/site_grouping.py.
+    parent_company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     locations: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
 
     discovery_run_id: Mapped[int | None] = mapped_column(
@@ -121,6 +126,11 @@ class Company(Base):
     updated_at: Mapped[datetime] = mapped_column(default=_utcnow, onupdate=_utcnow)
 
     discovery_run: Mapped[DiscoveryRun | None] = relationship(back_populates="companies")
+    # The other sites of this account (only populated on a parent).
+    sites: Mapped[list["Company"]] = relationship(
+        back_populates="parent", foreign_keys=[parent_company_id], order_by="Company.distance_km"
+    )
+    parent: Mapped["Company | None"] = relationship(back_populates="sites", remote_side="Company.id")
     revenue_snapshots: Mapped[list["RevenueSnapshot"]] = relationship(
         back_populates="company", cascade="all, delete-orphan"
     )

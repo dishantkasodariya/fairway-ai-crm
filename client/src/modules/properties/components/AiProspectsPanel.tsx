@@ -219,6 +219,11 @@ export const AiProspectsPanel: React.FC<AiProspectsPanelProps> = ({ property }) 
                   </p>
 
                   <div className="flex flex-wrap gap-1.5 text-[10px]">
+                    {company.siteCount > 1 && (
+                      <span className="px-2 py-0.5 rounded-lg bg-surface border border-border text-foreground-muted font-semibold">
+                        {company.siteCount} sites
+                      </span>
+                    )}
                     {company.businessType && (
                       <span className="px-2 py-0.5 rounded-lg bg-surface border border-border text-foreground-muted font-semibold">
                         {company.businessType}

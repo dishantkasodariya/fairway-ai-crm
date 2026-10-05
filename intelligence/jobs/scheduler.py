@@ -39,6 +39,7 @@ def _select_batch(batch_size: int) -> list[int]:
             db.query(Company.id)
             .outerjoin(OpportunityScore, OpportunityScore.company_id == Company.id)
             .filter(OpportunityScore.id.is_(None))
+            .filter(Company.parent_company_id.is_(None))  # one research per account, not per gate
             .order_by(Company.id.asc())
             .limit(batch_size)
             .all()
@@ -50,6 +51,7 @@ def _select_batch(batch_size: int) -> list[int]:
             stalest = (
                 db.query(Company.id)
                 .join(OpportunityScore, OpportunityScore.company_id == Company.id)
+                .filter(Company.parent_company_id.is_(None))
                 .order_by(OpportunityScore.computed_at.asc())
                 .limit(remaining)
                 .all()

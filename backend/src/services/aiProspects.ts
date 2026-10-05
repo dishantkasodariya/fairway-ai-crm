@@ -48,13 +48,39 @@ export interface IntelCompany {
   website: string | null;
   business_type: string | null;
   opportunity_score: { score: number; why: string | null; estimated_requirement: string | null } | null;
+  /** Multi-site accounts (intelligence groups a company's gates/plants): set on a site. */
+  parent_company_id?: number | null;
+  /** Set on an account's main row: its other sites. */
+  sites?: { id: number }[];
 }
+
+/**
+ * Every intelligence id in this prospect's account (the main row and all its sites),
+ * so a deal opened from one gate counts for the whole company.
+ */
+export const accountMemberIds = async (intel: IntelCompany): Promise<number[]> => {
+  const main: IntelCompany = intel.parent_company_id
+    ? await callIntelligenceApi(`/v1/companies/${intel.parent_company_id}`)
+    : intel;
+  return [...new Set([intel.id, main.id, ...(main.sites || []).map((s) => s.id)])];
+};
 
 export type CrmMatch = { id: string; name: string; matchedBy: 'link' | 'website' | 'name' } | null;
 
-/** Finds the CRM company for a prospect: explicit link first, then website domain, then cleaned-up name. */
-export const findCrmCompany = async (db: Db, intel: Pick<IntelCompany, 'id' | 'name' | 'website'>): Promise<CrmMatch> => {
-  const linked = (await db.query('SELECT id, name FROM companies WHERE intelligence_company_id = $1 LIMIT 1;', [intel.id])).rows[0];
+/**
+ * Finds the CRM company for a prospect: explicit link first (to this exact row, else to any
+ * other site of the same account), then website domain, then cleaned-up name.
+ */
+export const findCrmCompany = async (
+  db: Db,
+  intel: Pick<IntelCompany, 'id' | 'name' | 'website'>,
+  memberIds: number[] = [intel.id]
+): Promise<CrmMatch> => {
+  const linked = (await db.query(
+    `SELECT id, name FROM companies WHERE intelligence_company_id = ANY($1::int[])
+     ORDER BY (intelligence_company_id = $2) DESC, created_at ASC LIMIT 1;`,
+    [memberIds, intel.id]
+  )).rows[0];
   if (linked) return { id: linked.id, name: linked.name, matchedBy: 'link' };
 
   const rows = (await db.query('SELECT id, name, website FROM companies;')).rows as { id: string; name: string; website: string | null }[];
@@ -101,23 +127,34 @@ export const nearestManagedWarehouse = async (db: Db, lat: number | null, lng: n
   return best;
 };
 
-const openInquiryFor = async (db: Db, companyId: string) =>
+/** The newest open deal on this CRM company or on any CRM company linked to another site of the account. */
+const openInquiryFor = async (db: Db, companyId: string, memberIds: number[] = []) =>
   (await db.query(
-    `SELECT id, inquiry_number, stage, salesperson_name FROM inquiries
-     WHERE company_id = $1 AND stage NOT IN ('won', 'lost') ORDER BY created_at DESC LIMIT 1;`,
-    [companyId]
+    `SELECT i.id, i.inquiry_number, i.stage, i.salesperson_name, c.name AS company_name FROM inquiries i
+     JOIN companies c ON c.id = i.company_id
+     WHERE (i.company_id = $1 OR c.intelligence_company_id = ANY($2::int[]))
+       AND i.stage NOT IN ('won', 'lost')
+     ORDER BY (i.company_id = $1) DESC, i.created_at DESC LIMIT 1;`,
+    [companyId, memberIds]
   )).rows[0] || null;
 
 export const getCrmStatus = async (intelId: number) => {
   const intel: IntelCompany = await callIntelligenceApi(`/v1/companies/${intelId}`);
-  const match = await findCrmCompany(pool, intel);
-  const openInquiry = match ? await openInquiryFor(pool, match.id) : null;
+  const memberIds = await accountMemberIds(intel);
+  const match = await findCrmCompany(pool, intel, memberIds);
+  const openInquiry = match ? await openInquiryFor(pool, match.id, memberIds) : null;
   const owner = await nearestManagedWarehouse(pool, intel.lat, intel.lng);
   return {
     inCrm: !!match,
     company: match,
     openInquiry: openInquiry
-      ? { id: openInquiry.id, inquiryNumber: openInquiry.inquiry_number, stage: openInquiry.stage, ownerName: openInquiry.salesperson_name }
+      ? {
+          id: openInquiry.id,
+          inquiryNumber: openInquiry.inquiry_number,
+          stage: openInquiry.stage,
+          ownerName: openInquiry.salesperson_name,
+          companyName: openInquiry.company_name,
+        }
       : null,
     suggestedOwner: owner,
   };
@@ -154,6 +191,7 @@ export const addProspectToCrm = async (
   userId?: string | null
 ): Promise<AddToCrmResult> => {
   const intel: IntelCompany = await callIntelligenceApi(`/v1/companies/${intelId}`);
+  const memberIds = await accountMemberIds(intel);
   let contact: { name: string; title: string | null; email: string | null; phone: string | null; linkedin_url: string | null } | null = null;
   if (opts.contactId) {
     const list = await callIntelligenceApi(`/v1/companies/${intelId}/contacts`);
@@ -169,7 +207,7 @@ export const addProspectToCrm = async (
     const city = cityFromAddress(intel.address);
     const owner = await nearestManagedWarehouse(client, intel.lat, intel.lng);
 
-    const match = await findCrmCompany(client, intel);
+    const match = await findCrmCompany(client, intel, memberIds);
     let companyId: string;
     let companyName: string;
     if (match) {
@@ -179,9 +217,9 @@ export const addProspectToCrm = async (
         'UPDATE companies SET intelligence_company_id = COALESCE(intelligence_company_id, $2), updated_at = CURRENT_TIMESTAMP WHERE id = $1;',
         [companyId, intel.id]
       );
-      const open = await openInquiryFor(client, companyId);
+      const open = await openInquiryFor(client, companyId, memberIds);
       if (open && !opts.allowSecondInquiry) {
-        throw new DealError(`${companyName} already has an open deal (${open.inquiry_number}, ${open.stage}).`, 409);
+        throw new DealError(`${open.company_name} already has an open deal (${open.inquiry_number}, ${open.stage}).`, 409);
       }
     } else {
       companyId = `comp_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;

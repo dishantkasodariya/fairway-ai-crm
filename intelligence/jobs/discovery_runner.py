@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import insert
 from app.db.models import Company, CompanyWarehouseLink, DiscoveryRun, DiscoveryRunStatus
 from classification.ai_fallback import AIFallbackClassifier
 from classification.rules import classify
+from discovery.site_grouping import apply_site_groups
 from discovery.tiling import find_companies_tiled
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,9 @@ def run_discovery_job(run_id: int) -> None:
                 db.flush()
                 _link_to_warehouse(db, company, run, c.get("distance_km"))
                 created += 1
+
+            # New gates/plants of a known company join its account.
+            apply_site_groups(db)
 
             run.companies_found = created
             run.api_calls_made = result["stats"]["total_calls"]

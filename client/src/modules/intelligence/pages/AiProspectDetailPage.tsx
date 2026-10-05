@@ -20,6 +20,8 @@ export interface AiProspectDetailPageProps {
   prospectId: number;
   onBack: () => void;
   onOpenInquiry: (inquiryId: string) => void;
+  /** Open another prospect (this account's main row or one of its sites). */
+  onOpenProspect: (id: number) => void;
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -39,7 +41,7 @@ const scoreBadgeClass = (score: number | null | undefined) => {
   return 'bg-surface-muted text-foreground-muted border-border';
 };
 
-export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ prospectId, onBack, onOpenInquiry }) => {
+export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ prospectId, onBack, onOpenInquiry, onOpenProspect }) => {
   const { success, error: toastError } = useToast();
   const [detail, setDetail] = useState<DiscoveredCompanyDetail | null>(null);
   const [crm, setCrm] = useState<CrmStatus | null>(null);
@@ -202,6 +204,15 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
               <MapPin className="w-3 h-3" />
               {detail.address || 'Address unavailable'}
             </p>
+            {detail.parent && (
+              <p className="text-xs text-foreground-muted mt-1">
+                One site of{' '}
+                <button type="button" onClick={() => onOpenProspect(detail.parent!.id)} className="font-semibold text-fairway-600 hover:underline cursor-pointer">
+                  {detail.parent.name}
+                </button>
+                {' '}— deals and research are kept on the company as a whole.
+              </p>
+            )}
             {detail.warehouseLinks.length > 0 && (
               <p className="text-xs text-foreground-muted mt-1">
                 Near{' '}
@@ -245,6 +256,7 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
               </p>
               <p className="text-foreground-muted mt-0.5">
                 Owner: {crm.openInquiry.ownerName || 'Unassigned'}
+                {crm.openInquiry.companyName && crm.openInquiry.companyName !== detail.name && ` · on ${crm.openInquiry.companyName}`}
                 {crm.company && crm.company.matchedBy !== 'link' && ` · matched to "${crm.company.name}" by ${crm.company.matchedBy}`}
               </p>
             </div>
@@ -376,6 +388,36 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
         companyName={detail.name}
         channel={draftTarget?.channel || 'linkedin'}
       />
+
+      {detail.sites.length > 0 && (
+        <Card className="p-5 space-y-3">
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-fairway-600" />
+            Other sites ({detail.sites.length})
+          </h2>
+          <p className="text-[11px] text-foreground-muted">
+            Plants and gates of the same company, found as separate places. They count as one account.
+          </p>
+          <div className="divide-y divide-border rounded-xl border border-border">
+            {detail.sites.map((site) => (
+              <button
+                key={site.id}
+                type="button"
+                onClick={() => onOpenProspect(site.id)}
+                className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-surface-muted/60 cursor-pointer"
+              >
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold text-foreground truncate">{site.name}</span>
+                  <span className="block text-[11px] text-foreground-muted truncate">{site.address || 'Address unavailable'}</span>
+                </span>
+                {site.distanceKm !== null && (
+                  <span className="text-[11px] text-foreground-muted shrink-0">{site.distanceKm.toFixed(1)} km</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {detail.opportunityScore && (
         <Card className="p-5 space-y-2">

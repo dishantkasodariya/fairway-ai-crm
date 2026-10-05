@@ -283,6 +283,14 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
               {row.original.opportunityScore !== null ? Math.round(row.original.opportunityScore) : '—'}
             </span>
             <span className="font-bold text-foreground truncate">{row.original.name}</span>
+            {row.original.siteCount > 1 && (
+              <span
+                className="shrink-0 px-1.5 py-0.5 rounded-md bg-surface-muted border border-border text-[10px] font-semibold text-foreground-muted"
+                title="Plants/gates of the same company, shown as one account"
+              >
+                {row.original.siteCount} sites
+              </span>
+            )}
           </div>
         ),
         size: 260,
