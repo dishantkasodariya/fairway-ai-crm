@@ -30,6 +30,7 @@ import { NewPropertyPage } from '@/modules/properties/pages/NewPropertyPage';
 import { AiDiscoveryPage } from '@/modules/intelligence/pages/AiDiscoveryPage';
 import { AiProspectDetailPage } from '@/modules/intelligence/pages/AiProspectDetailPage';
 import { AiConnectionsPage } from '@/modules/intelligence/pages/AiConnectionsPage';
+import { TodayPage } from '@/modules/today/pages/TodayPage';
 import { ProposalsPage } from '@/modules/proposals/pages/ProposalsPage';
 import { SiteVisitsPage } from '@/modules/site-visits/pages/SiteVisitsPage';
 import { ContactsPage } from '@/modules/contacts/pages/ContactsPage';
@@ -294,6 +295,20 @@ const AppRouter: React.FC = () => {
           <PipelinePage
             onSelectInquiry={(id) => handleNavigate('inquiry_detail', id)}
             onOpenNewInquiry={() => handleNavigate('new_inquiry')}
+          />
+        );
+
+      case 'today':
+        if (!canView('inquiries')) {
+          return <AccessRestrictedView moduleName="Today" onGoBack={() => handleNavigate(getFirstAllowedView())} />;
+        }
+        return (
+          <TodayPage
+            onOpenInquiry={(id) => handleNavigate('inquiry_detail', id)}
+            onOpenProspect={(id) => handleNavigate('ai_prospect_detail', String(id))}
+            onOpenProperty={(id) => handleNavigate('property_detail', id)}
+            onOpenTasks={() => handleNavigate('tasks')}
+            onOpenPipeline={() => handleNavigate('pipeline')}
           />
         );
 

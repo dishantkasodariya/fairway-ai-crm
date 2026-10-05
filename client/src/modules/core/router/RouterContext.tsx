@@ -76,6 +76,10 @@ export function parseRoute(pathname: string): {
     return { view: 'tasks', isAuth: false, authType: 'login' };
   }
 
+  if (cleanPath === '/today') {
+    return { view: 'today', isAuth: false, authType: 'login' };
+  }
+
   if (cleanPath === '/properties/new' || cleanPath === '/warehouses/new' || cleanPath === '/new-warehouse' || cleanPath === '/new-property') {
     return { view: 'new_property', isAuth: false, authType: 'login' };
   }
@@ -193,6 +197,8 @@ export function pathToView(view: ActiveNavView, entityId?: string): string {
       return '/pipeline';
     case 'tasks':
       return '/tasks';
+    case 'today':
+      return '/today';
     case 'properties':
       return '/properties';
     case 'new_property':

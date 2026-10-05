@@ -35,6 +35,7 @@ import {
   User as UserIcon,
   ChevronsUpDown,
   Sparkles,
+  ListTodo,
 } from 'lucide-react';
 
 
@@ -55,6 +56,7 @@ import { useToast } from '@/modules/core/providers/ToastContext';
 
 
 export type ActiveNavView =
+  | 'today'
   | 'dashboard'
   | 'companies'
   | 'company_detail'
@@ -176,6 +178,7 @@ export const AppShell: React.FC<AppShellProps> = ({
           canView('proposals') ||
           canView('reports')
         );
+      case 'today':
       case 'inquiries':
       case 'pipeline':
         return canView('inquiries');
@@ -219,6 +222,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   }
 
   const allNavItems: NavItem[] = [
+    { id: 'today' as ActiveNavView, label: 'Today', icon: <ListTodo className="w-4 h-4" /> },
     { id: 'dashboard' as ActiveNavView, label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: 'inquiries' as ActiveNavView, label: 'Inquiries / Leads', icon: <FileText className="w-4 h-4" /> },
     { id: 'companies' as ActiveNavView, label: 'Companies Master', icon: <Building2 className="w-4 h-4" /> },
@@ -251,7 +255,9 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   const handleCommandSelect = (type: string, id: string) => {
     const t = (type || '').toLowerCase().trim();
-    if (t === 'inquiry' || t === 'inquiry_detail' || t === 'inquiries' || t === 'lead') {
+    if (t === 'today' || t === 'today_digest') {
+      onNavigate('today');
+    } else if (t === 'inquiry' || t === 'inquiry_detail' || t === 'inquiries' || t === 'lead') {
       if (id) {
         onNavigate('inquiry_detail', id);
       } else {

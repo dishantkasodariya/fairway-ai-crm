@@ -2,6 +2,7 @@ import app from './app.js';
 import { config } from './config/index.js';
 import { initDatabase } from './config/db.js';
 import { startAiSignalsWatcher } from './jobs/aiSignalsWatcher.js';
+import { startTodayDigest } from './jobs/todayDigest.js';
 
 const PORT = config.port;
 
@@ -11,6 +12,9 @@ const startServer = async () => {
 
   if (process.env.AI_SIGNALS_WATCHER_ENABLED !== 'false') {
     startAiSignalsWatcher();
+  }
+  if (process.env.TODAY_DIGEST_ENABLED !== 'false') {
+    startTodayDigest();
   }
 
   const server = app.listen(PORT, () => {

@@ -421,6 +421,7 @@ export type NotificationType =
   | 'proposal_updated'
   | 'site_visit_upcoming'
   | 'ai_signal'
+  | 'today_digest'
   | 'system';
 
 export interface Notification {

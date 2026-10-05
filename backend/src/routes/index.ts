@@ -25,6 +25,7 @@ import notificationsRoutes from './notifications.routes.js';
 import callsRoutes from './calls.routes.js';
 import intelligenceRoutes from './intelligence.routes.js';
 import leasesRoutes from './leases.routes.js';
+import todayRoutes from './today.routes.js';
 
 const router = Router();
 
@@ -77,6 +78,7 @@ router.use('/notifications', authenticateJWT, notificationsRoutes);
 router.use('/calls', authenticateJWT, callsRoutes);
 router.use('/intelligence', authenticateJWT, intelligenceRoutes);
 router.use('/leases', authenticateJWT, leasesRoutes);
+router.use('/today', authenticateJWT, todayRoutes);
 
 export default router;
 

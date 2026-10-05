@@ -10,6 +10,7 @@ import {
   ExternalLink,
   RotateCw,
   Sparkles,
+  ListTodo,
 } from 'lucide-react';
 import { useNotifications } from '@/modules/core/providers/NotificationContext';
 import { Notification } from '@/modules/core/types';
@@ -98,6 +99,13 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({ onNavi
         icon: <Briefcase className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />,
         badge: 'Proposal',
         badgeColor: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+      };
+    }
+    if (t.includes('today_digest')) {
+      return {
+        icon: <ListTodo className="w-3.5 h-3.5 text-fairway-600 dark:text-fairway-400" />,
+        badge: 'Today',
+        badgeColor: 'bg-fairway-500/10 text-fairway-600 dark:text-fairway-400 border-fairway-500/20',
       };
     }
     if (t.includes('ai_signal')) {
