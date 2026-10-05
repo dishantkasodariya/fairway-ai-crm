@@ -197,7 +197,8 @@ Each step below = one commit on `feature/ai-prospect-intelligence`. A step is do
 | C2 Runner links re-found companies instead of skipping; list filter by warehouse; nearest warehouse | done | 666eeaf |
 | C3 Discovery UI by warehouse (picker, filter, Warehouse column), property panel shows known prospects | done | 46b3aea |
 | C4 One account for many sites: 17 accounts / 23 sites grouped (822 rows → 799 accounts); CRM status + Add to CRM account-aware | done | f6cea47 |
-| C5 Monthly discovery per managed warehouse (off: `DISCOVERY_CRON_ENABLED`), manager notified; signals research nearest-first | done | (this commit) |
+| C5 Monthly discovery per managed warehouse (off: `DISCOVERY_CRON_ENABLED`), manager notified; signals research nearest-first | done | eb1afa2 |
+| D1 AI attribution report (`GET /api/reports/ai-attribution`) + Dashboard "What AI Discovery delivered" | done | (this commit) |
 
 Notes carried forward:
 - A won card still shows "N days overdue" from its old `next_follow_up_date` → B1 clears follow-ups on won/lost.

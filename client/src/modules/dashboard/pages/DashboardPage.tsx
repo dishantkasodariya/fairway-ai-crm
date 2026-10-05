@@ -24,6 +24,7 @@ import { Button } from '@/modules/core/components/ui/Button';
 import { Card, CardHeader, CardTitle } from '@/modules/core/components/ui/Card';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { Task, Inquiry, Property } from '@/modules/core/types';
+import { AiAttributionPanel } from '../components/AiAttributionPanel';
 
 export interface DashboardViewProps {
   onNavigate: (view: any, entityId?: string) => void;
@@ -375,6 +376,9 @@ export const DashboardPage: React.FC<DashboardViewProps> = ({ onNavigate, onOpen
           </div>
         </div>
       </div>
+
+      {/* 2c. AI attribution: what AI-sourced leads turned into */}
+      <AiAttributionPanel onOpenInquiry={(id) => onNavigate('inquiry_detail', id)} />
 
       {/* 3. Balanced 2-Column Work Area */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

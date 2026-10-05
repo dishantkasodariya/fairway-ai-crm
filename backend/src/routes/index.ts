@@ -26,6 +26,7 @@ import callsRoutes from './calls.routes.js';
 import intelligenceRoutes from './intelligence.routes.js';
 import leasesRoutes from './leases.routes.js';
 import todayRoutes from './today.routes.js';
+import reportsRoutes from './reports.routes.js';
 
 const router = Router();
 
@@ -79,6 +80,7 @@ router.use('/calls', authenticateJWT, callsRoutes);
 router.use('/intelligence', authenticateJWT, intelligenceRoutes);
 router.use('/leases', authenticateJWT, leasesRoutes);
 router.use('/today', authenticateJWT, todayRoutes);
+router.use('/reports', authenticateJWT, reportsRoutes);
 
 export default router;
 
