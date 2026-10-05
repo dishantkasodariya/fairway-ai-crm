@@ -196,7 +196,8 @@ Each step below = one commit on `feature/ai-prospect-intelligence`. A step is do
 | C1 `discovery_runs.property_id` + `company_warehouse_links`; Olpad backfilled (runs 1/2/8, 822 links) | done | dd41095 |
 | C2 Runner links re-found companies instead of skipping; list filter by warehouse; nearest warehouse | done | 666eeaf |
 | C3 Discovery UI by warehouse (picker, filter, Warehouse column), property panel shows known prospects | done | 46b3aea |
-| C4 One account for many sites: 17 accounts / 23 sites grouped (822 rows → 799 accounts); CRM status + Add to CRM account-aware | done | (this commit) |
+| C4 One account for many sites: 17 accounts / 23 sites grouped (822 rows → 799 accounts); CRM status + Add to CRM account-aware | done | f6cea47 |
+| C5 Monthly discovery per managed warehouse (off: `DISCOVERY_CRON_ENABLED`), manager notified; signals research nearest-first | done | (this commit) |
 
 Notes carried forward:
 - A won card still shows "N days overdue" from its old `next_follow_up_date` → B1 clears follow-ups on won/lost.
@@ -217,5 +218,10 @@ Notes carried forward:
   main row is its best-researched site (score, then revenue) — e.g. Aether's is Site V.
 - CRM has separate company rows for some sites (Reliance x3, Aether x2, Colourtex x2 ...) from the old Add to CRM;
   not merged (same question as Neogen), but deal checks now look across the whole account.
+- C5 runs only for warehouses with a manager and a map location (today: Olpad only; the 3 demo parks have no manager).
+  Default radius 50 km (`DISCOVERY_CRON_RADIUS_KM`); an 8 km search cost 19 Places calls, 3 km cost 7, so 50 km is
+  in the hundreds of calls per warehouse per month — that's why it stays off until Bhavya turns it on.
+- Security (pre-existing, not touched): backend/.env.example is committed with what looks like a real production
+  DATABASE_URL password and JWT_SECRET — rotate them and replace with placeholders.
 - Open data questions: Amit Patel was set as Olpad's manager as a placeholder; Neogen Chemicals exists twice in the
   CRM (comp_e82dd44f / comp_725eaa7a, each with a deal) from the old client-side Add to CRM — merge or keep?

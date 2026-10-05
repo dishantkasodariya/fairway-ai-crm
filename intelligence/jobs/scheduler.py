@@ -40,7 +40,8 @@ def _select_batch(batch_size: int) -> list[int]:
             .outerjoin(OpportunityScore, OpportunityScore.company_id == Company.id)
             .filter(OpportunityScore.id.is_(None))
             .filter(Company.parent_company_id.is_(None))  # one research per account, not per gate
-            .order_by(Company.id.asc())
+            # Nearest a warehouse first: those are the likeliest tenants.
+            .order_by(Company.distance_km.asc().nullslast(), Company.id.asc())
             .limit(batch_size)
             .all()
         )

@@ -3,6 +3,7 @@ import { config } from './config/index.js';
 import { initDatabase } from './config/db.js';
 import { startAiSignalsWatcher } from './jobs/aiSignalsWatcher.js';
 import { startTodayDigest } from './jobs/todayDigest.js';
+import { startMonthlyDiscovery } from './jobs/monthlyDiscovery.js';
 
 const PORT = config.port;
 
@@ -15,6 +16,10 @@ const startServer = async () => {
   }
   if (process.env.TODAY_DIGEST_ENABLED !== 'false') {
     startTodayDigest();
+  }
+  // Opt-in: each run spends Google Places API credits.
+  if (process.env.DISCOVERY_CRON_ENABLED === 'true') {
+    startMonthlyDiscovery();
   }
 
   const server = app.listen(PORT, () => {
