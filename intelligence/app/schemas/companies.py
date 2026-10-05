@@ -55,6 +55,17 @@ class CompanyListItemOut(BaseModel):
     latest_revenue_cr: float | None = None
     opportunity_score: float | None = None
     latest_signal_freshness: str | None = None
+    # Nearest CRM warehouse this company is linked to, and how many it's near.
+    nearest_property_id: str | None = None
+    warehouse_count: int = 0
+
+
+class WarehouseLinkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    property_id: str
+    distance_km: float | None
+    discovery_run_id: int | None
 
 
 class CompanyDetailOut(BaseModel):
@@ -81,6 +92,7 @@ class CompanyDetailOut(BaseModel):
     revenue_snapshots: list[RevenueSnapshotOut] = []
     signals: list[SignalOut] = []
     opportunity_score: OpportunityScoreOut | None = None
+    warehouse_links: list[WarehouseLinkOut] = []
 
 
 class CompanyListOut(BaseModel):

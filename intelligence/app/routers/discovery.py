@@ -1,7 +1,8 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.db.models import DiscoveryRun, DiscoveryRunStatus, RevenueEnrichmentStatus
+from app.db.models import CompanyWarehouseLink, DiscoveryRun, DiscoveryRunStatus, RevenueEnrichmentStatus
 from app.deps import get_db, require_api_key
 from app.schemas.discovery import DiscoveryRunCreate, DiscoveryRunOut
 from jobs.discovery_runner import run_discovery_job
@@ -10,6 +11,16 @@ from jobs.enrich_revenue_runner import run_enrich_revenue_job
 router = APIRouter(
     prefix="/v1/discovery/runs", tags=["discovery"], dependencies=[Depends(require_api_key)]
 )
+
+
+def _run_out(db: Session, run: DiscoveryRun) -> DiscoveryRunOut:
+    out = DiscoveryRunOut.model_validate(run)
+    out.companies_linked = (
+        db.query(func.count(CompanyWarehouseLink.id))
+        .filter(CompanyWarehouseLink.discovery_run_id == run.id)
+        .scalar()
+    )
+    return out
 
 
 @router.post("", response_model=DiscoveryRunOut, status_code=202)
@@ -25,6 +36,7 @@ def create_discovery_run(
         warehouse_lat=body.lat,
         warehouse_lng=body.lng,
         radius_km=body.radius_km,
+        property_id=body.property_id,
         status=DiscoveryRunStatus.queued,
     )
     db.add(run)
@@ -32,7 +44,7 @@ def create_discovery_run(
     db.refresh(run)
 
     background_tasks.add_task(run_discovery_job, run.id)
-    return run
+    return _run_out(db, run)
 
 
 @router.get("/{run_id}", response_model=DiscoveryRunOut)
@@ -40,7 +52,7 @@ def get_discovery_run(run_id: int, db: Session = Depends(get_db)):
     run = db.query(DiscoveryRun).filter(DiscoveryRun.id == run_id).one_or_none()
     if run is None:
         raise HTTPException(status_code=404, detail="Discovery run not found")
-    return run
+    return _run_out(db, run)
 
 
 @router.post("/{run_id}/enrich-revenue", response_model=DiscoveryRunOut, status_code=202)
@@ -62,4 +74,4 @@ def enrich_revenue(
     db.refresh(run)
 
     background_tasks.add_task(run_enrich_revenue_job, run_id)
-    return run
+    return _run_out(db, run)

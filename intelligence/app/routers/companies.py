@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, aliased, joinedload
 
-from app.db.models import Company, OpportunityScore, RevenueSnapshot
+from app.db.models import Company, CompanyWarehouseLink, OpportunityScore, RevenueSnapshot
 from app.deps import get_db, require_api_key
 from app.schemas.companies import (
     BusinessTypeCountOut,
@@ -21,6 +21,7 @@ def list_companies(
     search: str | None = Query(default=None, description="Case-insensitive substring match on company name"),
     business_type: str | None = Query(default=None),
     discovery_run_id: int | None = Query(default=None, description="Restrict to companies found by one discovery run"),
+    property_id: str | None = Query(default=None, description="Restrict to companies near one CRM warehouse"),
     min_score: float | None = Query(default=None),
     max_revenue_cr: float | None = Query(default=None),
     min_revenue_cr: float | None = Query(default=None),
@@ -37,11 +38,42 @@ def list_companies(
         .subquery()
     )
 
+    # Each company's nearest linked warehouse (rn = 1) and how many it's near.
+    L = CompanyWarehouseLink
+    ranked_links = db.query(
+        L.company_id,
+        L.property_id,
+        func.row_number().over(partition_by=L.company_id, order_by=L.distance_km.asc().nullslast()).label("rn"),
+        func.count(L.id).over(partition_by=L.company_id).label("n"),
+    ).subquery()
+    nearest = (
+        db.query(ranked_links.c.company_id, ranked_links.c.property_id, ranked_links.c.n)
+        .filter(ranked_links.c.rn == 1)
+        .subquery()
+    )
+
+    # Distance shown/sorted: to the chosen warehouse when filtering, else the nearest one.
+    distance_col = Company.distance_km
     q = (
-        db.query(Company, OpportunityScore.score, latest_revenue.c.latest_revenue_cr, OpportunityScore)
+        db.query(
+            Company,
+            OpportunityScore.score,
+            latest_revenue.c.latest_revenue_cr,
+            OpportunityScore,
+            nearest.c.property_id,
+            nearest.c.n,
+        )
         .outerjoin(OpportunityScore, OpportunityScore.company_id == Company.id)
         .outerjoin(latest_revenue, latest_revenue.c.company_id == Company.id)
+        .outerjoin(nearest, nearest.c.company_id == Company.id)
     )
+    if property_id:
+        chosen = aliased(L)
+        q = q.join(chosen, (chosen.company_id == Company.id) & (chosen.property_id == property_id))
+        distance_col = chosen.distance_km
+        q = q.add_columns(chosen.distance_km)
+    else:
+        q = q.add_columns(Company.distance_km)
 
     if search:
         q = q.filter(Company.name.ilike(f"%{search}%"))
@@ -65,7 +97,7 @@ def list_companies(
     elif sort_by == "revenue":
         q = q.order_by(latest_revenue.c.latest_revenue_cr.desc().nullslast())
     elif sort_by == "distance":
-        q = q.order_by(Company.distance_km.asc().nullslast())
+        q = q.order_by(distance_col.asc().nullslast())
 
     rows = q.offset(offset).limit(limit).all()
 
@@ -75,13 +107,15 @@ def list_companies(
             name=company.name,
             business_type=company.business_type,
             address=company.address,
-            distance_km=company.distance_km,
+            distance_km=distance_km,
             site_count=company.site_count,
             latest_revenue_cr=latest_revenue_cr,
             opportunity_score=opp.score if opp else None,
             latest_signal_freshness=opp.latest_signal_freshness if opp else None,
+            nearest_property_id=nearest_property_id,
+            warehouse_count=warehouse_count or 0,
         )
-        for company, _score, latest_revenue_cr, opp in rows
+        for company, _score, latest_revenue_cr, opp, nearest_property_id, warehouse_count, distance_km in rows
     ]
     return CompanyListOut(total=total, items=items)
 
@@ -109,6 +143,7 @@ def get_company(company_id: int, db: Session = Depends(get_db)):
             joinedload(Company.revenue_snapshots),
             joinedload(Company.signals),
             joinedload(Company.opportunity_score),
+            joinedload(Company.warehouse_links),
         )
         .filter(Company.id == company_id)
         .one_or_none()

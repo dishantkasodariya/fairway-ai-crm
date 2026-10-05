@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 
 from app.config import get_settings
 from app.db.base import SessionLocal
-from app.db.models import Company, DiscoveryRun, DiscoveryRunStatus
+from sqlalchemy.dialects.postgresql import insert
+
+from app.db.models import Company, CompanyWarehouseLink, DiscoveryRun, DiscoveryRunStatus
 from classification.ai_fallback import AIFallbackClassifier
 from classification.rules import classify
 from discovery.tiling import find_companies_tiled
@@ -25,6 +27,27 @@ BASE_SUB_RADIUS_M = 3000
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _link_to_warehouse(db, company: Company, run: DiscoveryRun, distance_km: float | None) -> None:
+    """Record that this company is near the run's warehouse. A company already
+    linked to the warehouse keeps its original link; one found again from a
+    different warehouse gains a second link instead of a duplicate row."""
+    if not run.property_id:
+        return
+    db.execute(
+        insert(CompanyWarehouseLink)
+        .values(
+            company_id=company.id,
+            property_id=run.property_id,
+            discovery_run_id=run.id,
+            distance_km=distance_km,
+        )
+        .on_conflict_do_nothing(constraint="uq_company_warehouse")
+    )
+    # companies.distance_km = distance to the nearest known warehouse.
+    if distance_km is not None and (company.distance_km is None or distance_km < company.distance_km):
+        company.distance_km = distance_km
 
 
 def run_discovery_job(run_id: int) -> None:
@@ -56,6 +79,7 @@ def run_discovery_job(run_id: int) -> None:
                 if existing is not None:
                     if existing.discovery_run_id is None:
                         existing.discovery_run_id = run.id
+                    _link_to_warehouse(db, existing, run, c.get("distance_km"))
                     continue
 
                 category = classify(c["name"])
@@ -66,23 +90,26 @@ def run_discovery_job(run_id: int) -> None:
                     confidence = ai_result["confidence"]
                     reason = ai_result["reason"]
 
-                db.add(
-                    Company(
-                        place_id=c.get("id"),
-                        name=c["name"],
-                        address=c.get("address"),
-                        lat=c.get("lat"),
-                        lng=c.get("lng"),
-                        distance_km=c.get("distance_km"),
-                        phone=c.get("phone"),
-                        website=c.get("website"),
-                        primary_type=c.get("primary_type"),
-                        business_type=category,
-                        business_type_confidence=confidence,
-                        business_type_reason=reason,
-                        discovery_run_id=run.id,
-                    )
+                company = Company(
+                    place_id=c.get("id"),
+                    name=c["name"],
+                    address=c.get("address"),
+                    lat=c.get("lat"),
+                    lng=c.get("lng"),
+                    distance_km=c.get("distance_km"),
+                    phone=c.get("phone"),
+                    website=c.get("website"),
+                    primary_type=c.get("primary_type"),
+                    business_type=category,
+                    business_type_confidence=confidence,
+                    business_type_reason=reason,
+                    discovery_run_id=run.id,
                 )
+                db.add(company)
+                # Flush so the next result's place_id lookup sees this row
+                # (the session has autoflush off) and the link gets an id.
+                db.flush()
+                _link_to_warehouse(db, company, run, c.get("distance_km"))
                 created += 1
 
             run.companies_found = created

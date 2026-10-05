@@ -133,7 +133,9 @@ class Company(Base):
     jobs: Mapped[list["Job"]] = relationship(back_populates="company", cascade="all, delete-orphan")
     contacts: Mapped[list["Contact"]] = relationship(back_populates="company", cascade="all, delete-orphan")
     warehouse_links: Mapped[list["CompanyWarehouseLink"]] = relationship(
-        back_populates="company", cascade="all, delete-orphan"
+        back_populates="company",
+        cascade="all, delete-orphan",
+        order_by="CompanyWarehouseLink.distance_km",
     )
 
 

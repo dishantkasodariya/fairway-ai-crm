@@ -9,6 +9,8 @@ class DiscoveryRunCreate(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lng: float = Field(ge=-180, le=180)
     radius_km: float = Field(gt=0, le=MAX_RADIUS_M / 1000)
+    # CRM warehouse this search is for. Found companies get linked to it.
+    property_id: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 class DiscoveryRunOut(BaseModel):
@@ -18,9 +20,13 @@ class DiscoveryRunOut(BaseModel):
     warehouse_lat: float
     warehouse_lng: float
     radius_km: float
+    property_id: str | None = None
     status: str
     companies_found: int
     api_calls_made: int
+    # Companies this run linked to its warehouse: new ones plus already-known
+    # ones found again (companies_found counts only the new ones).
+    companies_linked: int = 0
     revenue_enrichment_status: str
     revenue_enriched_count: int
     created_at: datetime

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { config } from '../config/index.js';
+import { pool } from '../config/db.js';
 
 /**
  * Server-to-server proxy to the Fairway Company Intelligence API (Python/
@@ -64,15 +65,38 @@ const handleIntelligenceError = (res: Response, error: any, fallbackMessage: str
  */
 export const startDiscoveryRun = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { lat, lng, radiusKm } = req.body;
-    if (typeof lat !== 'number' || typeof lng !== 'number' || typeof radiusKm !== 'number') {
-      res.status(400).json({ success: false, error: 'lat, lng, and radiusKm (numbers) are required' });
+    const { propertyId, radiusKm } = req.body;
+    let { lat, lng } = req.body;
+    if (typeof radiusKm !== 'number') {
+      res.status(400).json({ success: false, error: 'radiusKm (number) is required' });
+      return;
+    }
+
+    // Searching for a warehouse: always use its saved coordinates, so a run
+    // can't be filed under one warehouse while centred somewhere else.
+    if (propertyId !== undefined && propertyId !== null && propertyId !== '') {
+      const { rows } = await pool.query('SELECT latitude, longitude FROM properties WHERE id = $1', [String(propertyId)]);
+      const property = rows[0];
+      if (!property) {
+        res.status(404).json({ success: false, error: 'Warehouse not found' });
+        return;
+      }
+      lat = property.latitude === null ? null : Number(property.latitude);
+      lng = property.longitude === null ? null : Number(property.longitude);
+      if (!lat || !lng) {
+        res.status(400).json({ success: false, error: 'This warehouse has no map location yet. Add its latitude and longitude first.' });
+        return;
+      }
+    }
+
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      res.status(400).json({ success: false, error: 'Pick a warehouse, or give lat and lng (numbers)' });
       return;
     }
 
     const run = await callIntelligenceApi('/v1/discovery/runs', {
       method: 'POST',
-      body: JSON.stringify({ lat, lng, radius_km: radiusKm }),
+      body: JSON.stringify({ lat, lng, radius_km: radiusKm, property_id: propertyId ? String(propertyId) : null }),
     });
 
     res.status(202).json({ success: true, data: toCamelCaseDeep(run) });
@@ -127,10 +151,11 @@ export const getBusinessTypes = async (req: Request, res: Response): Promise<voi
  */
 export const listDiscoveredCompanies = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { discoveryRunId, sortBy, minScore, search, businessType, minRevenueCr, maxRevenueCr, limit, offset } = req.query;
+    const { discoveryRunId, propertyId, sortBy, minScore, search, businessType, minRevenueCr, maxRevenueCr, limit, offset } = req.query;
 
     const params = new URLSearchParams();
     if (discoveryRunId) params.set('discovery_run_id', String(discoveryRunId));
+    if (propertyId) params.set('property_id', String(propertyId));
     if (sortBy) params.set('sort_by', String(sortBy));
     if (minScore) params.set('min_score', String(minScore));
     if (search) params.set('search', String(search));
