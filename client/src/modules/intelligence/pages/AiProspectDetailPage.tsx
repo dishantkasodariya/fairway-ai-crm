@@ -425,8 +425,15 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
           <p className="text-xs text-foreground-muted">{detail.opportunityScore.why}</p>
           <div className="grid grid-cols-2 gap-3 text-xs pt-2">
             <div>
-              <span className="text-foreground-muted">Estimated Requirement</span>
+              <span className="text-foreground-muted">Warehouse Space</span>
               <p className="font-semibold text-foreground">{detail.opportunityScore.estimatedRequirement || '—'}</p>
+              {detail.opportunityScore.requirementBasis === 'Confirmed requirement' ? (
+                <span className="inline-block mt-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  From cited research
+                </span>
+              ) : detail.opportunityScore.requirementBasis?.startsWith('AI-estimated') ? (
+                <span className="inline-block mt-1 text-[10px] text-foreground-muted">Rough guess from revenue — confirm with the company</span>
+              ) : null}
             </div>
             <div>
               <span className="text-foreground-muted">Recommended Action</span>

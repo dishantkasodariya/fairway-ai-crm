@@ -17,7 +17,7 @@ from app.db.models import Company, Contact, Job, JobStatus, JobType, Opportunity
 from agents.revenue_agent import RevenueAgent
 from agents.signal_agent import SignalAgent
 from agents.enrichment.apollo_client import ApolloApiError, ApolloClient
-from scoring.fusion import fuse_signals
+from scoring.fusion import fuse_signals, merge_requirement
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +147,12 @@ def run_signal_research_job(job_id: int) -> None:
 
             score_row.score = fused["opportunity_score"]
             score_row.why = fused["why"]
-            score_row.estimated_requirement = fused["estimated_requirement"]
-            score_row.requirement_basis = fused["requirement_basis"]
+            score_row.estimated_requirement, score_row.requirement_basis = merge_requirement(
+                score_row.estimated_requirement,
+                score_row.requirement_basis,
+                fused["estimated_requirement"],
+                fused["requirement_basis"],
+            )
             score_row.recommended_action = fused["recommended_action"]
             score_row.confidence = fused["confidence"]
             score_row.latest_signal_date = fused["latest_signal_date"]

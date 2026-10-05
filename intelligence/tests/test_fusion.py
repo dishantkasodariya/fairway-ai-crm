@@ -1,4 +1,4 @@
-from scoring.fusion import fuse_signals, sqft_bucket_for_revenue
+from scoring.fusion import fuse_signals, merge_requirement, sqft_bucket_for_revenue
 
 
 def test_regulatory_closure_reclassified_as_distress_and_suppresses_score():
@@ -94,3 +94,19 @@ def test_sqft_bucket_boundaries():
     assert sqft_bucket_for_revenue(75) == "20,000-50,000 sq.ft."
     assert sqft_bucket_for_revenue(76) == "50,000-100,000 sq.ft."
     assert sqft_bucket_for_revenue(5000) == "500,000+ sq.ft."
+
+
+def test_confirmed_requirement_survives_a_later_estimate():
+    kept = merge_requirement(
+        "~20,000 sq.ft. (existing Surat facility)", "Confirmed requirement",
+        "20,000-50,000 sq.ft.", "AI-estimated requirement (revenue-based heuristic)",
+    )
+    assert kept == ("~20,000 sq.ft. (existing Surat facility)", "Confirmed requirement")
+
+
+def test_new_confirmed_requirement_replaces_old_one_and_estimates_replace_estimates():
+    assert merge_requirement("old", "Confirmed requirement", "new 40,000 sq.ft.", "Confirmed requirement") == (
+        "new 40,000 sq.ft.", "Confirmed requirement")
+    assert merge_requirement("a", "AI-estimated requirement (revenue-based heuristic)", "b", "Unavailable") == (
+        "b", "Unavailable")
+    assert merge_requirement(None, None, "c", "Unavailable") == ("c", "Unavailable")

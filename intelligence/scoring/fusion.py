@@ -69,6 +69,23 @@ def reclassify_negative_regulatory(signals):
     return out
 
 
+CONFIRMED_BASIS = "Confirmed requirement"
+
+
+def merge_requirement(
+    existing_requirement: str | None,
+    existing_basis: str | None,
+    new_requirement: str,
+    new_basis: str,
+) -> tuple[str, str]:
+    """A confirmed (cited) space requirement is kept when a later research pass only
+    produced a revenue-based estimate or nothing — a guess must not replace a fact.
+    A newly confirmed figure always wins."""
+    if new_basis != CONFIRMED_BASIS and existing_basis == CONFIRMED_BASIS and existing_requirement:
+        return existing_requirement, existing_basis
+    return new_requirement, new_basis
+
+
 def fuse_signals(revenue_cr: float | None, signals: list[dict], estimated_sqft: str = "") -> dict:
     """signals: list of dicts with type/summary/date/source_name/source_url/confidence."""
     signals = [s for s in signals if s.get("type") in SIGNAL_TYPES and s.get("source_url")]
@@ -95,7 +112,7 @@ def fuse_signals(revenue_cr: float | None, signals: list[dict], estimated_sqft: 
     estimated_sqft = (estimated_sqft or "").strip()
     if estimated_sqft:
         requirement = estimated_sqft
-        requirement_basis = "Confirmed requirement"
+        requirement_basis = CONFIRMED_BASIS
     elif revenue_cr is not None:
         requirement = sqft_bucket_for_revenue(revenue_cr)
         requirement_basis = "AI-estimated requirement (revenue-based heuristic)"

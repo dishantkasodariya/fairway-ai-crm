@@ -1,0 +1,76 @@
+{
+  "source": "Opportunity Radar — Surat–Bharuch Corridor (artifact 65dsn2e5kR4LakTTZnTgYK, Sep 2026)",
+  "note": "Cited facility/space facts only (requirement_basis = Confirmed requirement); evidence URLs are the citations.",
+  "companies": [
+    {
+      "company": "Ideal Technoplast Industries Limited",
+      "estimated_requirement": "~20,000 sq.ft. (existing Surat facility, per IPO-related coverage)",
+      "requirement_basis": "Confirmed requirement",
+      "citations": [
+        "https://groww.in/ipo/ideal-technoplast-industries-ipo",
+        "https://upstox.com/news/market-news/ipo/ideal-technoplast-industries-ipo-day-3-nse-sme-issue-booked-112-times-on-high-retail-demand-1/article-112497/",
+        "https://nsearchives.nseindia.com/emerge/corporates/content/IdealTechnoplastIndustriesLimited_DP.pdf",
+        "https://aliceblueonline.com/ipo/ideal-technoplast-industries-limited-ipo/",
+        "https://www.linkedin.com/posts/ideal-technoplast-industries_idealtechnoplast-gheecontainers-plasticcontainers-activity-7264837618176053248-aND3"
+      ]
+    },
+    {
+      "company": "Aether Industries Limited - Site - V / BackSide",
+      "estimated_requirement": "Site 5 Panoli spans 31 acres (~12x the size of existing Site 2)",
+      "requirement_basis": "Confirmed requirement",
+      "citations": [
+        "https://www.sahi.com/news/aether-industries-commissions-2-phase-1-blocks-at-site-5-panoli-to-scale-capacity-5169-PE1_COR",
+        "https://scanx.trade/stock-market-news/corporate-actions/aether-industries-limited-completes-full-utilization-of-rs-7-286-14-million-qip-proceeds/32611584",
+        "https://static.hdfcsky.com/research/reports/019f1c5e6f5b789d91587c158b66dc98.pdf",
+        "https://www.linkedin.com/posts/aether-industries-limited_expanding-the-expansions-activity-7034565784878071809-QZwC"
+      ]
+    },
+    {
+      "company": "TPL PLASTECH LTD",
+      "estimated_requirement": "Bhuj IBC facility: 150,000 IBCs/year capacity (sq ft not disclosed).",
+      "requirement_basis": "Confirmed requirement",
+      "citations": [
+        "https://www.sahi.com/news/tpl-plastech-subsidiary-starts-150-000-ibc-capacity-facility-in-bhuj-gujarat-1613-PE1_COR",
+        "https://www.indianchemicalnews.com/general/tpl-plastech-commences-greenfield-industrial-packaging-manufacturing-facility-at-dahej-17319",
+        "https://www.tipranks.com/news/company-announcements/tpl-plastech-posts-strong-q1-fy27-growth-plans-solar-shift-and-bhuj-expansion",
+        "https://www.linkedin.com/posts/business-news-today-reporter-2947182_tpl-plastech-posts-17-revenue-growth-in-activity-7359882262999388161-5ZPK"
+      ]
+    },
+    {
+      "company": "Snowman Logistics Ltd",
+      "estimated_requirement": "Network-wide: ~150,754 pallets across 43 warehouses (~3 million+ sq ft of land area) as of mid-2025; new Kolkata facility 5,630 pallets, Krishnapatnam 3,927 pallets, planned Hyderabad addition 10,000 pallets, Pune BTS facility 5,900 pallets (individual sq ft not disclosed).",
+      "requirement_basis": "Confirmed requirement",
+      "citations": [
+        "https://www.constructionworld.in/urban-infrastructure/warehouse-and-logistics/snowman-logistics-adds-2-new-temperature-controlled-warehouses/75466",
+        "https://www.itln.in/amp/logistics/snowman-logistics-to-open-10000-pallet-cold-storage-in-hyderabad-1359914",
+        "https://www.constructionworld.in/urban-infrastructure/warehouse-and-logistics/snowman-logistics-adds-new-facility-in-kundli--expands-capacity/76050",
+        "https://www.whalesbook.com/news/English/industrial-goodsservices/Snowman-Logistics-Builds-Major-Cold-Storage-Hub-in-Patna/69b3bf1af962c451ea5fb742",
+        "https://in.linkedin.com/jobs/view/warehouse-sales-specialist-at-snowman-logistics-limited-4139517217",
+        "https://in.linkedin.com/posts/snowman-logistics_we-inaugurated-our-new-warehouse-at-krishnapatnam-activity-6364014364403560448-JNZD",
+        "https://www.linkedin.com/posts/hindubusinessline_snowman-logistics-opens-new-facility-in-guwahati-activity-7147524375917830144-h0wr"
+      ]
+    },
+    {
+      "company": "DIC India Limited",
+      "estimated_requirement": "~996,000 sq ft (92,500 sq m) — Saykha Optima plant, phase I",
+      "requirement_basis": "Confirmed requirement",
+      "citations": [
+        "https://dic.co.in/dic-india-inaugurates-its-new-state-of-the-art-manufacturing-facility-in-gujarat",
+        "https://www.labelsandlabeling.com/news/industry-trends/dic-india-inaugurates-new-factory-gujarat",
+        "https://www.equitymaster.com/research-it/annual-results-analysis/COAT/DIC-INDIA-LIMITED-2024-25-Annual-Report-Analysis/15811"
+      ]
+    },
+    {
+      "company": "Hikal Limited",
+      "estimated_requirement": "Panoli plant covers approximately 126,000 sq. meters (~1.36 million sq. ft) per site profile (thescirank.com), though this is total plant land area, not warehouse-specific.",
+      "requirement_basis": "Confirmed requirement",
+      "citations": [
+        "https://www.indianpharmapost.com/news/hikal-invests-rs-500-crore-into-fine-chemicals-plant-at-panoli-15125",
+        "https://www.icra.in/Rating/ShowRationalReportFilePdf/134410",
+        "https://www.indianchemicalnews.com/general/hikal-reports-q1-fy26-consolidated-loss-of-rs-224-cr-27047",
+        "https://www.hikal.com/uploads/documents/SignedResultsPresentation13112025.pdf",
+        "https://in.linkedin.com/jobs/view/executive-procurement-at-hikal-ltd-4152188528"
+      ]
+    }
+  ]
+}
