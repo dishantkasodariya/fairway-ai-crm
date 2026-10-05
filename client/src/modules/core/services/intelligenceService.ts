@@ -5,8 +5,13 @@ export interface DiscoveryRun {
   warehouseLat: number;
   warehouseLng: number;
   radiusKm: number;
+  /** CRM warehouse this run searched around; null for an ad-hoc point. */
+  propertyId: string | null;
   status: 'queued' | 'running' | 'done' | 'failed';
+  /** New companies this run added. */
   companiesFound: number;
+  /** New + already-known companies this run linked to its warehouse. */
+  companiesLinked: number;
   apiCallsMade: number;
   revenueEnrichmentStatus: 'not_started' | 'running' | 'done';
   revenueEnrichedCount: number;
@@ -62,10 +67,22 @@ export interface DiscoveredCompany {
   latestRevenueCr: number | null;
   opportunityScore: number | null;
   latestSignalFreshness: string | null;
+  /** Nearest CRM warehouse this company is near, and how many warehouses it's near. */
+  nearestPropertyId: string | null;
+  warehouseCount: number;
 }
 
-export interface DiscoveredCompanyDetail extends Omit<DiscoveredCompany, 'opportunityScore'> {
+export interface WarehouseLink {
+  propertyId: string;
+  distanceKm: number | null;
+  discoveryRunId: number | null;
+}
+
+export interface DiscoveredCompanyDetail
+  extends Omit<DiscoveredCompany, 'opportunityScore' | 'nearestPropertyId' | 'warehouseCount'> {
   placeId: string | null;
+  /** Warehouses this company is near, nearest first. */
+  warehouseLinks: WarehouseLink[];
   lat: number | null;
   lng: number | null;
   phone: string | null;
@@ -107,6 +124,8 @@ export interface DiscoveredCompanyDetail extends Omit<DiscoveredCompany, 'opport
 
 export interface ListDiscoveredCompaniesParams {
   discoveryRunId?: number;
+  /** Only companies near this CRM warehouse; distance is then to that warehouse. */
+  propertyId?: string;
   sortBy?: 'score' | 'recency' | 'revenue' | 'distance';
   minScore?: number;
   search?: string;
@@ -119,9 +138,11 @@ export interface ListDiscoveredCompaniesParams {
 
 export class IntelligenceService {
   /** Kick off a tiled company search around a property's coordinates. */
+  /** Search around a warehouse (its saved coordinates are used) or an ad-hoc lat/lng. */
   static async startDiscoveryRun(params: {
-    lat: number;
-    lng: number;
+    propertyId?: string;
+    lat?: number;
+    lng?: number;
     radiusKm: number;
   }): Promise<{ success: boolean; data?: DiscoveryRun; error?: string }> {
     try {
@@ -190,6 +211,7 @@ export class IntelligenceService {
     try {
       const q = new URLSearchParams();
       if (params.discoveryRunId !== undefined) q.set('discoveryRunId', String(params.discoveryRunId));
+      if (params.propertyId) q.set('propertyId', params.propertyId);
       if (params.sortBy) q.set('sortBy', params.sortBy);
       if (params.minScore !== undefined) q.set('minScore', String(params.minScore));
       if (params.search) q.set('search', params.search);

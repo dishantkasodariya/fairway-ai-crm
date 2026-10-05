@@ -11,6 +11,7 @@ import { cn } from '@/modules/core/lib/utils';
 import {
   IntelligenceService, DiscoveredCompany, DiscoveredCompanyDetail, Contact, CrmStatus,
 } from '@/modules/core/services/intelligenceService';
+import { PropertyService } from '@/modules/core/services/propertyService';
 import { addProspectToCrm } from '../utils/addProspectToCrm';
 import { exportProspectsCsv } from '../utils/exportProspectsCsv';
 import { OutreachDraftModal, OutreachChannel } from '../components/OutreachDraftModal';
@@ -51,6 +52,13 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
   const [contactError, setContactError] = useState('');
   const [isSavingContact, setIsSavingContact] = useState(false);
   const [draftTarget, setDraftTarget] = useState<{ contact: Contact; channel: OutreachChannel } | null>(null);
+  const [warehouseNames, setWarehouseNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    PropertyService.getProperties().then((res) => {
+      if (res.success && res.data) setWarehouseNames(Object.fromEntries(res.data.map((p) => [p.id, p.name])));
+    });
+  }, []);
 
   const loadCrmAndContacts = async () => {
     const [crmRes, contactsRes] = await Promise.all([
@@ -124,6 +132,8 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
     latestRevenueCr: d.revenueSnapshots[0]?.revenueCr ?? null,
     opportunityScore: d.opportunityScore?.score ?? null,
     latestSignalFreshness: d.opportunityScore?.latestSignalFreshness ?? null,
+    nearestPropertyId: d.warehouseLinks[0]?.propertyId ?? null,
+    warehouseCount: d.warehouseLinks.length,
   });
 
   const handleAddToCrm = async () => {
@@ -192,6 +202,14 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
               <MapPin className="w-3 h-3" />
               {detail.address || 'Address unavailable'}
             </p>
+            {detail.warehouseLinks.length > 0 && (
+              <p className="text-xs text-foreground-muted mt-1">
+                Near{' '}
+                {detail.warehouseLinks
+                  .map((l) => `${warehouseNames[l.propertyId] ?? 'another warehouse'}${l.distanceKm !== null ? ` (${l.distanceKm.toFixed(1)} km)` : ''}`)
+                  .join(' · ')}
+              </p>
+            )}
           </div>
           <span className={`px-3 py-1 rounded-full text-sm font-bold border shrink-0 flex items-center gap-1 ${scoreBadgeClass(detail.opportunityScore?.score)}`}>
             <TrendingUp className="w-4 h-4" />

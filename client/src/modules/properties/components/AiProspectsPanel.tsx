@@ -11,6 +11,7 @@ export interface AiProspectsPanelProps {
   property: Property;
 }
 
+const SHOWN_LIMIT = 30;
 const POLL_INTERVAL_MS = 4000;
 
 const scoreBadgeClass = (score: number | null) => {
@@ -25,6 +26,7 @@ export const AiProspectsPanel: React.FC<AiProspectsPanelProps> = ({ property }) 
   const [radiusKm, setRadiusKm] = useState(10);
   const [run, setRun] = useState<DiscoveryRun | null>(null);
   const [prospects, setProspects] = useState<DiscoveredCompany[]>([]);
+  const [totalNearby, setTotalNearby] = useState(0);
   const [isStarting, setIsStarting] = useState(false);
   const [addingIds, setAddingIds] = useState<Set<number>>(new Set());
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
@@ -39,12 +41,19 @@ export const AiProspectsPanel: React.FC<AiProspectsPanelProps> = ({ property }) 
 
   useEffect(() => stopPolling, []);
 
-  const loadResults = async (runId: number) => {
-    const res = await IntelligenceService.listDiscoveredCompanies({ discoveryRunId: runId, sortBy: 'score', limit: 100 });
+  // Everything already known near this warehouse — new finds plus companies first found from another warehouse.
+  const loadResults = async () => {
+    const res = await IntelligenceService.listDiscoveredCompanies({ propertyId: property.id, sortBy: 'score', limit: SHOWN_LIMIT });
     if (res.success && res.data) {
       setProspects(res.data.items);
+      setTotalNearby(res.data.total);
     }
   };
+
+  useEffect(() => {
+    loadResults();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [property.id]);
 
   const handleFindProspects = async () => {
     if (!property.latitude || !property.longitude) {
@@ -55,11 +64,7 @@ export const AiProspectsPanel: React.FC<AiProspectsPanelProps> = ({ property }) 
     setIsStarting(true);
     setProspects([]);
     try {
-      const res = await IntelligenceService.startDiscoveryRun({
-        lat: property.latitude,
-        lng: property.longitude,
-        radiusKm,
-      });
+      const res = await IntelligenceService.startDiscoveryRun({ propertyId: property.id, radiusKm });
 
       if (!res.success || !res.data) {
         toastError('Search Failed', res.error || 'Could not start the prospect search.');
@@ -77,7 +82,13 @@ export const AiProspectsPanel: React.FC<AiProspectsPanelProps> = ({ property }) 
         setRun(poll.data);
         if (poll.data.status === 'done') {
           stopPolling();
-          await loadResults(runId);
+          await loadResults();
+          const reFound = Math.max(0, poll.data.companiesLinked - poll.data.companiesFound);
+          success(
+            'Search complete',
+            `${poll.data.companiesFound} new ${poll.data.companiesFound === 1 ? 'company' : 'companies'}` +
+              (reFound > 0 ? `, ${reFound} already known now linked to this warehouse.` : '.')
+          );
         } else if (poll.data.status === 'failed') {
           stopPolling();
           toastError('Search Failed', 'The prospect search failed on the intelligence service.');
@@ -168,16 +179,22 @@ export const AiProspectsPanel: React.FC<AiProspectsPanelProps> = ({ property }) 
         </div>
       )}
 
-      {!isSearching && run?.status === 'done' && prospects.length === 0 && (
+      {!isSearching && prospects.length === 0 && (
         <div className="py-10 text-center space-y-2">
-          <p className="text-xs text-foreground-muted">No companies found within {run.radiusKm}km of this park.</p>
+          <p className="text-xs text-foreground-muted">
+            {run?.status === 'done'
+              ? `No companies found within ${run.radiusKm} km of this park.`
+              : 'No companies found near this park yet. Pick a radius and click Find Prospects.'}
+          </p>
         </div>
       )}
 
       {!isSearching && prospects.length > 0 && (
         <div className="space-y-3">
           <p className="text-[11px] text-foreground-muted">
-            {prospects.length} companies found within {run?.radiusKm}km, sorted by opportunity score.
+            {totalNearby > prospects.length
+              ? `Top ${prospects.length} of ${totalNearby} companies near this park, by opportunity score. AI Discovery has the full list.`
+              : `${prospects.length} ${prospects.length === 1 ? 'company' : 'companies'} near this park, by opportunity score.`}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {prospects.map((company) => {
@@ -209,12 +226,12 @@ export const AiProspectsPanel: React.FC<AiProspectsPanelProps> = ({ property }) 
                     )}
                     {company.distanceKm !== null && (
                       <span className="px-2 py-0.5 rounded-lg bg-surface border border-border text-foreground-muted font-semibold">
-                        {company.distanceKm.toFixed(1)} km away
+                        {company.distanceKm.toFixed(1)} km from this park
                       </span>
                     )}
                     {company.latestRevenueCr !== null && (
                       <span className="px-2 py-0.5 rounded-lg bg-surface border border-border text-foreground-muted font-semibold">
-                        ₹{company.latestRevenueCr} Cr revenue
+                        ₹{Number(company.latestRevenueCr.toFixed(2)).toLocaleString('en-IN')} Cr revenue
                       </span>
                     )}
                     {company.latestSignalFreshness && (

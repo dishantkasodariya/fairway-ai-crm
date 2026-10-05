@@ -192,7 +192,10 @@ Each step below = one commit on `feature/ai-prospect-intelligence`. A step is do
 | B3a Server-side Add to CRM (no duplicates, owner = nearest warehouse manager), manual contacts | done | 57d5065 |
 | B3b Prospect page: CRM status, key people, draft messages | done | 4ed5381 |
 | B4 Today list + 08:00 IST digest + stale-hold release | done | dbef117 |
-| B5 AI Discovery search debounce/stale-response fix (+ revenue rounding) | done | (this commit) |
+| B5 AI Discovery search debounce/stale-response fix (+ revenue rounding) | done | b9e78b2 |
+| C1 `discovery_runs.property_id` + `company_warehouse_links`; Olpad backfilled (runs 1/2/8, 822 links) | done | dd41095 |
+| C2 Runner links re-found companies instead of skipping; list filter by warehouse; nearest warehouse | done | 666eeaf |
+| C3 Discovery UI by warehouse (picker, filter, Warehouse column), property panel shows known prospects | done | (this commit) |
 
 Notes carried forward:
 - A won card still shows "N days overdue" from its old `next_follow_up_date` → B1 clears follow-ups on won/lost.
@@ -202,5 +205,9 @@ Notes carried forward:
   jumping to Req. Confirmed; Today's prospect threshold is score >= 50 (nobody scores 70 yet, max 63); unassigned
   deals show a *suggested* owner instead of being bulk-reassigned; expired proposals only free their space, their
   status is not changed automatically.
+- C3 real test run 14 (Olpad, 8 km, 19 Places calls): 0 new, no duplicates — kept, it's genuine data.
+- Runs 3/4/5/9/10/11 were ad-hoc test points (0 companies) and stay unlinked; prop_1/2/3 are demo warehouses.
+- Pre-existing from 21 Sep (before this plan): intelligence contact "Rajesh Mehta" (source `manual-test`) on
+  Ideal Technoplast, and its deal INQ-1051 — left as is.
 - Open data questions: Amit Patel was set as Olpad's manager as a placeholder; Neogen Chemicals exists twice in the
   CRM (comp_e82dd44f / comp_725eaa7a, each with a deal) from the old client-side Add to CRM — merge or keep?

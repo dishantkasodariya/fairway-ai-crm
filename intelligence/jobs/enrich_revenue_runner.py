@@ -11,8 +11,10 @@ so no SQLAlchemy session ever crosses a thread boundary.
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from sqlalchemy import or_
+
 from app.db.base import SessionLocal
-from app.db.models import Company, DiscoveryRun, Job, JobStatus, JobType, RevenueEnrichmentStatus
+from app.db.models import Company, CompanyWarehouseLink, DiscoveryRun, Job, JobStatus, JobType, RevenueEnrichmentStatus
 from jobs.runner import run_revenue_research_job
 
 logger = logging.getLogger(__name__)
@@ -48,7 +50,13 @@ def run_enrich_revenue_job(run_id: int) -> None:
         try:
             companies = (
                 db.query(Company)
-                .filter(Company.discovery_run_id == run_id)
+                .filter(
+                    or_(
+                        Company.discovery_run_id == run_id,
+                        # already-known companies this run linked to its warehouse
+                        Company.warehouse_links.any(CompanyWarehouseLink.discovery_run_id == run_id),
+                    )
+                )
                 .filter(~Company.revenue_snapshots.any())
                 .all()
             )

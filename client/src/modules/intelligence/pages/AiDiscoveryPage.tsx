@@ -29,6 +29,8 @@ import {
   DiscoveryRun,
   BusinessTypeCount,
 } from '@/modules/core/services/intelligenceService';
+import { PropertyService } from '@/modules/core/services/propertyService';
+import type { Property } from '@/modules/core/types';
 import { exportProspectsCsv } from '../utils/exportProspectsCsv';
 
 export interface AiDiscoveryPageProps {
@@ -36,6 +38,15 @@ export interface AiDiscoveryPageProps {
 }
 
 const POLL_INTERVAL_MS = 4000;
+const WAREHOUSE_STORAGE_KEY = 'aiDiscovery.warehouseId';
+
+const readStoredWarehouse = (): string | null => {
+  try {
+    return localStorage.getItem(WAREHOUSE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
 
 const scoreBadgeClass = (score: number | null) => {
   if (score === null) return 'bg-surface-muted text-foreground-muted border-border';
@@ -47,8 +58,10 @@ const scoreBadgeClass = (score: number | null) => {
 export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspect }) => {
   const { success, error: toastError } = useToast();
 
-  const [lat, setLat] = useState('21.4779173');
-  const [lng, setLng] = useState('72.7234733');
+  // Warehouses that have a map location — the only places a search can start from.
+  const [warehouses, setWarehouses] = useState<Property[]>([]);
+  const [warehousesLoaded, setWarehousesLoaded] = useState(false);
+  const [warehouseId, setWarehouseId] = useState('');
   const [radiusKm, setRadiusKm] = useState(10);
   const [run, setRun] = useState<DiscoveryRun | null>(null);
   const [prospects, setProspects] = useState<DiscoveredCompany[]>([]);
@@ -63,6 +76,8 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const latestRequestRef = useRef(0);
   const [businessTypeFilter, setBusinessTypeFilter] = useState('all');
+  // 'all' = every discovered company; otherwise only those near this warehouse.
+  const [warehouseFilter, setWarehouseFilter] = useState('all');
   const [minScore, setMinScore] = useState('all');
   const [sortBy, setSortBy] = useState<'score' | 'recency' | 'revenue' | 'distance'>('score');
 
@@ -97,17 +112,32 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     IntelligenceService.getBusinessTypes().then((res) => {
       if (res.success && res.data) setBusinessTypes(res.data.items);
     });
+    PropertyService.getProperties().then((res) => {
+      const located = (res.success && res.data ? res.data : [])
+        .filter((p) => Number(p.latitude) && Number(p.longitude))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+      setWarehouses(located);
+      const stored = readStoredWarehouse();
+      setWarehouseId(located.find((p) => p.id === stored)?.id ?? located[0]?.id ?? '');
+      setWarehousesLoaded(true);
+    });
   }, []);
+
+  const warehouseName = useMemo(() => {
+    const names = new Map(warehouses.map((w) => [w.id, w.name]));
+    return (id: string | null) => (id ? names.get(id) ?? 'Other warehouse' : '—');
+  }, [warehouses]);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  const loadResults = async (runId?: number) => {
+  const loadResults = async (propertyIdOverride?: string) => {
     const requestId = ++latestRequestRef.current;
+    const propertyId = propertyIdOverride ?? (warehouseFilter !== 'all' ? warehouseFilter : undefined);
     const res = await IntelligenceService.listDiscoveredCompanies({
-      discoveryRunId: runId,
+      propertyId,
       sortBy,
       minScore: minScore !== 'all' ? Number(minScore) : undefined,
       search: debouncedSearch || undefined,
@@ -125,11 +155,14 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   };
 
   const handleSearch = async () => {
-    const latNum = parseFloat(lat);
-    const lngNum = parseFloat(lng);
-    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
-      toastError('Invalid Coordinates', 'Enter valid latitude and longitude.');
+    if (!warehouseId) {
+      toastError('Pick a warehouse', 'Choose which warehouse to search around.');
       return;
+    }
+    try {
+      localStorage.setItem(WAREHOUSE_STORAGE_KEY, warehouseId);
+    } catch {
+      /* remembering the choice is only a convenience */
     }
 
     setIsStarting(true);
@@ -137,7 +170,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     setRowSelection({});
     setPagination((p) => ({ ...p, pageIndex: 0 }));
     try {
-      const res = await IntelligenceService.startDiscoveryRun({ lat: latNum, lng: lngNum, radiusKm });
+      const res = await IntelligenceService.startDiscoveryRun({ propertyId: warehouseId, radiusKm });
       if (!res.success || !res.data) {
         toastError('Search Failed', res.error || 'Could not start the prospect search.');
         return;
@@ -154,7 +187,16 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         setRun(poll.data);
         if (poll.data.status === 'done') {
           stopPolling();
-          await loadResults(runId);
+          // Show everything near this warehouse: the new companies plus already-known ones it re-found.
+          const pid = poll.data.propertyId ?? warehouseId;
+          setWarehouseFilter(pid);
+          await loadResults(pid);
+          const reFound = Math.max(0, poll.data.companiesLinked - poll.data.companiesFound);
+          success(
+            'Search complete',
+            `${poll.data.companiesFound} new ${poll.data.companiesFound === 1 ? 'company' : 'companies'}` +
+              (reFound > 0 ? `, ${reFound} already known now linked to this warehouse.` : '.')
+          );
         } else if (poll.data.status === 'failed') {
           stopPolling();
           toastError('Search Failed', 'The prospect search failed on the intelligence service.');
@@ -185,7 +227,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         if (poll.data.revenueEnrichmentStatus === 'done') {
           stopEnrichPolling();
           setIsEnriching(false);
-          await loadResults(run.id);
+          await loadResults();
           success('Revenue Enriched', `Researched revenue for ${poll.data.revenueEnrichedCount} companies.`);
         }
       }, POLL_INTERVAL_MS);
@@ -195,21 +237,20 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     }
   };
 
-  // Re-run the results query (server-side paginated) whenever a filter or page changes, on
-  // mount, scoped to the active run if a fresh search just completed, otherwise across every
-  // already-discovered company.
+  // Re-run the results query (server-side paginated) on mount and whenever a filter or page
+  // changes — but not while a search is still running.
   useEffect(() => {
-    if (!run || run.status === 'done') {
-      loadResults(run?.status === 'done' ? run.id : undefined);
+    if (!run || run.status === 'done' || run.status === 'failed') {
+      loadResults();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, businessTypeFilter, minScore, sortBy, pagination.pageIndex, pagination.pageSize]);
+  }, [debouncedSearch, businessTypeFilter, warehouseFilter, minScore, sortBy, pagination.pageIndex, pagination.pageSize]);
 
   // A filter change can leave the current page out of range; jump back to page 1.
   useEffect(() => {
     setPagination((p) => (p.pageIndex === 0 ? p : { ...p, pageIndex: 0 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, businessTypeFilter, minScore, sortBy]);
+  }, [debouncedSearch, businessTypeFilter, warehouseFilter, minScore, sortBy]);
 
   const columns = useMemo<ColumnDef<DataGridFeatures, DiscoveredCompany>[]>(
     () => [
@@ -256,6 +297,31 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         size: 160,
       },
       {
+        id: 'warehouse',
+        accessorKey: 'nearestPropertyId',
+        meta: { headerTitle: 'Warehouse' },
+        header: ({ column }) => <DataGridColumnHeader column={column} title="Warehouse" />,
+        cell: ({ row }) => {
+          const shownId = warehouseFilter !== 'all' ? warehouseFilter : row.original.nearestPropertyId;
+          const others = row.original.warehouseCount - 1;
+          return (
+            <span className="text-xs text-foreground-muted flex items-center gap-1 min-w-0">
+              <span className="truncate">{warehouseName(shownId)}</span>
+              {others > 0 && (
+                <span
+                  className="shrink-0 px-1.5 py-0.5 rounded-md bg-surface-muted border border-border text-[10px] font-semibold"
+                  title={`Also near ${others} other warehouse${others === 1 ? '' : 's'}`}
+                >
+                  +{others}
+                </span>
+              )}
+            </span>
+          );
+        },
+        size: 200,
+        enableSorting: false,
+      },
+      {
         id: 'distanceKm',
         accessorKey: 'distanceKm',
         meta: { headerTitle: 'Distance' },
@@ -288,7 +354,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         size: 130,
       },
     ],
-    []
+    [warehouseFilter, warehouseName]
   );
 
   const table = useTable({
@@ -319,7 +385,8 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   };
 
   const isSearching = run !== null && (run.status === 'queued' || run.status === 'running');
-  const showEnrichBanner = run?.status === 'done' && run.revenueEnrichmentStatus === 'not_started' && prospects.length > 0;
+  // Only offer enrichment when this run actually brought companies to the warehouse.
+  const showEnrichBanner = run?.status === 'done' && run.revenueEnrichmentStatus === 'not_started' && run.companiesLinked > 0;
 
   return (
     <div className="space-y-5 p-4 sm:p-6">
@@ -330,31 +397,21 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
             AI Discovery
           </h1>
           <p className="text-xs text-foreground-muted mt-0.5">
-            Search for companies near a location, scored by expansion/hiring/funding/distress signals.
+            Find companies near your warehouses, scored by expansion, hiring, funding and distress signals.
           </p>
         </div>
       </div>
 
       <Card className="p-4 sm:p-5 space-y-3">
         <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="text-[11px] font-semibold text-foreground-muted block mb-1">Latitude</label>
-            <input
-              type="text"
-              value={lat}
-              onChange={(e) => setLat(e.target.value)}
-              className="w-32 bg-surface-muted border border-border rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground focus:outline-none"
-              disabled={isSearching}
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-semibold text-foreground-muted block mb-1">Longitude</label>
-            <input
-              type="text"
-              value={lng}
-              onChange={(e) => setLng(e.target.value)}
-              className="w-32 bg-surface-muted border border-border rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground focus:outline-none"
-              disabled={isSearching}
+          <div className="min-w-[240px]">
+            <label className="text-[11px] font-semibold text-foreground-muted block mb-1">Warehouse</label>
+            <Combobox
+              options={warehouses.map((w) => ({ value: w.id, label: w.city ? `${w.name} · ${w.city}` : w.name }))}
+              value={warehouseId}
+              onChange={setWarehouseId}
+              placeholder={warehousesLoaded ? 'No warehouse with a map location' : 'Loading warehouses…'}
+              disabled={isSearching || warehouses.length === 0}
             />
           </div>
           <div>
@@ -373,19 +430,25 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
             type="button"
             onClick={handleSearch}
             isLoading={isStarting || isSearching}
+            disabled={!warehouseId}
             leftIcon={<Sparkles className="w-3.5 h-3.5" />}
             className="rounded-xl text-xs font-semibold"
           >
             {isSearching ? 'Searching…' : 'Find Prospects'}
           </Button>
         </div>
+        {warehousesLoaded && warehouses.length === 0 && (
+          <p className="text-[11px] text-foreground-muted">
+            None of your warehouses has a map location yet. Add latitude and longitude on the warehouse page to search around it.
+          </p>
+        )}
       </Card>
 
       {isSearching && (
         <div className="py-10 text-center space-y-3">
           <Loader2 className="w-8 h-8 text-fairway-600 animate-spin mx-auto" />
           <p className="text-xs text-foreground-muted">
-            Tiling a {radiusKm}km radius, classifying businesses, and scoring opportunity — this can take a minute for larger radii.
+            Searching {radiusKm} km around {warehouseName(run?.propertyId ?? warehouseId)} and classifying businesses — this can take a minute for larger radii.
           </p>
         </div>
       )}
@@ -393,7 +456,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
       {showEnrichBanner && (
         <Card className="p-4 flex items-center justify-between gap-3 border-fairway-600/30 bg-fairway-600/5">
           <p className="text-xs text-foreground">
-            {prospects.length} companies found. Research revenue for all of them to improve opportunity scoring?
+            This search brought {run?.companiesLinked} {run?.companiesLinked === 1 ? 'company' : 'companies'} to {warehouseName(run?.propertyId ?? null)}. Research revenue for the ones without it to improve opportunity scoring?
           </p>
           <Button type="button" size="sm" onClick={handleEnrichRevenue} isLoading={isEnriching} className="rounded-lg text-xs font-semibold shrink-0">
             {isEnriching ? `Enriching… (${run?.revenueEnrichedCount ?? 0})` : 'Enrich Revenue'}
@@ -419,7 +482,17 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
               value={businessTypeFilter}
               onChange={setBusinessTypeFilter}
               placeholder="All Business Types"
+              className="w-56"
             />
+            {warehouses.length > 0 && (
+              <Combobox
+                options={[{ value: 'all', label: 'All Warehouses' }, ...warehouses.map((w) => ({ value: w.id, label: `Near ${w.name}` }))]}
+                value={warehouseFilter}
+                onChange={setWarehouseFilter}
+                placeholder="All Warehouses"
+              className="w-72"
+              />
+            )}
             <Combobox
               options={[
                 { value: 'all', label: 'Any Score' },
@@ -429,6 +502,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
               value={minScore}
               onChange={setMinScore}
               placeholder="Any Score"
+              className="w-36"
             />
             <Combobox
               options={[
@@ -440,6 +514,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
               value={sortBy}
               onChange={(v) => setSortBy(v as typeof sortBy)}
               placeholder="Sort"
+              className="w-40"
             />
             <div className="flex-1" />
             <Button
@@ -469,8 +544,8 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
           {prospects.length === 0 && (
             <div className="py-10 text-center">
               <p className="text-xs text-foreground-muted">
-                {run?.status === 'done'
-                  ? `No companies found within ${run.radiusKm}km of this location.`
+                {warehouseFilter !== 'all' && !debouncedSearch && businessTypeFilter === 'all' && minScore === 'all'
+                  ? `No companies found near ${warehouseName(warehouseFilter)} yet. Run a search around it above.`
                   : 'No discovered companies match these filters yet.'}
               </p>
             </div>
