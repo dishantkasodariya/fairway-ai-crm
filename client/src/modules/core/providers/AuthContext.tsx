@@ -74,16 +74,17 @@ const saveCurrentUserLocal = (user: User) => {
 
 export const normalizeModuleCategory = (mod: string): string => {
   const m = (mod || '').toLowerCase().trim();
-  if (m.includes('inquir') || m.includes('lead') || m.includes('pipeline')) return 'Inquiries & Leads';
-  if (m.includes('prop_quote') || m.includes('proposal') || m.includes('quote')) return 'Proposals & Financials';
+  if (m.includes('inquir') || m.includes('lead') || m.includes('pipeline') || m.includes('deal')) return 'Inquiries & Leads';
+  if (m.includes('prop_quote') || m.includes('proposal') || m.includes('quote') || m.includes('financial')) return 'Proposals & Financials';
   if (m.includes('prop') || m.includes('warehouse')) return 'Properties & Warehouses';
-  if (m.includes('comp') || m.includes('account') || m.includes('contact')) return 'Companies & Accounts';
+  if (m.includes('comp') || m.includes('account') || m.includes('contact') || m.includes('intelligence')) return 'Companies & Accounts';
   if (m.includes('task') || m.includes('follow') || m.includes('site')) return 'Tasks & Follow-ups';
   if (m.includes('comm') || m.includes('mail') || m.includes('call')) return 'Communications';
   if (m.includes('rep') || m.includes('analytics')) return 'Reports & Analytics';
   if (m.includes('adm') || m.includes('setting') || m.includes('role') || m.includes('user')) return 'Administration';
   return mod;
 };
+
 
 export type PermissionActionType =
   | 'view'
@@ -646,8 +647,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     moduleName: string,
     actionKey: PermissionActionType
   ): boolean => {
-    // Only Super Admin has unconditional platform root bypass
-    if (isSuperAdmin) return true;
+    // Both Super Admin and Admin have unconditional platform access
+    if (isSuperAdmin || isAdmin) return true;
 
     const targetCategory = normalizeModuleCategory(moduleName).toLowerCase();
 
@@ -694,7 +695,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasCapability = (capabilityId: string): boolean => {
-    if (isSuperAdmin) return true;
+    if (isSuperAdmin || isAdmin) return true;
     const targetId = capabilityId.toLowerCase().trim();
     const found = rolePermissions.find((p) => (p.id || '').toLowerCase().trim() === targetId);
     if (found) {
@@ -728,9 +729,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canAssign = (module: string) => checkPermission(module, 'assign');
   const canManage = (module: string) => checkPermission(module, 'manage');
 
-  const canManageUsers = isSuperAdmin || hasCapability('perm_adm_users');
-  const canConfigureStages = isSuperAdmin || hasCapability('perm_adm_stages') || hasCapability('perm_inq_stage');
-  const canViewAuditLogs = isSuperAdmin || hasCapability('perm_adm_audit');
+  const canManageUsers = isSuperAdmin || isAdmin || hasCapability('perm_adm_users');
+  const canConfigureStages = isSuperAdmin || isAdmin || hasCapability('perm_adm_stages') || hasCapability('perm_inq_stage');
+  const canViewAuditLogs = isSuperAdmin || isAdmin || hasCapability('perm_adm_audit');
+
 
   return (
     <AuthContext.Provider

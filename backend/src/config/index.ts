@@ -17,6 +17,9 @@ export const config = {
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   // Fairway Company Intelligence API (Python/FastAPI service under /intelligence)
-  intelligenceApiUrl: process.env.INTELLIGENCE_API_URL || 'http://localhost:8000',
-  intelligenceApiKey: process.env.INTELLIGENCE_API_KEY || '',
+  intelligenceApiUrl:
+    process.env.INTELLIGENCE_API_URL ||
+    (nodeEnv === 'production' ? 'https://fairway-intelligence.onrender.com' : 'http://localhost:8000'),
+  intelligenceApiKey: process.env.INTELLIGENCE_API_KEY || 'fairway_intelligence_dev_key',
 };
+

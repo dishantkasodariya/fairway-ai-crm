@@ -15,10 +15,10 @@ export type PermissionAction =
 
 export const normalizeCategory = (moduleName: string): string => {
   const m = (moduleName || '').toLowerCase().trim();
-  if (m.includes('inquir') || m.includes('lead') || m.includes('pipeline')) return 'Inquiries & Leads';
-  if (m.includes('prop') || m.includes('warehouse')) return 'Properties & Warehouses';
-  if (m.includes('comp') || m.includes('account') || m.includes('contact')) return 'Companies & Accounts';
+  if (m.includes('inquir') || m.includes('lead') || m.includes('pipeline') || m.includes('deal')) return 'Inquiries & Leads';
   if (m.includes('prop_quote') || m.includes('proposal') || m.includes('financial') || m.includes('quote')) return 'Proposals & Financials';
+  if (m.includes('prop') || m.includes('warehouse')) return 'Properties & Warehouses';
+  if (m.includes('comp') || m.includes('account') || m.includes('contact') || m.includes('intelligence')) return 'Companies & Accounts';
   if (m.includes('task') || m.includes('site_visit') || m.includes('follow')) return 'Tasks & Follow-ups';
   if (m.includes('comm') || m.includes('mail') || m.includes('call')) return 'Communications';
   if (m.includes('rep') || m.includes('analytic')) return 'Reports & Analytics';
@@ -133,7 +133,7 @@ export const requirePermission = (moduleName: string, action: PermissionAction) 
       // 3. Query role_permissions for capabilities matching this module
       const targetCategory = normalizeCategory(moduleName).toLowerCase();
       const permsRes = await query(
-        `SELECT id, capability, category, custom_permissions 
+        `SELECT id, capability, category, super_admin, admin, sales, viewer, custom_permissions 
          FROM role_permissions 
          ORDER BY id ASC`
       );
@@ -160,33 +160,55 @@ export const requirePermission = (moduleName: string, action: PermissionAction) 
         matchAction(p.id, p.capability, action)
       );
 
-      // Helper to evaluate value from custom_permissions
-      const isPermitted = (custom: Record<string, string> | null) => {
-        if (!custom) return false;
-        const keys = [role, role.toUpperCase(), role.toLowerCase()];
-        for (const k of keys) {
-          if (custom[k] !== undefined) {
-            const v = String(custom[k]).trim().toLowerCase();
-            return v !== 'no' && v !== '' && v !== 'false';
+      // Helper to evaluate value from custom_permissions or dedicated role column
+      const isPermitted = (row: any) => {
+        const custom = row.custom_permissions as Record<string, string> | null;
+        if (custom) {
+          const keys = [role, role.toUpperCase(), role.toLowerCase()];
+          for (const k of keys) {
+            if (custom[k] !== undefined) {
+              const v = String(custom[k]).trim().toLowerCase();
+              return v !== 'no' && v !== '' && v !== 'false';
+            }
+          }
+          for (const [k, v] of Object.entries(custom)) {
+            if (k.toLowerCase() === role.toLowerCase()) {
+              const val = String(v).trim().toLowerCase();
+              return val !== 'no' && val !== '' && val !== 'false';
+            }
           }
         }
-        for (const [k, v] of Object.entries(custom)) {
-          if (k.toLowerCase() === role.toLowerCase()) {
-            const val = String(v).trim().toLowerCase();
-            return val !== 'no' && val !== '' && val !== 'false';
-          }
+
+        // Fall back to dedicated role column
+        const colVal =
+          row[role] ||
+          (role === 'admin'
+            ? row.admin
+            : role === 'sales'
+            ? row.sales
+            : role === 'viewer'
+            ? row.viewer
+            : role === 'super_admin'
+            ? row.super_admin
+            : null);
+
+        if (colVal !== undefined && colVal !== null) {
+          const v = String(colVal).trim().toLowerCase();
+          return v !== 'no' && v !== '' && v !== 'false';
         }
+
         return false;
       };
 
       let allowed = false;
 
       if (matchingActionPerms.length > 0) {
-        allowed = matchingActionPerms.some((p) => isPermitted(p.custom_permissions));
+        allowed = matchingActionPerms.some((p) => isPermitted(p));
       } else if (action === 'view') {
         // If checking 'view' and no explicit 'view' capability matched, check if ANY capability in category is granted
-        allowed = categoryPerms.some((p) => isPermitted(p.custom_permissions));
+        allowed = categoryPerms.some((p) => isPermitted(p));
       }
+
 
       if (!allowed) {
         res.status(403).json({

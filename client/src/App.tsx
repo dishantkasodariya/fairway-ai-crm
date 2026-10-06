@@ -69,8 +69,9 @@ const AccessRestrictedView: React.FC<{
 };
 
 const AppRouter: React.FC = () => {
-  const { isAuthenticated, logout, isSuperAdmin, canView, canImport, hasCapability } = useAuth();
+  const { isAuthenticated, logout, isSuperAdmin, isAdmin, canView, canImport, hasCapability } = useAuth();
   const { activeView, selectedEntityId, navigate, pathname } = useRouter();
+
 
   // Global Quick Action State
   const [defaultInquiryCompanyId, setDefaultInquiryCompanyId] = useState<string | undefined>(undefined);
@@ -117,6 +118,7 @@ const AppRouter: React.FC = () => {
 
 
   const getFirstAllowedView = (): ActiveNavView => {
+    if (isSuperAdmin || isAdmin) return 'dashboard';
     if (canView('inquiries')) return 'inquiries';
     if (canView('companies')) return 'companies';
     if (canView('properties')) return 'properties';
@@ -131,6 +133,7 @@ const AppRouter: React.FC = () => {
       case 'dashboard': {
         const canAccessDashboard =
           isSuperAdmin ||
+          isAdmin ||
           canView('inquiries') ||
           canView('companies') ||
           canView('properties') ||
@@ -145,6 +148,7 @@ const AppRouter: React.FC = () => {
             />
           );
         }
+
         return (
           <DashboardPage
             onNavigate={handleNavigate}
@@ -560,7 +564,7 @@ const AppRouter: React.FC = () => {
         return <ReportsPage />;
 
       case 'settings':
-        if (!canView('settings') && !hasCapability('perm_adm_roles') && !hasCapability('perm_adm_users') && !isSuperAdmin) {
+        if (!isAdmin && !isSuperAdmin && !canView('settings') && !hasCapability('perm_adm_roles') && !hasCapability('perm_adm_users')) {
           return (
             <AccessRestrictedView
               moduleName="Settings & RBAC"
@@ -569,6 +573,7 @@ const AppRouter: React.FC = () => {
           );
         }
         return <SettingsPage />;
+
 
       case 'profile':
         return <ProfilePage />;

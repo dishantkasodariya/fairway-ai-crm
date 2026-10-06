@@ -36,8 +36,9 @@ export async function callIntelligenceApi(
   path: string,
   options: RequestInit = {},
   retries = 2,
-  timeoutMs = 15000
+  timeoutMs = 35000
 ): Promise<any> {
+
   if (!config.intelligenceApiUrl) {
     throw new IntelligenceApiError(503, 'Intelligence API is not configured (set INTELLIGENCE_API_URL)', 'INTELLIGENCE_NOT_CONFIGURED');
   }
