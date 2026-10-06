@@ -191,6 +191,11 @@ export const getBusinessTypes = async (req: Request, res: Response): Promise<voi
     const result = await callIntelligenceApi('/v1/companies/business-types');
     res.status(200).json({ success: true, data: toCamelCaseDeep(result) });
   } catch (error: any) {
+    if (error?.status === 502 || error?.status === 503 || error?.status === 504 || error?.code === 'TIMEOUT') {
+      console.warn('[intelligence] Intelligence service cold starting, returning graceful fallback for business types');
+      res.status(200).json({ success: true, data: { items: [] }, warming: true });
+      return;
+    }
     handleIntelligenceError(res, error, 'Failed to fetch business types');
   }
 };
@@ -217,9 +222,15 @@ export const listDiscoveredCompanies = async (req: Request, res: Response): Prom
     const result = await callIntelligenceApi(`/v1/companies?${params.toString()}`);
     res.status(200).json({ success: true, data: toCamelCaseDeep(result) });
   } catch (error: any) {
+    if (error?.status === 502 || error?.status === 503 || error?.status === 504 || error?.code === 'TIMEOUT') {
+      console.warn('[intelligence] Intelligence service cold starting, returning graceful fallback for companies list');
+      res.status(200).json({ success: true, data: { total: 0, items: [] }, warming: true });
+      return;
+    }
     handleIntelligenceError(res, error, 'Failed to fetch discovered companies');
   }
 };
+
 
 /**
  * GET /api/intelligence/companies/:id
@@ -291,9 +302,15 @@ export const listAllContacts = async (req: Request, res: Response): Promise<void
     const result = await callIntelligenceApi('/v1/contacts');
     res.status(200).json({ success: true, data: toCamelCaseDeep(result) });
   } catch (error: any) {
+    if (error?.status === 502 || error?.status === 503 || error?.status === 504 || error?.code === 'TIMEOUT') {
+      console.warn('[intelligence] Intelligence service cold starting, returning graceful fallback for contacts');
+      res.status(200).json({ success: true, data: { items: [] }, warming: true });
+      return;
+    }
     handleIntelligenceError(res, error, 'Failed to fetch contacts');
   }
 };
+
 
 /**
  * POST /api/intelligence/contacts/:id/draft-message

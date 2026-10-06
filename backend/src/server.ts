@@ -22,6 +22,18 @@ const startServer = async () => {
     startMonthlyDiscovery();
   }
 
+  // Keep Render intelligence service awake and warm (free tier idle spin-down prevention)
+  if (config.intelligenceApiUrl && config.intelligenceApiUrl.includes('onrender.com')) {
+    const pingIntelligence = () => {
+      fetch(`${config.intelligenceApiUrl}/healthz`, {
+        headers: { 'X-API-Key': config.intelligenceApiKey },
+      }).catch(() => {});
+    };
+    pingIntelligence();
+    setInterval(pingIntelligence, 10 * 60 * 1000).unref();
+  }
+
+
   const server = app.listen(PORT, () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`📡 Health endpoint: http://localhost:${PORT}/api/health`);
