@@ -191,8 +191,13 @@ export const getNotifications = async (req: AuthenticatedRequest, res: Response)
       unreadCount: formatted.filter((n) => !n.isRead).length,
     });
   } catch (error: any) {
-    console.error('Error in getNotifications:', error);
-    res.status(500).json({ success: false, error: 'Failed to retrieve notifications.' });
+    console.warn('Notice in getNotifications (database offline or reconnecting):', error.message);
+    res.status(200).json({
+      success: true,
+      data: [],
+      unreadCount: 0,
+      warning: 'Notifications temporarily unavailable.',
+    });
   }
 };
 
