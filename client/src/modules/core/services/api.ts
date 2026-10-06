@@ -158,9 +158,12 @@ class ApiClient {
       }));
 
       if (!response.ok) {
+        const errorObj = data.error || { message: data.message || `Error ${response.status}` };
+        const errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || `Error ${response.status}`;
         return {
           success: false,
-          error: data.error || { message: data.message || `Error ${response.status}` },
+          error: errorMessage,
+          data: data.data,
         };
       }
 
@@ -169,7 +172,7 @@ class ApiClient {
       console.warn(`[API Network Error] ${endpoint}:`, networkError.message);
       return {
         success: false,
-        error: { message: networkError.message || 'Cannot reach backend server. Ensure backend is running.' },
+        error: networkError.message || 'Cannot reach backend server. Ensure backend is running.',
       };
     }
   }

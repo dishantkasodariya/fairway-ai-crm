@@ -124,8 +124,14 @@ export const getProperties = async (req: Request, res: Response): Promise<void> 
 
     res.status(200).json({ success: true, data: properties });
   } catch (error: any) {
-    console.warn('Notice fetching properties (db offline):', error.message);
-    res.status(200).json({ success: true, data: [], warning: error.message });
+    console.error('Error fetching properties:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: error.message || 'Failed to fetch properties',
+      },
+    });
   }
 };
 

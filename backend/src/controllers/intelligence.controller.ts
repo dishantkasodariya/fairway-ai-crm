@@ -24,38 +24,86 @@ export const toCamelCaseDeep = (value: any): any => {
 
 export class IntelligenceApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code: string;
+  constructor(status: number, message: string, code = 'INTELLIGENCE_API_ERROR') {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
-export async function callIntelligenceApi(path: string, options: RequestInit = {}): Promise<any> {
+export async function callIntelligenceApi(
+  path: string,
+  options: RequestInit = {},
+  retries = 2,
+  timeoutMs = 15000
+): Promise<any> {
   if (!config.intelligenceApiUrl) {
-    throw new IntelligenceApiError(503, 'Intelligence API is not configured (set INTELLIGENCE_API_URL)');
+    throw new IntelligenceApiError(503, 'Intelligence API is not configured (set INTELLIGENCE_API_URL)', 'INTELLIGENCE_NOT_CONFIGURED');
   }
 
   const url = `${config.intelligenceApiUrl}${path}`;
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': config.intelligenceApiKey,
-      ...(options.headers as Record<string, string> | undefined),
-    },
-  });
+  let lastError: any = null;
 
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new IntelligenceApiError(response.status, body?.detail || `Intelligence API error (${response.status})`);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': config.intelligenceApiKey,
+          ...(options.headers as Record<string, string> | undefined),
+        },
+      });
+
+      clearTimeout(timer);
+
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        // If 502/503/504 and we have retries remaining, wait and retry
+        if ([502, 503, 504].includes(response.status) && attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 500));
+          continue;
+        }
+        throw new IntelligenceApiError(
+          response.status,
+          body?.detail || `Intelligence API error (${response.status})`,
+          `HTTP_${response.status}`
+        );
+      }
+      return body;
+    } catch (err: any) {
+      lastError = err;
+      if (err.name === 'AbortError') {
+        lastError = new IntelligenceApiError(504, `Intelligence API timed out after ${timeoutMs}ms`, 'TIMEOUT');
+      }
+      if (attempt < retries && !(err instanceof IntelligenceApiError && err.status < 500)) {
+        await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 500));
+        continue;
+      }
+      break;
+    }
   }
-  return body;
+
+  throw lastError;
 }
 
 const handleIntelligenceError = (res: Response, error: any, fallbackMessage: string) => {
   const status = error instanceof IntelligenceApiError ? error.status : 502;
-  console.error(`[intelligence] ${fallbackMessage}:`, error.message);
-  res.status(status).json({ success: false, error: error.message || fallbackMessage });
+  const code = error instanceof IntelligenceApiError ? error.code : 'INTELLIGENCE_GATEWAY_ERROR';
+  const message = error.message || fallbackMessage;
+  console.error(`[intelligence] ${fallbackMessage}:`, message);
+  res.status(status).json({
+    success: false,
+    error: {
+      code,
+      message,
+    },
+  });
 };
 
 /**

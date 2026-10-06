@@ -311,6 +311,44 @@ Full details in [`intelligence/README.md`](./intelligence/README.md).
 
 ---
 
+---
+
+## 🧪 Automated Testing & QA Suite
+
+Fairway CRM includes comprehensive automated testing across all layers:
+
+### Running Backend Unit, Integration & E2E Tests
+```bash
+cd backend
+npm test
+```
+- **Total Tests**: 41 automated tests passing
+- **Test Runner**: Node.js Native Test Runner with `tsx` and `supertest`
+- **Coverage**:
+  - `src/utils/jwt.test.ts`: Cryptographic token issue, payload verification, and signature rejection.
+  - `src/utils/password.test.ts`: Bcrypt hashing, salt generation, and password validation.
+  - `src/tests/api.integration.test.ts`: Health checks with DB latency, 404 error boundaries, auth login/me, RBAC permissions, and protected business resources (companies, inquiries, properties, leases, today).
+  - `src/tests/intelligence.test.ts`: AI schema conversion (`toCamelCaseDeep`), API timeout/retries with exponential backoff, and failure recovery.
+  - `src/tests/e2e.flow.test.ts`: Full lifecycle test simulating an end-to-end user session from login through deal progression and property matching to DB cleanup.
+
+### Running Python Intelligence Engine Tests
+```bash
+cd intelligence
+pytest tests
+```
+- **Total Tests**: 20 tests covering classification rules, agent workflows, and data fusion.
+
+### Running Production Bundle Builds
+```bash
+# Verify TypeScript and build client bundle
+npm run build --prefix client
+
+# Verify backend TypeScript compilation
+npm run build --prefix backend
+```
+
+---
+
 ## 🛠️ Technology Stack
 
 | Layer | Technologies |
@@ -321,7 +359,7 @@ Full details in [`intelligence/README.md`](./intelligence/README.md).
 | **GIS & Interactive Maps** | Leaflet 1.9, `react-leaflet`, OpenStreetMap Tiles |
 | **Icons & Visuals** | Lucide React, Canvas Confetti |
 | **Backend Runtime** | Node.js 18+, Express 4.21, TypeScript (ESM) |
-| **Database & ORM** | PostgreSQL 15+, Prisma / `pg` Connection Pool |
+| **Database & ORM** | PostgreSQL 15+, `pg` Connection Pool with Auto-migration & Schema Isolation |
 | **Authentication & Crypto** | JSON Web Tokens (`jsonwebtoken`), `bcryptjs` |
 | **File & Spreadsheet Tools** | SheetJS (`xlsx`), Custom CSV Streaming Parser |
 
@@ -329,14 +367,12 @@ Full details in [`intelligence/README.md`](./intelligence/README.md).
 
 ## ☁️ Deployment & Production
 
-### Building for Production
-```bash
-# Build frontend bundle (Vite + TypeScript)
-npm run build --prefix client
-
-# Compile backend TypeScript
-npm run build --prefix backend
-```
+### Live Production Deployments
+- **Frontend Web App**: [https://fairway-ai-crm.onrender.com](https://fairway-ai-crm.onrender.com)
+- **CRM Backend API**: [https://fairway-crm-backend.onrender.com](https://fairway-crm-backend.onrender.com)
+  - Health check: [https://fairway-crm-backend.onrender.com/health](https://fairway-crm-backend.onrender.com/health)
+- **AI Intelligence Service**: [https://fairway-intelligence.onrender.com](https://fairway-intelligence.onrender.com)
+  - Health check: [https://fairway-intelligence.onrender.com/health](https://fairway-intelligence.onrender.com/health)
 
 ### Running in Production
 ```bash

@@ -14,19 +14,16 @@ import { logTouch, closeFollowUps } from '../services/followUpLoop.js';
 const generateInquiryNumber = async (): Promise<string> => {
   try {
     const result = await query(
-      "SELECT inquiry_number FROM inquiries WHERE inquiry_number ~ '^INQ-[0-9]+$' ORDER BY created_at DESC LIMIT 1;"
+      "SELECT MAX(CAST(SUBSTRING(inquiry_number FROM 'INQ-([0-9]+)') AS INTEGER)) as max_num FROM inquiries WHERE inquiry_number ~ '^INQ-[0-9]+$';"
     );
-    if (result.rows.length > 0) {
-      const match = result.rows[0].inquiry_number.match(/INQ-([0-9]+)/);
-      if (match) {
-        const nextNum = parseInt(match[1], 10) + 1;
-        return `INQ-${nextNum}`;
-      }
+    if (result.rows.length > 0 && result.rows[0].max_num != null) {
+      const nextNum = parseInt(result.rows[0].max_num, 10) + 1;
+      return `INQ-${nextNum}`;
     }
   } catch (err) {
     console.warn('Could not compute sequential inquiry number:', err);
   }
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+  const randomSuffix = Math.floor(10000 + Math.random() * 90000);
   return `INQ-${randomSuffix}`;
 };
 
@@ -219,15 +216,13 @@ export const getInquiries = async (req: Request, res: Response): Promise<void> =
       totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
     });
   } catch (error: any) {
-    console.warn('Notice fetching inquiries (db offline):', error.message);
-    res.status(200).json({
-      success: true,
-      data: [],
-      totalCount: 0,
-      pageNumber: 1,
-      pageSize: 10,
-      totalPages: 1,
-      warning: error.message || 'Failed to fetch inquiries',
+    console.error('Error fetching inquiries:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: error.message || 'Failed to fetch inquiries',
+      },
     });
   }
 };

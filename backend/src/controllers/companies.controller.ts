@@ -184,15 +184,13 @@ export const getCompanies = async (req: Request, res: Response): Promise<void> =
       totalPages: limit > 0 ? Math.ceil(totalCount / limit) : 1,
     });
   } catch (error: any) {
-    console.warn('Notice fetching companies (db offline):', error.message);
-    res.status(200).json({
-      success: true,
-      data: [],
-      totalCount: 0,
-      pageNumber: 1,
-      pageSize: 10,
-      totalPages: 1,
-      warning: error.message || 'Failed to fetch companies',
+    console.error('Error fetching companies:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: error.message || 'Failed to fetch companies',
+      },
     });
   }
 };

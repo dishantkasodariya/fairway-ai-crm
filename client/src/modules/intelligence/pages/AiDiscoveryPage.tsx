@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, Loader2, MapPin, TrendingUp, Download, Search as SearchIcon } from 'lucide-react';
+import { Sparkles, Loader2, MapPin, TrendingUp, Download, Search as SearchIcon, AlertTriangle } from 'lucide-react';
 import {
   ColumnDef,
   PaginationState,
@@ -70,6 +70,8 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   const [businessTypes, setBusinessTypes] = useState<BusinessTypeCount[]>([]);
   const [hasResults, setHasResults] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoadingProspects, setIsLoadingProspects] = useState(false);
 
   const [search, setSearch] = useState('');
   // The box updates `search` per keystroke; the query only uses this settled value.
@@ -136,21 +138,37 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   const loadResults = async (propertyIdOverride?: string) => {
     const requestId = ++latestRequestRef.current;
     const propertyId = propertyIdOverride ?? (warehouseFilter !== 'all' ? warehouseFilter : undefined);
-    const res = await IntelligenceService.listDiscoveredCompanies({
-      propertyId,
-      sortBy,
-      minScore: minScore !== 'all' ? Number(minScore) : undefined,
-      search: debouncedSearch || undefined,
-      businessType: businessTypeFilter !== 'all' ? businessTypeFilter : undefined,
-      limit: pagination.pageSize,
-      offset: pagination.pageIndex * pagination.pageSize,
-    });
-    // A slower, older request must not overwrite newer results (typing "chem" used to show "c"'s 481 rows).
-    if (requestId !== latestRequestRef.current) return;
-    if (res.success && res.data) {
-      setProspects(res.data.items);
-      setTotalCount(res.data.total);
-      setHasResults(true);
+    setIsLoadingProspects(true);
+    try {
+      const res = await IntelligenceService.listDiscoveredCompanies({
+        propertyId,
+        sortBy,
+        minScore: minScore !== 'all' ? Number(minScore) : undefined,
+        search: debouncedSearch || undefined,
+        businessType: businessTypeFilter !== 'all' ? businessTypeFilter : undefined,
+        limit: pagination.pageSize,
+        offset: pagination.pageIndex * pagination.pageSize,
+      });
+      // A slower, older request must not overwrite newer results (typing "chem" used to show "c"'s 481 rows).
+      if (requestId !== latestRequestRef.current) return;
+      if (res.success && res.data) {
+        setProspects(res.data.items);
+        setTotalCount(res.data.total);
+        setHasResults(true);
+        setLoadError(null);
+      } else {
+        const err = res.error;
+        const msg = typeof err === 'string' ? err : (err as any)?.message || 'Could not load company intelligence.';
+        setLoadError(msg);
+      }
+    } catch (err: any) {
+      if (requestId === latestRequestRef.current) {
+        setLoadError(err.message || 'Cannot reach intelligence service.');
+      }
+    } finally {
+      if (requestId === latestRequestRef.current) {
+        setIsLoadingProspects(false);
+      }
     }
   };
 
@@ -195,7 +213,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
           success(
             'Search complete',
             `${poll.data.companiesFound} new ${poll.data.companiesFound === 1 ? 'company' : 'companies'}` +
-              (reFound > 0 ? `, ${reFound} already known now linked to this warehouse.` : '.')
+            (reFound > 0 ? `, ${reFound} already known now linked to this warehouse.` : '.')
           );
         } else if (poll.data.status === 'failed') {
           stopPolling();
@@ -472,7 +490,22 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         </Card>
       )}
 
-      {!isSearching && hasResults && (
+      {loadError && (
+        <Card className="p-4 border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-300 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
+            <div>
+              <p className="text-xs font-semibold">Unable to load AI Discovery prospects</p>
+              <p className="text-[11px] text-rose-600/80 dark:text-rose-400/80 mt-0.5">{loadError}</p>
+            </div>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => loadResults()} className="h-8 text-xs cursor-pointer">
+            Retry
+          </Button>
+        </Card>
+      )}
+
+      {!isSearching && (hasResults || !loadError) && (
         <>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -498,7 +531,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
                 value={warehouseFilter}
                 onChange={setWarehouseFilter}
                 placeholder="All Warehouses"
-              className="w-72"
+                className="w-72"
               />
             )}
             <Combobox

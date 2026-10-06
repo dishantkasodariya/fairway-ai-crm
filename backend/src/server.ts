@@ -1,6 +1,6 @@
 import app from './app.js';
 import { config } from './config/index.js';
-import { initDatabase } from './config/db.js';
+import { initDatabase, pool } from './config/db.js';
 import { startAiSignalsWatcher } from './jobs/aiSignalsWatcher.js';
 import { startTodayDigest } from './jobs/todayDigest.js';
 import { startMonthlyDiscovery } from './jobs/monthlyDiscovery.js';
@@ -37,16 +37,38 @@ const startServer = async () => {
     }
   });
 
-  const shutdown = () => {
-    server.close(() => {
+  const shutdown = (signal: string) => {
+    console.log(`🛑 Received ${signal}. Initiating graceful shutdown...`);
+    server.close(async () => {
+      try {
+        await pool.end();
+        console.log('✅ PostgreSQL connection pool closed cleanly.');
+      } catch (err) {
+        console.error('⚠️ Error closing PostgreSQL pool:', err);
+      }
       process.exit(0);
     });
+
+    // Force shutdown if cleanup hangs
+    setTimeout(() => {
+      console.error('⚠️ Forced shutdown timed out after 10s.');
+      process.exit(1);
+    }, 10000).unref();
   };
 
-  process.on('SIGTERM', shutdown);
-  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('⚠️ Unhandled Promise Rejection at:', promise, 'reason:', reason);
+  });
+
+  process.on('uncaughtException', (err) => {
+    console.error('💥 Uncaught Exception:', err);
+  });
 };
 
 startServer().catch((err) => {
   console.error('Failed to start server:', err);
 });
+

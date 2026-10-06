@@ -70,12 +70,16 @@ export const initDatabase = async () => {
     const url = new URL(config.databaseUrl);
     const targetDbName = url.pathname.replace(/^\//, '').split('?')[0] || 'fairway_crm';
 
-    // 1. Ensure database exists
+    // 1. Ensure databases exist
     await ensureDatabaseExists(targetDbName);
+    await ensureDatabaseExists('fairway_intelligence');
 
     // 2. Connect to the target database
     const client = await pool.connect();
     console.log(`✅ Connected to PostgreSQL database "${targetDbName}".`);
+
+    // Ensure intelligence schema exists as fallback namespace
+    await client.query(`CREATE SCHEMA IF NOT EXISTS intelligence;`);
 
     // 3. Create users table
     await client.query(`

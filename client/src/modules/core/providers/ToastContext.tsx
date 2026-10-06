@@ -68,16 +68,27 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     []
   );
 
+  const formatMessage = (msg?: any): string | undefined => {
+    if (!msg) return undefined;
+    if (typeof msg === 'string') return msg;
+    if (typeof msg?.message === 'string') return msg.message;
+    try {
+      return JSON.stringify(msg);
+    } catch {
+      return String(msg);
+    }
+  };
+
   const success = useCallback(
-    (title: string, message?: string) => showToast(title, { message, type: 'success' }),
+    (title: string, message?: any) => showToast(title, { message: formatMessage(message), type: 'success' }),
     [showToast]
   );
   const error = useCallback(
-    (title: string, message?: string) => showToast(title, { message, type: 'error' }),
+    (title: string, message?: any) => showToast(title, { message: formatMessage(message), type: 'error' }),
     [showToast]
   );
   const info = useCallback(
-    (title: string, message?: string) => showToast(title, { message, type: 'info' }),
+    (title: string, message?: any) => showToast(title, { message: formatMessage(message), type: 'info' }),
     [showToast]
   );
 
