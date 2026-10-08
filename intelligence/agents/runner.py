@@ -3,7 +3,7 @@ Generic tool-use loop shared by every agent task (revenue research, signal
 research, ...). Structured output is forced by giving the model a
 "submit_result" tool whose parameters ARE the caller's JSON schema, rather
 than relying on free-text JSON parsing — this works identically across
-providers that support tool calling (Groq today, Bedrock tomorrow).
+providers that support tool calling (Groq, Bedrock, OpenAI).
 """
 
 import logging
@@ -39,7 +39,9 @@ class AgentRunner:
             result = self.provider.chat(system, messages, tool_specs, force_tool=force_tool)
 
             if not result.tool_calls:
-                messages.append({"role": "assistant", "content": result.content, "tool_calls": []})
+                messages.append(
+                    {"role": "assistant", "content": result.content, "tool_calls": [], "provider_items": result.provider_items}
+                )
                 messages.append(
                     {
                         "role": "user",
@@ -52,7 +54,12 @@ class AgentRunner:
                 continue
 
             messages.append(
-                {"role": "assistant", "content": result.content, "tool_calls": result.tool_calls}
+                {
+                    "role": "assistant",
+                    "content": result.content,
+                    "tool_calls": result.tool_calls,
+                    "provider_items": result.provider_items,
+                }
             )
 
             for tc in result.tool_calls:

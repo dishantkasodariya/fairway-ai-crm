@@ -122,8 +122,9 @@ pg_restore --clean --if-exists --no-owner --no-acl -d "$CRM_DB" docs/fairway_crm
 | `DATABASE_URL` | Render Internal Database URL for Intelligence DB |
 | `API_KEY` | Shared secret key matching `INTELLIGENCE_API_KEY` |
 | `PLACES_API` | Google Places API key for company discovery |
-| `LLM_PROVIDER` | `groq` or `bedrock` |
+| `LLM_PROVIDER` | `groq`, `bedrock` or `openai` |
 | `GROQ_API_KEY` | Groq API Key (if using Groq) |
+| `OPENAI_API_KEY` | OpenAI API key (if using OpenAI); optional `OPENAI_MODEL_BULK`, `OPENAI_MODEL_JUDGMENT` (default `gpt-6-luna`), `OPENAI_REASONING_EFFORT` (default `low`) |
 | `SERPER_API_KEY` | Google search API key for company signals |
 | `APOLLO_API_KEY` | Apollo.io API key for contact discovery |
 

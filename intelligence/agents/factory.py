@@ -18,4 +18,11 @@ def build_llm_provider(settings: Settings, tier: Tier = "bulk") -> LLMProvider:
 
         model_id = settings.bedrock_model_id_bulk if tier == "bulk" else settings.bedrock_model_id_judgment
         return BedrockProvider(region=settings.aws_region, model_id=model_id)
+    if settings.llm_provider == "openai":
+        from agents.llm.openai_provider import OpenAIProvider
+
+        model = settings.openai_model_bulk if tier == "bulk" else settings.openai_model_judgment
+        return OpenAIProvider(
+            api_key=settings.openai_api_key, model=model, reasoning_effort=settings.openai_reasoning_effort
+        )
     raise ValueError(f"Unknown LLM_PROVIDER: {settings.llm_provider!r}")

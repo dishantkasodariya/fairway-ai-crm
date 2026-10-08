@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     serper_api_key: str = ""
 
-    llm_provider: str = "groq"  # "groq" (dev) or "bedrock" (prod)
+    llm_provider: str = "groq"  # "groq" (dev), "bedrock" or "openai" (prod)
     aws_region: str = "ap-south-1"
     # Verify these against your account's actual enabled Bedrock model access —
     # exact inference-profile IDs vary by region and change as AWS adds models.
@@ -21,6 +21,13 @@ class Settings(BaseSettings):
 
     groq_model_bulk: str = "openai/gpt-oss-20b"
     groq_model_judgment: str = "openai/gpt-oss-120b"
+
+    # OpenAI (LLM_PROVIDER=openai) — Responses API. GPT-6 Luna for both tiers keeps cost
+    # lowest; set OPENAI_MODEL_JUDGMENT=gpt-6-sol for stronger outreach drafts.
+    openai_api_key: str = ""
+    openai_model_bulk: str = "gpt-6-luna"
+    openai_model_judgment: str = "gpt-6-luna"
+    openai_reasoning_effort: str = "low"
 
     api_key: str = "change_me"
 

@@ -28,7 +28,7 @@ FastAPI  →  app/  (Postgres-backed, async jobs, webhook callbacks)
 ```
 
 - **`agents/`** — the agent framework: `llm/` (provider-agnostic `LLMProvider` —
-  Groq for dev/free, Bedrock for prod), `tools/` (`SearchTool` protocol +
+  Groq for dev/free, Bedrock or OpenAI for prod), `tools/` (`SearchTool` protocol +
   Serper implementation, page fetcher), `runner.py` (the tool-use loop, with a
   forced-submit safety net so a run always terminates), and the two task-specific
   agents (`revenue_agent.py`, `signal_agent.py`) with their prompts under `prompts/`.
@@ -120,12 +120,20 @@ pytest tests/
 ## LLM provider
 
 Set `LLM_PROVIDER=groq` (default, free tier) for local dev, or `LLM_PROVIDER=bedrock`
-for production — the switch is a config change, not a code change, since both
-providers implement the same `agents/llm/base.py` interface. Bedrock credentials
+or `LLM_PROVIDER=openai` for production — the switch is a config change, not a code
+change, since all providers implement the same `agents/llm/base.py` interface. Bedrock credentials
 come from the standard boto3 chain (env vars, `~/.aws/credentials`, or an
 instance/task role); model IDs are configurable via `BEDROCK_MODEL_ID_BULK` /
 `BEDROCK_MODEL_ID_JUDGMENT` in `.env` (verify against your account's enabled
 model access — see `.env.example`).
+
+OpenAI uses the Responses API (`agents/llm/openai_provider.py`) with
+`OPENAI_API_KEY`; models are `OPENAI_MODEL_BULK` / `OPENAI_MODEL_JUDGMENT`
+(default `gpt-6-luna` for both) and `OPENAI_REASONING_EFFORT` (default `low`).
+Requests are stateless (`store: false`); the encrypted reasoning items that
+reasoning models return are replayed on the next call via
+`ChatResult.provider_items`. A ChatGPT subscription does not include API use —
+the key needs pay-as-you-go API credits.
 
 ## Legacy Streamlit map explorer
 

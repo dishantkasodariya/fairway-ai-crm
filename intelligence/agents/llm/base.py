@@ -1,11 +1,11 @@
 """
 Normalized chat-with-tools interface every LLM provider (Groq for dev,
-Bedrock for prod) implements, so AgentRunner and the agent prompts don't
+Bedrock or OpenAI for prod) implements, so AgentRunner and the agent prompts don't
 care which one is behind the call.
 
 Internal message format (owned by AgentRunner, translated per-provider):
     {"role": "user", "content": str}
-    {"role": "assistant", "content": str | None, "tool_calls": [ToolCall]}
+    {"role": "assistant", "content": str | None, "tool_calls": [ToolCall], "provider_items": list}
     {"role": "tool_result", "tool_call_id": str, "name": str, "content": str}
 """
 
@@ -24,6 +24,9 @@ class ToolCall:
 class ChatResult:
     content: str | None
     tool_calls: list[ToolCall] = field(default_factory=list)
+    # Opaque provider-specific items the provider needs replayed on the next call
+    # (OpenAI's encrypted reasoning items). Other providers leave it empty.
+    provider_items: list = field(default_factory=list)
 
 
 class LLMProvider(ABC):
