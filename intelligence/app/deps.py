@@ -8,7 +8,11 @@ __all__ = ["get_db", "require_api_key"]
 
 def require_api_key(x_api_key: str | None = Header(default=None)):
     settings = get_settings()
-    valid_keys = {settings.api_key, "fairway_intelligence_dev_key"}
+    valid_keys = {settings.api_key}
+    if settings.environment != "production":
+        # Convenience fallback for local/dev/staging only — never accepted once
+        # ENVIRONMENT=production is set, so this can't become a prod backdoor.
+        valid_keys.add("fairway_intelligence_dev_key")
     if not x_api_key or x_api_key not in valid_keys:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

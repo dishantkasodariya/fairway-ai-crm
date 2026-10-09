@@ -8,6 +8,10 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg2://fairway:fairway@localhost:5439/fairway"
 
+    # Set ENVIRONMENT=production on the real deployment — gates the dev API-key
+    # bypass in app/deps.py. Defaults to dev-like behavior everywhere else.
+    environment: str = "development"
+
     places_api: str = ""
     groq_api_key: str = ""
     serper_api_key: str = ""
