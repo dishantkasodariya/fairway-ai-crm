@@ -8,10 +8,15 @@
   "scripts": {
     "dev": "nodemon",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-fairway-backend} OTEL_TRACES_EXPORTER=${OTEL_TRACES_EXPORTER:-otlp} node --import @opentelemetry/auto-instrumentations-node/register dist/server.js",
     "test": "tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {
+    "@opentelemetry/auto-instrumentations-node": "^0.81.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.223.0",
+    "@opentelemetry/resources": "^2.12.0",
+    "@opentelemetry/sdk-node": "^0.223.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",

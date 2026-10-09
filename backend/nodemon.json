@@ -2,5 +2,12 @@
   "watch": ["src"],
   "ext": "ts,json",
   "ignore": ["src/**/*.test.ts", "node_modules"],
-  "exec": "tsx src/server.ts"
+  "exec": "tsx src/server.ts",
+  "env": {
+    "NODE_OPTIONS": "--import @opentelemetry/auto-instrumentations-node/register",
+    "OTEL_SERVICE_NAME": "fairway-backend",
+    "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4318",
+    "OTEL_NODE_RESOURCE_DETECTORS": "env,host,os"
+  }
 }

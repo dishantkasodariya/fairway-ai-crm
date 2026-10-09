@@ -12,6 +12,13 @@ pydantic==2.13.5
 pydantic-settings==2.15.0
 apscheduler==3.11.0
 
+# Observability: traces (-> Jaeger/any OTLP collector) + structured logging
+opentelemetry-sdk==1.45.1
+opentelemetry-exporter-otlp-proto-http==1.45.1
+opentelemetry-instrumentation-fastapi==0.66b1
+opentelemetry-instrumentation-sqlalchemy==0.66b1
+opentelemetry-instrumentation-requests==0.66b1
+
 # Legacy discovery/mapping tools (still used by app.py / map_builder.py)
 requests==2.34.2
 python-dotenv==1.2.3

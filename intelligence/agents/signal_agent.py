@@ -18,7 +18,7 @@ class SignalAgent:
     def research(self, name: str, address: str = "", business_type: str | None = None) -> dict:
         provider = build_llm_provider(self.settings, tier="bulk")
         tools = [SerperSearchTool(api_key=self.settings.serper_api_key), PageFetchTool()]
-        runner = AgentRunner(provider=provider, tools=tools, max_steps=14)
+        runner = AgentRunner(provider=provider, tools=tools, max_steps=14, tool_limits={"web_search": 6})
 
         result = runner.run(
             system=SYSTEM_PROMPT,
@@ -28,4 +28,5 @@ class SignalAgent:
         return {
             "signals": result.get("signals", []),
             "estimated_sqft": result.get("estimated_sqft", ""),
+            "research_stats": runner.last_run_stats,
         }

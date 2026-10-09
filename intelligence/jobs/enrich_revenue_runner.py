@@ -15,9 +15,11 @@ from sqlalchemy import or_
 
 from app.db.base import SessionLocal
 from app.db.models import Company, CompanyWarehouseLink, DiscoveryRun, Job, JobStatus, JobType, RevenueEnrichmentStatus
+from app.observability import get_tracer
 from jobs.runner import run_revenue_research_job
 
 logger = logging.getLogger(__name__)
+tracer = get_tracer()
 
 MAX_WORKERS = 4
 
@@ -47,38 +49,48 @@ def run_enrich_revenue_job(run_id: int) -> None:
             logger.error("enrich-revenue: discovery run %s not found", run_id)
             return
 
-        try:
-            companies = (
-                db.query(Company)
-                .filter(
-                    or_(
-                        Company.discovery_run_id == run_id,
-                        # already-known companies this run linked to its warehouse
-                        Company.warehouse_links.any(CompanyWarehouseLink.discovery_run_id == run_id),
+        with tracer.start_as_current_span("job.enrich_revenue_batch") as span:
+            span.set_attribute("discovery_run.id", run_id)
+            try:
+                # Only companies this run touched that still have no revenue snapshot at
+                # all — a company already enriched (by this run or an earlier one) is
+                # never re-researched, so re-running enrich-revenue on overlapping
+                # warehouses doesn't re-spend search/LLM budget on known companies.
+                companies = (
+                    db.query(Company)
+                    .filter(
+                        or_(
+                            Company.discovery_run_id == run_id,
+                            # already-known companies this run linked to its warehouse
+                            Company.warehouse_links.any(CompanyWarehouseLink.discovery_run_id == run_id),
+                        )
                     )
+                    .filter(~Company.revenue_snapshots.any())
+                    .all()
                 )
-                .filter(~Company.revenue_snapshots.any())
-                .all()
-            )
-            company_ids = [c.id for c in companies]
+                company_ids = [c.id for c in companies]
+                span.set_attribute("batch.size", len(company_ids))
+                logger.info("enrich-revenue: run=%s batch_size=%d", run_id, len(company_ids))
 
-            if company_ids:
-                with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-                    futures = {pool.submit(_enrich_one, cid): cid for cid in company_ids}
-                    for future in as_completed(futures):
-                        cid = futures[future]
-                        try:
-                            future.result()
-                        except Exception:  # noqa: BLE001 - one company's failure shouldn't stop the batch
-                            logger.exception("enrich-revenue: company %s failed", cid)
-                        run.revenue_enriched_count = (run.revenue_enriched_count or 0) + 1
-                        db.commit()
+                if company_ids:
+                    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+                        futures = {pool.submit(_enrich_one, cid): cid for cid in company_ids}
+                        for future in as_completed(futures):
+                            cid = futures[future]
+                            try:
+                                future.result()
+                            except Exception:  # noqa: BLE001 - one company's failure shouldn't stop the batch
+                                logger.exception("enrich-revenue: company %s failed", cid)
+                            run.revenue_enriched_count = (run.revenue_enriched_count or 0) + 1
+                            db.commit()
 
-            run.revenue_enrichment_status = RevenueEnrichmentStatus.done
-            db.commit()
-        except Exception:  # noqa: BLE001 - never leave the run stuck on "running"
-            logger.exception("enrich-revenue: run %s failed", run_id)
-            run.revenue_enrichment_status = RevenueEnrichmentStatus.done
-            db.commit()
+                run.revenue_enrichment_status = RevenueEnrichmentStatus.done
+                db.commit()
+                logger.info("enrich-revenue: run=%s done, enriched=%d", run_id, run.revenue_enriched_count or 0)
+            except Exception as e:  # noqa: BLE001 - never leave the run stuck on "running"
+                logger.exception("enrich-revenue: run %s failed", run_id)
+                span.set_attribute("run.error", str(e))
+                run.revenue_enrichment_status = RevenueEnrichmentStatus.done
+                db.commit()
     finally:
         db.close()

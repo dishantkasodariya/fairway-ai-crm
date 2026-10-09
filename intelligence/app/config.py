@@ -37,6 +37,13 @@ class Settings(BaseSettings):
 
     apollo_api_key: str = ""
 
+    log_level: str = "INFO"
+    otel_enabled: bool = True
+    otel_service_name: str = "fairway-intelligence"
+    # Jaeger's OTLP/HTTP receiver, already running locally (asaya-jaeger, ports 4318/16686).
+    # Point this at a reachable OTLP collector for staging/prod.
+    otel_exporter_otlp_endpoint: str = "http://localhost:4318"
+
 
 @lru_cache
 def get_settings() -> Settings:

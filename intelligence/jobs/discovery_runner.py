@@ -14,12 +14,14 @@ from app.db.base import SessionLocal
 from sqlalchemy.dialects.postgresql import insert
 
 from app.db.models import Company, CompanyWarehouseLink, DiscoveryRun, DiscoveryRunStatus
+from app.observability import get_tracer
 from classification.ai_fallback import AIFallbackClassifier
 from classification.rules import classify
 from discovery.site_grouping import apply_site_groups
 from discovery.tiling import find_companies_tiled
 
 logger = logging.getLogger(__name__)
+tracer = get_tracer()
 
 # Fixed 3km sub-circles, no auto-subdivision — same approach validated on
 # Surat's 50km sweep (see app.py, the Streamlit explorer this replaces).
@@ -58,72 +60,86 @@ def run_discovery_job(run_id: int) -> None:
         run.status = DiscoveryRunStatus.running
         db.commit()
 
-        try:
-            settings = get_settings()
-            result = find_companies_tiled(
-                run.warehouse_lat,
-                run.warehouse_lng,
-                run.radius_km * 1000,
-                settings.places_api,
-                base_sub_radius_m=BASE_SUB_RADIUS_M,
-                max_depth=0,
-                max_workers=4,
-                max_qps=5,
-            )
-
-            ai_classifier = AIFallbackClassifier(settings)
-            created = 0
-            for c in result["companies"]:
-                existing = None
-                if c.get("id"):
-                    existing = db.query(Company).filter(Company.place_id == c["id"]).one_or_none()
-                if existing is not None:
-                    if existing.discovery_run_id is None:
-                        existing.discovery_run_id = run.id
-                    _link_to_warehouse(db, existing, run, c.get("distance_km"))
-                    continue
-
-                category = classify(c["name"])
-                confidence, reason = "high", "rule-based keyword match"
-                if category == "?":
-                    ai_result = ai_classifier.classify(c["name"], c.get("address") or "", c.get("website"))
-                    category = ai_result["category"]
-                    confidence = ai_result["confidence"]
-                    reason = ai_result["reason"]
-
-                company = Company(
-                    place_id=c.get("id"),
-                    name=c["name"],
-                    address=c.get("address"),
-                    lat=c.get("lat"),
-                    lng=c.get("lng"),
-                    distance_km=c.get("distance_km"),
-                    phone=c.get("phone"),
-                    website=c.get("website"),
-                    primary_type=c.get("primary_type"),
-                    business_type=category,
-                    business_type_confidence=confidence,
-                    business_type_reason=reason,
-                    discovery_run_id=run.id,
+        with tracer.start_as_current_span("job.discovery_run") as span:
+            span.set_attribute("discovery_run.id", run_id)
+            span.set_attribute("discovery_run.radius_km", run.radius_km)
+            span.set_attribute("discovery_run.property_id", run.property_id or "")
+            try:
+                settings = get_settings()
+                result = find_companies_tiled(
+                    run.warehouse_lat,
+                    run.warehouse_lng,
+                    run.radius_km * 1000,
+                    settings.places_api,
+                    base_sub_radius_m=BASE_SUB_RADIUS_M,
+                    max_depth=0,
+                    max_workers=4,
+                    max_qps=5,
                 )
-                db.add(company)
-                # Flush so the next result's place_id lookup sees this row
-                # (the session has autoflush off) and the link gets an id.
-                db.flush()
-                _link_to_warehouse(db, company, run, c.get("distance_km"))
-                created += 1
 
-            # New gates/plants of a known company join its account.
-            apply_site_groups(db)
+                ai_classifier = AIFallbackClassifier(settings)
+                created = 0
+                linked = 0
+                for c in result["companies"]:
+                    existing = None
+                    if c.get("id"):
+                        existing = db.query(Company).filter(Company.place_id == c["id"]).one_or_none()
+                    if existing is not None:
+                        if existing.discovery_run_id is None:
+                            existing.discovery_run_id = run.id
+                        _link_to_warehouse(db, existing, run, c.get("distance_km"))
+                        linked += 1
+                        continue
 
-            run.companies_found = created
-            run.api_calls_made = result["stats"]["total_calls"]
-            run.status = DiscoveryRunStatus.done
-        except Exception:  # noqa: BLE001 — record failure on the run row, don't crash the worker
-            logger.exception("Discovery run %s failed", run_id)
-            run.status = DiscoveryRunStatus.failed
-        finally:
-            run.completed_at = _utcnow()
-            db.commit()
+                    category = classify(c["name"])
+                    confidence, reason = "high", "rule-based keyword match"
+                    if category == "?":
+                        ai_result = ai_classifier.classify(c["name"], c.get("address") or "", c.get("website"))
+                        category = ai_result["category"]
+                        confidence = ai_result["confidence"]
+                        reason = ai_result["reason"]
+
+                    company = Company(
+                        place_id=c.get("id"),
+                        name=c["name"],
+                        address=c.get("address"),
+                        lat=c.get("lat"),
+                        lng=c.get("lng"),
+                        distance_km=c.get("distance_km"),
+                        phone=c.get("phone"),
+                        website=c.get("website"),
+                        primary_type=c.get("primary_type"),
+                        business_type=category,
+                        business_type_confidence=confidence,
+                        business_type_reason=reason,
+                        discovery_run_id=run.id,
+                    )
+                    db.add(company)
+                    # Flush so the next result's place_id lookup sees this row
+                    # (the session has autoflush off) and the link gets an id.
+                    db.flush()
+                    _link_to_warehouse(db, company, run, c.get("distance_km"))
+                    created += 1
+
+                # New gates/plants of a known company join its account.
+                apply_site_groups(db)
+
+                run.companies_found = created
+                run.api_calls_made = result["stats"]["total_calls"]
+                run.status = DiscoveryRunStatus.done
+                span.set_attribute("result.companies_created", created)
+                span.set_attribute("result.companies_already_known", linked)
+                span.set_attribute("result.api_calls_made", result["stats"]["total_calls"])
+                logger.info(
+                    "discovery_run id=%s radius_km=%s created=%d already_known=%d api_calls=%d",
+                    run_id, run.radius_km, created, linked, result["stats"]["total_calls"],
+                )
+            except Exception as e:  # noqa: BLE001 — record failure on the run row, don't crash the worker
+                logger.exception("Discovery run %s failed", run_id)
+                run.status = DiscoveryRunStatus.failed
+                span.set_attribute("run.error", str(e))
+            finally:
+                run.completed_at = _utcnow()
+                db.commit()
     finally:
         db.close()

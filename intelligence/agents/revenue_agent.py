@@ -48,7 +48,7 @@ class RevenueAgent:
 
         provider = build_llm_provider(self.settings, tier="bulk")
         tools = [SerperSearchTool(api_key=self.settings.serper_api_key), PageFetchTool()]
-        runner = AgentRunner(provider=provider, tools=tools, max_steps=8)
+        runner = AgentRunner(provider=provider, tools=tools, max_steps=8, tool_limits={"web_search": 3})
 
         result = runner.run(
             system=SYSTEM_PROMPT,
@@ -63,4 +63,5 @@ class RevenueAgent:
             "source_url": result.get("source_url") or None,
             "method": "agent",
             "confidence": result.get("confidence") or "low",
+            "research_stats": runner.last_run_stats,
         }

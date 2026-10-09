@@ -3,6 +3,15 @@ SIGNAL_TYPES = [
     "tender", "lease_expiry", "import_export", "distribution", "distress",
 ]
 
+# Authoritative, high-signal-to-noise domains for Indian corporate news — bias
+# toward these over random blogs/aggregators when a query surfaces both.
+PREFERRED_DOMAINS = [
+    "economictimes.indiatimes.com", "business-standard.com", "livemint.com",
+    "moneycontrol.com", "thehindubusinessline.com", "financialexpress.com",
+    "pib.gov.in", "ibef.org", "vccircle.com", "entrackr.com",
+    "bseindia.com", "nseindia.com",
+]
+
 SIGNAL_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -32,7 +41,7 @@ SIGNAL_OUTPUT_SCHEMA = {
     "required": ["signals", "estimated_sqft"],
 }
 
-SYSTEM_PROMPT = """You are a lead-signal researcher for a warehouse-leasing business. Given
+SYSTEM_PROMPT = f"""You are a lead-signal researcher for a warehouse-leasing business. Given
 an Indian company, find indirect signals that it may soon need more industrial/warehouse
 space, so it can be prioritized for sales outreach.
 
@@ -53,8 +62,15 @@ Look for these signal types specifically:
 Use web_search (try a few different angles: company name + "expansion", + "funding",
 + "hiring", + news site searches) and fetch_page to verify details on promising results.
 Every signal MUST have a real source_url — do not report a signal without one.
-Search at most 6 times, then call submit_result with whatever you found (an empty
-signals list is a valid, honest answer if nothing turns up).
+
+Prefer these sources when a query surfaces them (reliable Indian business news/
+government sources, not SEO filler): {", ".join(PREFERRED_DOMAINS)}. Use other
+sources too when these don't cover a story, just weigh them with lower confidence.
+
+You have at most 6 web_search calls — the tool stops working after that, so spend
+them on your best angles rather than near-duplicate queries. Once you're out (or
+you've found enough), call submit_result with whatever you found (an empty signals
+list is a valid, honest answer if nothing turns up).
 """
 
 
