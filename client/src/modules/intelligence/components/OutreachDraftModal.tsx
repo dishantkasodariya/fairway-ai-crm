@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Copy, ExternalLink, Loader2 } from 'lucide-react';
+import { Copy, ExternalLink, Loader2, Send, CheckCircle2 } from 'lucide-react';
 import { Modal } from '@/modules/core/components/ui/Modal';
 import { Button } from '@/modules/core/components/ui/Button';
 import { useToast } from '@/modules/core/providers/ToastContext';
@@ -10,24 +10,30 @@ export type OutreachChannel = 'linkedin' | 'email';
 export interface OutreachDraftModalProps {
   isOpen: boolean;
   onClose: () => void;
-  contact: { id: number; name: string; email: string | null; linkedinUrl: string | null } | null;
+  contact: { id: number; companyId: number; name: string; email: string | null; linkedinUrl: string | null } | null;
   companyName: string;
   channel: OutreachChannel;
 }
 
 /**
  * Drafts a LinkedIn note or email for a key person from the company's opportunity signals.
- * Review-only by design: Copy / open LinkedIn / open the email client — nothing is sent automatically.
+ * Email can be sent for real, one message at a time, only after the person reviews it here
+ * (via Resend — see backend/src/services/emailSender.ts). LinkedIn has no send button by
+ * design: no outside app can message a LinkedIn member on someone's behalf without breaking
+ * LinkedIn's terms, so that channel stays Copy + open the profile and send it yourself.
  */
 export const OutreachDraftModal: React.FC<OutreachDraftModalProps> = ({ isOpen, onClose, contact, companyName, channel }) => {
   const { error: toastError, success } = useToast();
   const [draft, setDraft] = useState<DraftMessage | null>(null);
   const [isDrafting, setIsDrafting] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !contact) return;
     let alive = true;
     setDraft(null);
+    setSent(false);
     setIsDrafting(true);
     IntelligenceService.draftMessage(contact.id).then((res) => {
       if (!alive) return;
@@ -58,14 +64,35 @@ export const OutreachDraftModal: React.FC<OutreachDraftModalProps> = ({ isOpen, 
     }
   };
 
-  const handleOpen = () => {
-    if (!contact) return;
-    if (channel === 'linkedin' && contact.linkedinUrl) {
+  const handleOpenLinkedIn = () => {
+    if (contact?.linkedinUrl) {
       window.open(contact.linkedinUrl, '_blank', 'noopener,noreferrer');
-    } else if (channel === 'email' && contact.email) {
-      const subject = active?.subject ? `?subject=${encodeURIComponent(active.subject)}` : '';
-      window.location.href = `mailto:${contact.email}${subject}`;
     }
+  };
+
+  const handleOpenEmailClient = () => {
+    if (!contact?.email) return;
+    const subject = active?.subject ? `?subject=${encodeURIComponent(active.subject)}` : '';
+    window.location.href = `mailto:${contact.email}${subject}`;
+  };
+
+  const handleSendEmail = async () => {
+    if (!contact?.email || !active?.subject) return;
+    setIsSending(true);
+    const res = await IntelligenceService.sendEmail(contact.id, {
+      to: contact.email,
+      subject: active.subject,
+      body: active.body,
+      contactName: contact.name,
+      intelligenceCompanyId: contact.companyId,
+    });
+    setIsSending(false);
+    if (!res.success) {
+      toastError('Send Failed', res.error || 'Could not send the email. Use Copy and send it from your own email client instead.');
+      return;
+    }
+    setSent(true);
+    success('Email Sent', `Sent to ${contact.email}.`);
   };
 
   return (
@@ -81,10 +108,47 @@ export const OutreachDraftModal: React.FC<OutreachDraftModalProps> = ({ isOpen, 
             <Button type="button" variant="outline" size="sm" onClick={handleCopy} leftIcon={<Copy className="w-3.5 h-3.5" />}>
               Copy
             </Button>
-            <Button type="button" size="sm" onClick={handleOpen} leftIcon={<ExternalLink className="w-3.5 h-3.5" />}
-              disabled={channel === 'linkedin' ? !contact?.linkedinUrl : !contact?.email}>
-              {channel === 'linkedin' ? 'Open LinkedIn Profile' : 'Open in Email Client'}
-            </Button>
+            {channel === 'linkedin' ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleOpenLinkedIn}
+                leftIcon={<ExternalLink className="w-3.5 h-3.5" />}
+                disabled={!contact?.linkedinUrl}
+              >
+                Open LinkedIn Profile
+              </Button>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenEmailClient}
+                  leftIcon={<ExternalLink className="w-3.5 h-3.5" />}
+                  disabled={!contact?.email}
+                >
+                  Open in Email Client
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSendEmail}
+                  disabled={!contact?.email || isSending}
+                  leftIcon={
+                    isSending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : sent ? (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )
+                  }
+                >
+                  {isSending ? 'Sending…' : sent ? 'Sent — Send Again' : 'Send Email'}
+                </Button>
+              </>
+            )}
           </>
         )
       }
@@ -99,7 +163,11 @@ export const OutreachDraftModal: React.FC<OutreachDraftModalProps> = ({ isOpen, 
           {channel === 'email' && active.subject && <p className="text-sm font-semibold text-foreground">Subject: {active.subject}</p>}
           <p className="text-sm text-foreground whitespace-pre-wrap">{active.body}</p>
           <p className="text-[11px] text-foreground-muted pt-2">
-            After you send it, log it on the deal with "I followed up" so the 5-day check-in is scheduled.
+            {channel === 'email'
+              ? sent
+                ? 'Sent. Log it on the deal with "I followed up" so the 5-day check-in is scheduled.'
+                : 'Review the draft above, then click Send Email. After it sends, log it on the deal with "I followed up" so the 5-day check-in is scheduled.'
+              : 'After you send it, log it on the deal with "I followed up" so the 5-day check-in is scheduled.'}
           </p>
         </div>
       ) : null}

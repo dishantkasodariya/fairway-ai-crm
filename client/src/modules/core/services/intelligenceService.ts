@@ -347,6 +347,28 @@ export class IntelligenceService {
     }
   }
 
+  /**
+   * Sends the reviewed email draft via Resend — a real, one-at-a-time send the
+   * salesperson triggers after reading the draft, never automatic. Logs an
+   * activity on the matching CRM company when the prospect has one.
+   */
+  static async sendEmail(
+    contactId: number,
+    payload: { to: string; subject: string; body: string; contactName?: string; intelligenceCompanyId?: number }
+  ): Promise<{ success: boolean; data?: { id: string }; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/contacts/${contactId}/send-email`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
   /** Is this prospect already in the CRM (and with which open deal), and who would own it? */
   static async getCrmStatus(companyId: number): Promise<{ success: boolean; data?: CrmStatus; error?: string }> {
     try {

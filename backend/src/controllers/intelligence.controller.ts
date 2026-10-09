@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import { config } from '../config/index.js';
 import { pool } from '../config/db.js';
+import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+import { sendOutreachEmail as sendViaResend, EmailSendError } from '../services/emailSender.js';
 
 /**
  * Server-to-server proxy to the Fairway Company Intelligence API (Python/
@@ -321,6 +324,69 @@ export const draftMessage = async (req: Request, res: Response): Promise<void> =
     res.status(200).json({ success: true, data: toCamelCaseDeep(draft) });
   } catch (error: any) {
     handleIntelligenceError(res, error, 'Failed to draft outreach message');
+  }
+};
+
+/**
+ * POST /api/intelligence/contacts/:id/send-email
+ *
+ * A real, one-at-a-time send via Resend — the human reviews the drafted
+ * text in the modal first, then clicks Send. Never a bulk/automatic send.
+ * If the prospect has already been added to the CRM (companies.intelligence_company_id
+ * matches), logs it as an activity on that company; otherwise sends without
+ * logging — a missing CRM link should never block sending the email.
+ */
+export const sendOutreachEmail = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  const { to, subject, body, contactName, intelligenceCompanyId } = req.body || {};
+  if (!to || !subject || !body) {
+    res.status(422).json({ success: false, error: { message: 'to, subject and body are required.' } });
+    return;
+  }
+
+  try {
+    const sent = await sendViaResend({ to, subject, text: body });
+
+    try {
+      if (intelligenceCompanyId) {
+        const { rows } = await pool.query(
+          'SELECT id, name FROM companies WHERE intelligence_company_id = $1 LIMIT 1',
+          [intelligenceCompanyId]
+        );
+        const company = rows[0];
+        if (company) {
+          const userId = req.user?.userId || '';
+          let userName = req.user?.email || 'System';
+          if (userId) {
+            const { rows: userRows } = await pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+            if (userRows[0]?.name) userName = userRows[0].name;
+          }
+          await pool.query(
+            `INSERT INTO activities
+               (id, company_id, company_name, user_id, user_name, activity_type, title, description,
+                activity_date, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 'Email', $6, $7,
+               to_char((now() AT TIME ZONE 'Asia/Kolkata')::date, 'YYYY-MM-DD'), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+            [
+              `act_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`,
+              company.id,
+              company.name,
+              userId,
+              userName,
+              `Sent "${subject}" to ${contactName || to}`,
+              body,
+            ]
+          );
+        }
+      }
+    } catch (logErr: any) {
+      // Logging the activity is best-effort — the email already sent successfully.
+      console.warn('[outreach] Could not log sent-email activity:', logErr.message);
+    }
+
+    res.status(200).json({ success: true, data: { id: sent.id } });
+  } catch (error: any) {
+    const status = error instanceof EmailSendError ? 502 : 500;
+    res.status(status).json({ success: false, error: { message: error.message || 'Failed to send email' } });
   }
 };
 

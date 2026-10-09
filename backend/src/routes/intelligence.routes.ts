@@ -12,6 +12,7 @@ import {
   getCompanyContacts,
   listAllContacts,
   draftMessage,
+  sendOutreachEmail,
   getResearchJob,
 } from '../controllers/intelligence.controller.js';
 import { crmStatus, addToCrm, createManualContact, deleteContact } from '../controllers/aiProspects.controller.js';
@@ -35,6 +36,7 @@ router.post('/companies/:id/add-to-crm', requirePermission('inquiries', 'create'
 router.delete('/contacts/:id', requirePermission('companies', 'edit'), deleteContact);
 router.get('/contacts', requirePermission('companies', 'view'), listAllContacts);
 router.post('/contacts/:id/draft-message', requirePermission('companies', 'edit'), draftMessage);
+router.post('/contacts/:id/send-email', requirePermission('companies', 'edit'), sendOutreachEmail);
 router.get('/jobs/:jobId', requirePermission('companies', 'view'), getResearchJob);
 
 export default router;
