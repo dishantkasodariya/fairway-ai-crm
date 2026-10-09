@@ -30,10 +30,11 @@ RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
 class OpenAIProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str = "gpt-6-luna", reasoning_effort: str = "low"):
+    def __init__(self, api_key: str, model: str = "gpt-6-luna", reasoning_effort: str = "low", max_tokens: int = 4096):
         self.api_key = api_key
         self.model = model
         self.reasoning_effort = reasoning_effort
+        self.max_tokens = max_tokens
 
     def _to_input(self, messages: list[dict]) -> list[dict]:
         items = []
@@ -96,6 +97,7 @@ class OpenAIProvider(LLMProvider):
             ],
             "tool_choice": {"type": "function", "name": force_tool} if force_tool else "auto",
             "reasoning": {"effort": self.reasoning_effort},
+            "max_output_tokens": self.max_tokens,
             "store": False,
             "include": ["reasoning.encrypted_content"],
         }

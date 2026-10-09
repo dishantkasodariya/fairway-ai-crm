@@ -16,9 +16,10 @@ MAX_RETRIES = 4
 
 
 class GroqProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str = "openai/gpt-oss-120b"):
+    def __init__(self, api_key: str, model: str = "openai/gpt-oss-120b", max_tokens: int = 4096):
         self.api_key = api_key
         self.model = model
+        self.max_tokens = max_tokens
 
     def _to_wire_messages(self, system: str, messages: list[dict]) -> list[dict]:
         wire = [{"role": "system", "content": system}]
@@ -83,6 +84,7 @@ class GroqProvider(LLMProvider):
             "messages": self._to_wire_messages(system, messages),
             "tools": wire_tools,
             "tool_choice": tool_choice,
+            "max_tokens": self.max_tokens,
         }
         resp = self._post_with_retry(payload)
         choice = resp.json()["choices"][0]["message"]

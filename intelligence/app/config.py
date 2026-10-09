@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     serper_api_key: str = ""
 
     llm_provider: str = "groq"  # "groq" (dev), "bedrock" or "openai" (prod)
+    # Hard cap on every LLM call's output (+ reasoning tokens, for reasoning models) —
+    # bounds cost/latency per call regardless of provider. Tool-call JSON and the
+    # short "continue researching" turns never need anywhere near this; it's a
+    # runaway-generation backstop, not a working limit.
+    llm_max_output_tokens: int = 4096
     aws_region: str = "ap-south-1"
     # Verify these against your account's actual enabled Bedrock model access —
     # exact inference-profile IDs vary by region and change as AWS adds models.

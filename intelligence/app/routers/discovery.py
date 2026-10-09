@@ -1,9 +1,10 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.models import CompanyWarehouseLink, DiscoveryRun, DiscoveryRunStatus, RevenueEnrichmentStatus
 from app.deps import get_db, require_api_key
+from app.rate_limit import limiter
 from app.schemas.discovery import DiscoveryRunCreate, DiscoveryRunOut
 from jobs.discovery_runner import run_discovery_job
 from jobs.enrich_revenue_runner import run_enrich_revenue_job
@@ -24,7 +25,9 @@ def _run_out(db: Session, run: DiscoveryRun) -> DiscoveryRunOut:
 
 
 @router.post("", response_model=DiscoveryRunOut, status_code=202)
+@limiter.limit("10/minute")
 def create_discovery_run(
+    request: Request,
     body: DiscoveryRunCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -56,7 +59,9 @@ def get_discovery_run(run_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{run_id}/enrich-revenue", response_model=DiscoveryRunOut, status_code=202)
+@limiter.limit("10/minute")
 def enrich_revenue(
+    request: Request,
     run_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),

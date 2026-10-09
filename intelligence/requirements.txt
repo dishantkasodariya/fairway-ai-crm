@@ -12,6 +12,11 @@ pydantic==2.13.5
 pydantic-settings==2.15.0
 apscheduler==3.11.0
 
+# Rate limiting (defense-in-depth on top of the backend's own limits, in case
+# this service's URL is ever directly reachable)
+slowapi==0.1.10
+limits==5.8.0
+
 # Observability: traces (-> Jaeger/any OTLP collector) + structured logging
 opentelemetry-sdk==1.45.1
 opentelemetry-exporter-otlp-proto-http==1.45.1

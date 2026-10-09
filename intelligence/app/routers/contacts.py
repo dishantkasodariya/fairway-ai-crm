@@ -1,9 +1,10 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.models import Company, Contact, Job, JobStatus, JobType, OpportunityScore, OutreachDraft
 from app.deps import get_db, require_api_key
+from app.rate_limit import limiter
 from app.schemas.contacts import (
     AllContactsListOut,
     ContactCreate,
@@ -21,7 +22,9 @@ router = APIRouter(prefix="/v1", tags=["contacts"], dependencies=[Depends(requir
 
 
 @router.post("/companies/{company_id}/contacts:enrich", response_model=JobOut, status_code=202)
+@limiter.limit("20/minute")
 def enrich_contacts(
+    request: Request,
     company_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
@@ -101,7 +104,8 @@ def list_all_contacts(db: Session = Depends(get_db)):
 
 
 @router.post("/contacts/{contact_id}/draft-message", response_model=DraftMessageOut)
-def draft_message(contact_id: int, db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def draft_message(request: Request, contact_id: int, db: Session = Depends(get_db)):
     """One AgentRunner call producing a LinkedIn note + email subject/body
     from the company's opportunity score why/estimated_requirement, stored
     as two OutreachDraft rows (one per channel)."""

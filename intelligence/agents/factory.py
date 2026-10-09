@@ -12,17 +12,22 @@ Tier = Literal["bulk", "judgment"]
 def build_llm_provider(settings: Settings, tier: Tier = "bulk") -> LLMProvider:
     if settings.llm_provider == "groq":
         model = settings.groq_model_bulk if tier == "bulk" else settings.groq_model_judgment
-        return GroqProvider(api_key=settings.groq_api_key, model=model)
+        return GroqProvider(api_key=settings.groq_api_key, model=model, max_tokens=settings.llm_max_output_tokens)
     if settings.llm_provider == "bedrock":
         from agents.llm.bedrock_provider import BedrockProvider  # deferred: boto3 only needed in prod
 
         model_id = settings.bedrock_model_id_bulk if tier == "bulk" else settings.bedrock_model_id_judgment
-        return BedrockProvider(region=settings.aws_region, model_id=model_id)
+        return BedrockProvider(
+            region=settings.aws_region, model_id=model_id, max_tokens=settings.llm_max_output_tokens
+        )
     if settings.llm_provider == "openai":
         from agents.llm.openai_provider import OpenAIProvider
 
         model = settings.openai_model_bulk if tier == "bulk" else settings.openai_model_judgment
         return OpenAIProvider(
-            api_key=settings.openai_api_key, model=model, reasoning_effort=settings.openai_reasoning_effort
+            api_key=settings.openai_api_key,
+            model=model,
+            reasoning_effort=settings.openai_reasoning_effort,
+            max_tokens=settings.llm_max_output_tokens,
         )
     raise ValueError(f"Unknown LLM_PROVIDER: {settings.llm_provider!r}")

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db.models import Company, Job, JobStatus, JobType
 from app.deps import get_db, require_api_key
+from app.rate_limit import limiter
 from app.schemas.jobs import JobOut
 from jobs.runner import dispatch_job
 
@@ -35,7 +36,9 @@ def _create_and_enqueue(
 
 
 @router.post("/companies/{company_id}/revenue:research", response_model=JobOut, status_code=202)
+@limiter.limit("20/minute")
 def research_revenue(
+    request: Request,
     company_id: int,
     background_tasks: BackgroundTasks,
     body: ResearchJobRequest = ResearchJobRequest(),
@@ -46,7 +49,9 @@ def research_revenue(
 
 
 @router.post("/companies/{company_id}/signals:research", response_model=JobOut, status_code=202)
+@limiter.limit("20/minute")
 def research_signals(
+    request: Request,
     company_id: int,
     background_tasks: BackgroundTasks,
     body: ResearchJobRequest = ResearchJobRequest(),

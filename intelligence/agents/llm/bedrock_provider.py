@@ -20,8 +20,9 @@ DEFAULT_MODEL_ID = "apac.anthropic.claude-haiku-4-5-20251001-v1:0"
 
 
 class BedrockProvider(LLMProvider):
-    def __init__(self, region: str, model_id: str = DEFAULT_MODEL_ID):
+    def __init__(self, region: str, model_id: str = DEFAULT_MODEL_ID, max_tokens: int = 4096):
         self.model_id = model_id
+        self.max_tokens = max_tokens
         self._client = boto3.client("bedrock-runtime", region_name=region)
 
     def _to_wire_messages(self, messages: list[dict]) -> list[dict]:
@@ -80,6 +81,7 @@ class BedrockProvider(LLMProvider):
             system=[{"text": system}],
             messages=self._to_wire_messages(messages),
             toolConfig=tool_config,
+            inferenceConfig={"maxTokens": self.max_tokens},
         )
 
         content_blocks = resp["output"]["message"]["content"]

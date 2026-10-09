@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { config } from '../config/index.js';
 
 export interface AppError extends Error {
   statusCode?: number;
@@ -34,6 +35,15 @@ export const errorHandler = (
   const requestId = (req.headers['x-request-id'] as string) || (req as any).requestId || 'req_unknown';
 
   console.error(`[Error] [${requestId}] ${statusCode} (${code}) - ${message}`);
+
+  // Below 500, the message was deliberately set by our own code (validation,
+  // auth, not-found, ...) and is safe to show. A 500 is unexpected — in
+  // production, hide whatever the underlying error (db driver, aws sdk, ...)
+  // actually said and point at the requestId for support/log correlation
+  // instead, so internals never leak to the client.
+  if (statusCode >= 500 && config.nodeEnv === 'production') {
+    message = 'Something went wrong on our end. Please try again, or contact support with this request ID.';
+  }
 
   res.status(statusCode).json({
     success: false,
