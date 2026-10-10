@@ -24,7 +24,9 @@ export const config = {
   // Outbound email for AI Connections' Send Email action.
   // "resend" = Resend's API (needs a DNS-verified sending domain).
   // "smtp"   = send through a real mailbox (Gmail, Outlook, Microsoft 365, etc.) via an app password — no DNS.
-  emailProvider: (process.env.EMAIL_PROVIDER || 'resend') as 'resend' | 'smtp',
+  // "log" = don't send; append each email to EMAIL_OUTBOX_FILE (dev, tests, rehearsals).
+  emailProvider: (process.env.EMAIL_PROVIDER || 'resend') as 'resend' | 'smtp' | 'log',
+  emailOutboxFile: process.env.EMAIL_OUTBOX_FILE || 'logs/email-outbox.jsonl',
   resendApiKey: process.env.RESEND_API_KEY || '',
   resendFromEmail: process.env.RESEND_FROM_EMAIL || '',
   resendFromName: process.env.RESEND_FROM_NAME || 'Fairway Warehousing',

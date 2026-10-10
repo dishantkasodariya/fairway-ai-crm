@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import nodemailer from 'nodemailer';
 import { config } from '../config/index.js';
 
@@ -6,11 +8,13 @@ import { config } from '../config/index.js';
  * human-reviewed send the salesperson triggers after reading the draft,
  * never a bulk/campaign send.
  *
- * Two interchangeable providers, picked by EMAIL_PROVIDER:
+ * Also used for internal notifications (task assigned). Providers, picked by EMAIL_PROVIDER:
  *  - "resend": Resend's REST API. Needs a DNS-verified sending domain.
  *  - "smtp":   sends through a real mailbox (Gmail, Outlook, Microsoft 365,
  *              any SMTP account) using an app password. No DNS to set up —
  *              it sends as that real address immediately.
+ *  - "log":    sends nothing; appends the email to EMAIL_OUTBOX_FILE. For dev, tests and
+ *              rehearsals, so nobody real gets mail from a test.
  */
 
 export class EmailSendError extends Error {}
@@ -19,10 +23,15 @@ export interface SendOutreachEmailParams {
   to: string;
   subject: string;
   text: string;
+  /** Optional HTML version; clients that can't show it fall back to `text`. */
+  html?: string;
   replyTo?: string;
 }
 
 export async function sendOutreachEmail(params: SendOutreachEmailParams): Promise<{ id: string }> {
+  if (config.emailProvider === 'log') {
+    return writeToOutbox(params);
+  }
   if (config.emailProvider === 'smtp') {
     return sendViaSmtp(params);
   }
@@ -53,6 +62,7 @@ async function sendViaResend(params: SendOutreachEmailParams): Promise<{ id: str
       to: [params.to],
       subject: params.subject,
       text: params.text,
+      ...(params.html ? { html: params.html } : {}),
       ...(params.replyTo ? { reply_to: params.replyTo } : {}),
     }),
   });
@@ -93,6 +103,7 @@ async function sendViaSmtp(params: SendOutreachEmailParams): Promise<{ id: strin
       to: params.to,
       subject: params.subject,
       text: params.text,
+      ...(params.html ? { html: params.html } : {}),
       ...(params.replyTo ? { replyTo: params.replyTo } : {}),
     });
     return { id: info.messageId };
@@ -102,4 +113,13 @@ async function sendViaSmtp(params: SendOutreachEmailParams): Promise<{ id: strin
     smtpTransporter = null;
     throw new EmailSendError(err?.message || 'SMTP send failed.');
   }
+}
+
+async function writeToOutbox(params: SendOutreachEmailParams): Promise<{ id: string }> {
+  const id = `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const file = path.resolve(config.emailOutboxFile);
+  await fs.promises.mkdir(path.dirname(file), { recursive: true });
+  await fs.promises.appendFile(file, JSON.stringify({ id, at: new Date().toISOString(), ...params }) + '\n');
+  console.info(`[email:log] ${params.subject} -> ${params.to} (not sent; written to ${config.emailOutboxFile})`);
+  return { id };
 }

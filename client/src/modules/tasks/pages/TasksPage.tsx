@@ -24,6 +24,7 @@ import {
 import { TaskService } from '@/modules/core/services/taskService';
 import { CompanyService } from '@/modules/core/services/companyService';
 import { useAuth } from '@/modules/core/providers/AuthContext';
+import type { TaskNotification } from '@/modules/core/services/taskService';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import { Task, Company } from '@/modules/core/types';
 import { formatDate } from '@/modules/core/utils/formatters';
@@ -81,6 +82,31 @@ export interface TaskListViewProps {
   onNavigateToInquiry: (inquiryId: string) => void;
 }
 
+/** "Notify by email" under the assignee picker. */
+const NotifyToggle: React.FC<{
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  assignee?: { name: string; email?: string };
+}> = ({ checked, onChange, assignee }) => (
+  <label className={`flex items-start gap-2 pt-1 ${assignee ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}>
+    <input
+      type="checkbox"
+      checked={checked && !!assignee}
+      disabled={!assignee}
+      onChange={(e) => onChange(e.target.checked)}
+      className="mt-0.5 rounded text-fairway-600 focus:ring-fairway-600"
+    />
+    <span className="text-[11px] leading-snug">
+      <span className="font-semibold text-foreground">Notify {assignee ? assignee.name.split(' ')[0] : 'assignee'} by email</span>
+      <span className="block text-foreground-muted">
+        {assignee?.email
+          ? `Sends what to do, when, and your notes to ${assignee.email}.`
+          : 'Sends what to do, when, and your notes.'}
+      </span>
+    </span>
+  </label>
+);
+
 export const TaskListView: React.FC<TaskListViewProps> = ({
   onNavigateToCompany,
   onNavigateToInquiry,
@@ -116,6 +142,8 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
     dueTime: '11:00 AM',
     priority: 'Medium' as Task['priority'],
     assignedUserId: currentUser?.id || '',
+    // Email the assignee what to do and when. Ticked automatically when assigning to someone else.
+    notify: false,
   });
 
   const [newTaskForm, setNewTaskForm] = useState(getEmptyTaskForm);
@@ -313,8 +341,20 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
       dueTime: task.dueTime || '',
       priority: task.priority || 'Medium',
       assignedUserId: task.assignedUserId || '',
+      notify: false,
     });
     setEditTaskErrors({});
+  };
+
+  // Tell the user whether the assignee was emailed; a failed email never loses the task.
+  const announceSaved = (title: string, message: string, notification?: TaskNotification) => {
+    if (!notification) {
+      success(title, message);
+    } else if (notification.sent) {
+      success(title, `${message} Emailed the details to ${notification.to}.`);
+    } else {
+      error(`${title}, but the email wasn't sent`, notification.reason);
+    }
   };
 
   // Create Task Submission
@@ -352,7 +392,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         status: 'Pending',
       };
 
-      const res = await TaskService.createTask(taskData);
+      const res = await TaskService.createTask({ ...taskData, notify: newTaskForm.notify });
       if (res.success && res.data) {
         const created: Task = {
           ...res.data,
@@ -363,7 +403,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         setIsNewTaskOpen(false);
         setNewTaskForm(getEmptyTaskForm());
         setTaskErrors({});
-        success('Task Scheduled', 'New follow-up task added to your schedule.');
+        announceSaved('Task Scheduled', 'New task added to the schedule.', res.notification);
       } else {
         error('Failed to create task', res.error || 'Server error creating task');
       }
@@ -409,7 +449,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         priority: editTaskForm.priority,
       };
 
-      const res = await TaskService.updateTask(editingTask.id, taskData);
+      const res = await TaskService.updateTask(editingTask.id, { ...taskData, notify: editTaskForm.notify });
       if (res.success && res.data) {
         const updated = {
           ...res.data,
@@ -420,7 +460,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
         setEditingTask(null);
         setEditTaskForm(getEmptyTaskForm());
         setEditTaskErrors({});
-        success('Task Updated', 'Follow-up task details updated.');
+        announceSaved('Task Updated', 'Task details updated.', res.notification);
       } else {
         error('Update Failed', res.error || 'Failed to update task');
       }
@@ -954,8 +994,13 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
             <UserCombobox
               users={users}
               value={newTaskForm.assignedUserId}
-              onChange={(val) => setNewTaskForm({ ...newTaskForm, assignedUserId: val })}
+              onChange={(val) => setNewTaskForm({ ...newTaskForm, assignedUserId: val, notify: !!val && val !== currentUser?.id })}
               placeholder="Assign to salesperson..."
+            />
+            <NotifyToggle
+              checked={newTaskForm.notify}
+              onChange={(notify) => setNewTaskForm({ ...newTaskForm, notify })}
+              assignee={users.find((u) => u.id === newTaskForm.assignedUserId)}
             />
           </div>
 
@@ -1091,8 +1136,15 @@ export const TaskListView: React.FC<TaskListViewProps> = ({
             <UserCombobox
               users={users}
               value={editTaskForm.assignedUserId}
-              onChange={(val) => setEditTaskForm({ ...editTaskForm, assignedUserId: val })}
+              onChange={(val) =>
+                setEditTaskForm({ ...editTaskForm, assignedUserId: val, notify: !!val && val !== editingTask?.assignedUserId })
+              }
               placeholder="Select salesperson..."
+            />
+            <NotifyToggle
+              checked={editTaskForm.notify}
+              onChange={(notify) => setEditTaskForm({ ...editTaskForm, notify })}
+              assignee={users.find((u) => u.id === editTaskForm.assignedUserId)}
             />
           </div>
 

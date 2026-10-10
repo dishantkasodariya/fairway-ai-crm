@@ -2,6 +2,15 @@ import { Request, Response } from 'express';
 import { query } from '../config/db.js';
 import crypto from 'crypto';
 import { AuthenticatedRequest } from '../middleware/auth.middleware.js';
+import { notifyTaskAssignee, TaskNotification } from '../services/taskNotifier.js';
+
+/** Display name of whoever is making the request, for "Assigned by". */
+const requesterName = async (req: Request): Promise<{ id: string | null; name: string }> => {
+  const userId = (req as AuthenticatedRequest).user?.userId || null;
+  if (!userId) return { id: null, name: 'A colleague' };
+  const { rows } = await query('SELECT name FROM users WHERE id = $1', [userId]);
+  return { id: userId, name: rows[0]?.name || 'A colleague' };
+};
 
 /**
  * GET /api/tasks
@@ -144,6 +153,7 @@ export const createTask = async (req: Request, res: Response): Promise<void> => 
       dueTime,
       priority,
       status,
+      notify,
     } = req.body;
 
     if (!description || !description.trim()) {
@@ -158,13 +168,14 @@ export const createTask = async (req: Request, res: Response): Promise<void> => 
       INSERT INTO tasks (
         id, company_id, company_name, inquiry_id, inquiry_number, facility_id,
         assigned_user_id, assigned_user_name, task_type, description, due_date, due_time,
-        priority, status, created_at, updated_at
+        priority, status, created_by_user_id, created_by_name, created_at, updated_at
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12,
-        $13, $14, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        $13, $14, $15, $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
       ) RETURNING *;
     `;
+    const requester = await requesterName(req);
 
     const values = [
       taskId,
@@ -181,10 +192,14 @@ export const createTask = async (req: Request, res: Response): Promise<void> => 
       dueTime || '11:00 AM',
       priority || 'High',
       status || 'Pending',
+      requester.id,
+      requester.name,
     ];
 
     const result = await query(sql, values);
     const row = result.rows[0];
+    // "Notify" ticked: email the assignee now. The task is saved either way.
+    const notification: TaskNotification | undefined = notify ? await notifyTaskAssignee(row, requester.name) : undefined;
 
     res.status(201).json({
       success: true,
@@ -206,6 +221,7 @@ export const createTask = async (req: Request, res: Response): Promise<void> => 
         createdAt: row.created_at.toISOString(),
         updatedAt: row.updated_at.toISOString(),
       },
+      notification,
     });
   } catch (error: any) {
     console.error('Error creating task:', error);
@@ -241,6 +257,7 @@ export const updateTask = async (req: Request, res: Response): Promise<void> => 
       assignedUserName,
       taskType,
       completedNotes,
+      notify,
     } = req.body;
 
     const sql = `
@@ -279,8 +296,12 @@ export const updateTask = async (req: Request, res: Response): Promise<void> => 
     }
 
     const row = result.rows[0];
+    const notification: TaskNotification | undefined = notify
+      ? await notifyTaskAssignee(row, (await requesterName(req)).name)
+      : undefined;
     res.status(200).json({
       success: true,
+      notification,
       data: {
         id: row.id,
         companyId: row.company_id,

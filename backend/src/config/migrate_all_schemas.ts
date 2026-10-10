@@ -605,6 +605,10 @@ export async function runAllSchemaFixes() {
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS manager_name VARCHAR(255);
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
       ALTER TABLE properties ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notified_at TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notified_to VARCHAR(255);
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_user_id VARCHAR(255);
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_name VARCHAR(255);
     `);
 
     // Sync location from address or corridor if empty

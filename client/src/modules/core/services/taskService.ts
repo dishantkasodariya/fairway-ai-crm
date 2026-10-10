@@ -1,6 +1,9 @@
 import { Task } from '@/modules/core/types';
 import { API_BASE_URL, getAuthHeaders } from './api';
 
+/** Result of "Notify by email" on a task save. */
+export type TaskNotification = { sent: true; to: string } | { sent: false; reason: string };
+
 export class TaskService {
   /**
    * Fetch all tasks with optional filters
@@ -65,7 +68,9 @@ export class TaskService {
   /**
    * Create a new task/follow-up
    */
-  static async createTask(taskData: Partial<Task>): Promise<{ success: boolean; data?: Task; error?: string }> {
+  static async createTask(
+    taskData: Partial<Task> & { notify?: boolean }
+  ): Promise<{ success: boolean; data?: Task; error?: string; notification?: TaskNotification }> {
     try {
       const res = await fetch(`${API_BASE_URL}/tasks`, {
         method: 'POST',
@@ -83,7 +88,10 @@ export class TaskService {
   /**
    * Update an existing task
    */
-  static async updateTask(id: string, taskData: Partial<Task>): Promise<{ success: boolean; data?: Task; error?: string }> {
+  static async updateTask(
+    id: string,
+    taskData: Partial<Task> & { notify?: boolean }
+  ): Promise<{ success: boolean; data?: Task; error?: string; notification?: TaskNotification }> {
     try {
       const res = await fetch(`${API_BASE_URL}/tasks/${id}`, {
         method: 'PUT',
