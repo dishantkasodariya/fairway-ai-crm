@@ -383,7 +383,13 @@ export const listAllContacts = async (req: Request, res: Response): Promise<void
  */
 export const draftMessage = async (req: Request, res: Response): Promise<void> => {
   try {
-    const draft = await callIntelligenceApi(`/v1/contacts/${req.params.id}/draft-message`, { method: 'POST', body: '{}' });
+    // Sign the draft as the person who'll send it.
+    const userId = (req as AuthenticatedRequest).user?.userId;
+    const sender = userId ? (await pool.query('SELECT name, department FROM users WHERE id = $1', [userId])).rows[0] : null;
+    const draft = await callIntelligenceApi(`/v1/contacts/${req.params.id}/draft-message`, {
+      method: 'POST',
+      body: JSON.stringify({ sender_name: sender?.name || null, sender_title: sender?.department || null }),
+    });
     res.status(200).json({ success: true, data: toCamelCaseDeep(draft) });
   } catch (error: any) {
     handleIntelligenceError(res, error, 'Failed to draft outreach message');
@@ -401,8 +407,13 @@ export const draftMessage = async (req: Request, res: Response): Promise<void> =
  */
 export const sendOutreachEmail = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { to, subject, body, contactName, intelligenceCompanyId } = req.body || {};
-  if (!to || !subject || !body) {
+  if (!to || !String(subject || '').trim() || !String(body || '').trim()) {
     res.status(422).json({ success: false, error: { message: 'to, subject and body are required.' } });
+    return;
+  }
+  // The subject and message are typed by the user now: one line, sane lengths.
+  if (/[\r\n]/.test(String(subject)) || String(subject).length > 200 || String(body).length > 5000) {
+    res.status(422).json({ success: false, error: { message: 'Subject must be one line (max 200 characters) and the message at most 5,000 characters.' } });
     return;
   }
 

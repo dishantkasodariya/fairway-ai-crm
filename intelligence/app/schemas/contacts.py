@@ -75,3 +75,10 @@ class CompanyConnectionsOut(BaseModel):
 class CompanyConnectionsListOut(BaseModel):
     total: int
     items: list[CompanyConnectionsOut]
+
+
+class DraftRequest(BaseModel):
+    """Who the message is from, so the draft is signed properly (no [Your Name])."""
+
+    sender_name: str | None = Field(default=None, max_length=120)
+    sender_title: str | None = Field(default=None, max_length=120)

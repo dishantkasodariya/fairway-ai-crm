@@ -15,6 +15,7 @@ from app.schemas.contacts import (
     ContactsListOut,
     ContactWithCompanyOut,
     DraftMessageOut,
+    DraftRequest,
     OutreachDraftOut,
 )
 from app.schemas.jobs import JobOut
@@ -153,7 +154,12 @@ def contacts_by_company(
 
 @router.post("/contacts/{contact_id}/draft-message", response_model=DraftMessageOut)
 @limiter.limit("20/minute")
-def draft_message(request: Request, contact_id: int, db: Session = Depends(get_db)):
+def draft_message(
+    request: Request,
+    contact_id: int,
+    body: DraftRequest | None = None,
+    db: Session = Depends(get_db),
+):
     """One AgentRunner call producing a LinkedIn note + email subject/body
     from the company's opportunity score why/estimated_requirement, stored
     as two OutreachDraft rows (one per channel)."""
@@ -171,6 +177,8 @@ def draft_message(request: Request, contact_id: int, db: Session = Depends(get_d
         company_name=company.name,
         why=score.why if score else None,
         estimated_requirement=score.estimated_requirement if score else None,
+        sender_name=body.sender_name if body else None,
+        sender_title=body.sender_title if body else None,
     )
 
     linkedin_row = OutreachDraft(

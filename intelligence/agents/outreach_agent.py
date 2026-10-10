@@ -19,11 +19,15 @@ class OutreachAgent:
         company_name: str,
         why: str | None,
         estimated_requirement: str | None,
+        sender_name: str | None = None,
+        sender_title: str | None = None,
     ) -> dict:
         provider = build_llm_provider(self.settings, tier="judgment")
         runner = AgentRunner(provider=provider, tools=[], max_steps=3)
         return runner.run(
             system=SYSTEM_PROMPT,
-            user_message=build_user_message(contact_name, contact_title, company_name, why, estimated_requirement),
+            user_message=build_user_message(
+                contact_name, contact_title, company_name, why, estimated_requirement, sender_name, sender_title
+            ),
             output_schema=OUTREACH_OUTPUT_SCHEMA,
         )
