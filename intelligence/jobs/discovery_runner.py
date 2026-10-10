@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.db.base import SessionLocal
 from sqlalchemy.dialects.postgresql import insert
 
-from app.db.models import Company, CompanyWarehouseLink, DiscoveryRun, DiscoveryRunStatus
+from app.db.models import Company, CompanyWarehouseLink, DiscoveryRun, DiscoveryRunCompany, DiscoveryRunStatus
 from app.observability import get_tracer
 from classification.ai_fallback import AIFallbackClassifier
 from classification.rules import classify
@@ -53,6 +53,16 @@ def _link_to_warehouse(db, company: Company, run: DiscoveryRun, distance_km: flo
         company.distance_km = distance_km
 
 
+def _record_in_run(db, company: Company, run: DiscoveryRun, distance_km: float | None, is_new: bool) -> None:
+    """Remember that this run found the company, so the run's results list it
+    even when an earlier run (or another warehouse) found it first."""
+    db.execute(
+        insert(DiscoveryRunCompany)
+        .values(discovery_run_id=run.id, company_id=company.id, distance_km=distance_km, is_new=is_new)
+        .on_conflict_do_nothing(constraint="uq_run_company")
+    )
+
+
 def run_discovery_job(run_id: int) -> None:
     db = SessionLocal()
     try:
@@ -77,6 +87,13 @@ def run_discovery_job(run_id: int) -> None:
                     max_qps=5,
                 )
 
+                stats = result["stats"]
+                failed = result.get("failed_circles") or []
+                if failed and stats.get("failed_calls", 0) >= stats.get("total_calls", 0):
+                    # Every Places call failed (bad/exhausted key, API disabled...). Say so
+                    # instead of reporting a clean run that found nothing.
+                    raise RuntimeError(f"Google Places search failed for every area searched: {failed[0]['error']}")
+
                 ai_classifier = AIFallbackClassifier(settings)
                 created = 0
                 linked = 0
@@ -88,16 +105,21 @@ def run_discovery_job(run_id: int) -> None:
                         if existing.discovery_run_id is None:
                             existing.discovery_run_id = run.id
                         _link_to_warehouse(db, existing, run, c.get("distance_km"))
+                        _record_in_run(db, existing, run, c.get("distance_km"), is_new=False)
                         linked += 1
                         continue
 
                     category = classify(c["name"])
                     confidence, reason = "high", "rule-based keyword match"
                     if category == "?":
-                        ai_result = ai_classifier.classify(c["name"], c.get("address") or "", c.get("website"))
-                        category = ai_result["category"]
-                        confidence = ai_result["confidence"]
-                        reason = ai_result["reason"]
+                        try:
+                            ai_result = ai_classifier.classify(c["name"], c.get("address") or "", c.get("website"))
+                            category = ai_result["category"]
+                            confidence = ai_result["confidence"]
+                            reason = ai_result["reason"]
+                        except Exception:  # noqa: BLE001 — one LLM hiccup must not sink the whole run
+                            logger.warning("discovery_run id=%s: AI classification failed for %r", run_id, c["name"], exc_info=True)
+                            confidence, reason = "low", "unclassified: AI classifier unavailable"
 
                     company = Company(
                         place_id=c.get("id"),
@@ -119,6 +141,7 @@ def run_discovery_job(run_id: int) -> None:
                     # (the session has autoflush off) and the link gets an id.
                     db.flush()
                     _link_to_warehouse(db, company, run, c.get("distance_km"))
+                    _record_in_run(db, company, run, c.get("distance_km"), is_new=True)
                     created += 1
 
                 # New gates/plants of a known company join its account.
@@ -127,6 +150,8 @@ def run_discovery_job(run_id: int) -> None:
                 run.companies_found = created
                 run.api_calls_made = result["stats"]["total_calls"]
                 run.status = DiscoveryRunStatus.done
+                if failed:
+                    run.error = f"{len(failed)} of {stats['total_calls']} search areas failed; results may be incomplete"
                 span.set_attribute("result.companies_created", created)
                 span.set_attribute("result.companies_already_known", linked)
                 span.set_attribute("result.api_calls_made", result["stats"]["total_calls"])
@@ -136,7 +161,9 @@ def run_discovery_job(run_id: int) -> None:
                 )
             except Exception as e:  # noqa: BLE001 — record failure on the run row, don't crash the worker
                 logger.exception("Discovery run %s failed", run_id)
+                db.rollback()
                 run.status = DiscoveryRunStatus.failed
+                run.error = str(e)[:500]
                 span.set_attribute("run.error", str(e))
             finally:
                 run.completed_at = _utcnow()

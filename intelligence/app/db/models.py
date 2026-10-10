@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -86,6 +86,11 @@ class DiscoveryRun(Base):
         default=RevenueEnrichmentStatus.not_started,
     )
     revenue_enriched_count: Mapped[int] = mapped_column(Integer, default=0)
+    # Run-level signals research: not_started | running | done (same lifecycle as revenue).
+    signals_status: Mapped[str] = mapped_column(String, default="not_started", server_default="not_started")
+    signals_researched_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Why the run failed, shown to the user instead of a bare "failed".
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
@@ -166,6 +171,21 @@ class CompanyWarehouseLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     company: Mapped[Company] = relationship(back_populates="warehouse_links")
+
+
+class DiscoveryRunCompany(Base):
+    """Every company a run found, new or already known, with its distance from
+    that run's centre. companies.discovery_run_id only names the first run."""
+
+    __tablename__ = "discovery_run_companies"
+    __table_args__ = (UniqueConstraint("discovery_run_id", "company_id", name="uq_run_company"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    discovery_run_id: Mapped[int] = mapped_column(ForeignKey("discovery_runs.id", ondelete="CASCADE"), index=True)
+    company_id: Mapped[int] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"), index=True)
+    distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    is_new: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
 class RevenueSnapshot(Base):

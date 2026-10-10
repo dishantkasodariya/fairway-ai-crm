@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased, joinedload
 
-from app.db.models import Company, CompanyWarehouseLink, OpportunityScore, RevenueSnapshot
+from app.db.models import Company, CompanyWarehouseLink, DiscoveryRunCompany, OpportunityScore, RevenueSnapshot
 from app.deps import get_db, require_api_key
 from app.schemas.companies import (
     BusinessTypeCountOut,
@@ -98,12 +98,25 @@ def list_companies(
     if group_sites:
         q = q.filter(Company.parent_company_id.is_(None))
 
-    # Distance shown/sorted: to the chosen warehouse when filtering, else the nearest one.
+    # Distance shown/sorted: from the search point when listing a run's results,
+    # to the chosen warehouse when filtering by one, else to the nearest warehouse.
+    if discovery_run_id is not None:
+        R = aliased(DiscoveryRunCompany)
+        run_members = (
+            db.query(member_account.label("account_id"), func.min(R.distance_km).label("distance_km"))
+            .join(R, R.company_id == member.id)
+            .filter(R.discovery_run_id == discovery_run_id)
+            .group_by(member_account)
+            .subquery()
+        )
+        q = q.join(run_members, run_members.c.account_id == Company.id)
+        distance_col = run_members.c.distance_km
     if property_id:
         chosen = aliased(account_links)
         q = q.join(chosen, (chosen.c.account_id == Company.id) & (chosen.c.property_id == property_id))
-        distance_col = chosen.c.distance_km
-    else:
+        if discovery_run_id is None:
+            distance_col = chosen.c.distance_km
+    elif discovery_run_id is None:
         distance_col = func.coalesce(nearest.c.distance_km, Company.distance_km)
     q = q.add_columns(distance_col.label("shown_distance_km"))
 
@@ -112,9 +125,6 @@ def list_companies(
         q = q.filter(Company.id.in_(matching))
     if business_type:
         q = q.filter(Company.business_type == business_type)
-    if discovery_run_id is not None:
-        in_run = db.query(member_account).filter(member.discovery_run_id == discovery_run_id)
-        q = q.filter(Company.id.in_(in_run))
     if min_score is not None:
         q = q.filter(BestOpp.score >= min_score)
     if min_revenue_cr is not None:

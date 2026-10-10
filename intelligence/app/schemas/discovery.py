@@ -29,5 +29,15 @@ class DiscoveryRunOut(BaseModel):
     companies_linked: int = 0
     revenue_enrichment_status: str
     revenue_enriched_count: int
+    # Every company this search found, new or already known (works with no warehouse too).
+    companies_matched: int = 0
+    signals_status: str = "not_started"
+    signals_researched_count: int = 0
+    error: str | None = None
     created_at: datetime
     completed_at: datetime | None
+
+
+class RunSignalsCreate(BaseModel):
+    # How many of the run's best unscored prospects to research (each costs search + LLM calls).
+    limit: int = Field(default=10, ge=1, le=25)
