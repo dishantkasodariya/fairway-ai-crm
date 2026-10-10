@@ -21,6 +21,17 @@ export interface DiscoveryRun {
   signalsResearchedCount: number;
   /** Why the run failed, or a note about partly failed search areas. */
   error: string | null;
+  /** One-click pipeline: revenue -> rank -> signals in batches -> Apollo contacts. */
+  pipelineStatus: 'not_started' | 'running' | 'done' | 'failed';
+  pipelineStage: 'revenue' | 'signals' | 'contacts' | null;
+  suitableCount: number;
+  skippedCount: number;
+  signalsTotal: number;
+  signalsBatchSize: number | null;
+  contactsStatus: 'not_started' | 'running' | 'done' | 'blocked' | 'skipped';
+  contactsCompaniesDone: number;
+  contactsFoundCount: number;
+  pipelineNote: string | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -43,6 +54,23 @@ export interface Contact {
   confidence: string | null;
   createdAt: string;
 }
+
+/** A company row on the Connections page. */
+export interface CompanyConnections {
+  companyId: number;
+  companyName: string;
+  businessType: string | null;
+  opportunityScore: number | null;
+  estimatedRequirement: string | null;
+  contactCount: number;
+  withEmail: number;
+  withLinkedin: number;
+  withPhone: number;
+}
+
+/** The API sends errors as a string or as { code, message }. */
+export const errorText = (error: unknown, fallback: string): string =>
+  typeof error === 'string' ? error : (error as any)?.message || fallback;
 
 export interface ContactWithCompany extends Contact {
   companyName: string;
@@ -351,6 +379,39 @@ export class IntelligenceService {
   }
 
   /** Every enriched contact across every discovered company. */
+  static async startRunPipeline(
+    runId: number,
+    options: { signalsBatchSize?: number; signalsMax?: number; contactsTopN?: number } = {}
+  ): Promise<{ success: boolean; data?: DiscoveryRun; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/discovery/runs/${runId}/pipeline`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(options),
+      });
+      return await res.json();
+    } catch (err: any) {
+      console.warn('IntelligenceService.startRunPipeline failed:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  static async listConnectionsByCompany(
+    params: { search?: string; limit?: number; offset?: number } = {}
+  ): Promise<{ success: boolean; data?: { total: number; items: CompanyConnections[] }; error?: string }> {
+    try {
+      const q = new URLSearchParams();
+      if (params.search) q.set('search', params.search);
+      if (params.limit !== undefined) q.set('limit', String(params.limit));
+      if (params.offset !== undefined) q.set('offset', String(params.offset));
+      const res = await fetch(`${API_BASE_URL}/intelligence/contacts/by-company?${q.toString()}`, { headers: getAuthHeaders() });
+      return await res.json();
+    } catch (err: any) {
+      console.warn('IntelligenceService.listConnectionsByCompany failed:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   static async listAllContacts(): Promise<{ success: boolean; data?: { items: ContactWithCompany[] }; error?: string }> {
     try {
       const res = await fetch(`${API_BASE_URL}/intelligence/contacts`, {

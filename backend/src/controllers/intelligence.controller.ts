@@ -325,6 +325,44 @@ export const getCompanyContacts = async (req: Request, res: Response): Promise<v
  * Every enriched contact across every discovered company, for the AI
  * Connections page.
  */
+/**
+ * GET /api/intelligence/contacts/by-company?search=&limit=&offset=
+ * Connections page: one row per company with how many people we can reach.
+ */
+export const listConnectionsByCompany = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = new URLSearchParams();
+    if (req.query.search) params.set('search', String(req.query.search));
+    if (req.query.limit) params.set('limit', String(req.query.limit));
+    if (req.query.offset) params.set('offset', String(req.query.offset));
+    const result = await callIntelligenceApi(`/v1/contacts/by-company?${params.toString()}`);
+    res.status(200).json({ success: true, data: toCamelCaseDeep(result) });
+  } catch (error: any) {
+    handleIntelligenceError(res, error, 'Failed to fetch connections');
+  }
+};
+
+/**
+ * POST /api/intelligence/discovery/runs/:runId/pipeline { signalsBatchSize?, signalsMax?, contactsTopN? }
+ * Revenue -> rank -> signals in batches -> Apollo contacts, in the background. Poll the run.
+ */
+export const startRunPipeline = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { signalsBatchSize, signalsMax, contactsTopN } = req.body || {};
+    const body: Record<string, number> = {};
+    if (signalsBatchSize !== undefined && signalsBatchSize !== null && signalsBatchSize !== '') body.signals_batch_size = Number(signalsBatchSize);
+    if (signalsMax !== undefined && signalsMax !== null && signalsMax !== '') body.signals_max = Number(signalsMax);
+    if (contactsTopN !== undefined && contactsTopN !== null && contactsTopN !== '') body.contacts_top_n = Number(contactsTopN);
+    const run = await callIntelligenceApi(`/v1/discovery/runs/${req.params.runId}/pipeline`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    res.status(202).json({ success: true, data: toCamelCaseDeep(run) });
+  } catch (error: any) {
+    handleIntelligenceError(res, error, 'Failed to start the intelligence pipeline');
+  }
+};
+
 export const listAllContacts = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await callIntelligenceApi('/v1/contacts');

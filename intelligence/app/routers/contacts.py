@@ -1,4 +1,5 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -7,6 +8,8 @@ from app.deps import get_db, require_api_key
 from app.rate_limit import limiter
 from app.schemas.contacts import (
     AllContactsListOut,
+    CompanyConnectionsListOut,
+    CompanyConnectionsOut,
     ContactCreate,
     ContactOut,
     ContactsListOut,
@@ -101,6 +104,51 @@ def list_all_contacts(db: Session = Depends(get_db)):
         for contact, company_name, business_type in rows
     ]
     return AllContactsListOut(items=items)
+
+
+@router.get("/contacts/by-company", response_model=CompanyConnectionsListOut)
+def contacts_by_company(
+    db: Session = Depends(get_db),
+    search: str | None = Query(default=None, description="Company or person name contains"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    """Connections page: one row per company that has contacts, best opportunity first.
+    The people themselves come from GET /v1/companies/{id}/contacts."""
+    q = (
+        db.query(
+            Company.id,
+            Company.name,
+            Company.business_type,
+            OpportunityScore.score,
+            OpportunityScore.estimated_requirement,
+            func.count(Contact.id),
+            func.count(Contact.email),
+            func.count(Contact.linkedin_url),
+            func.count(Contact.phone),
+        )
+        .join(Contact, Contact.company_id == Company.id)
+        .outerjoin(OpportunityScore, OpportunityScore.company_id == Company.id)
+        .group_by(Company.id, OpportunityScore.score, OpportunityScore.estimated_requirement)
+    )
+    if search:
+        like = f"%{search}%"
+        q = q.filter(Company.id.in_(
+            db.query(Contact.company_id).join(Company, Company.id == Contact.company_id)
+            .filter((Company.name.ilike(like)) | (Contact.name.ilike(like)))
+        ))
+    total = q.count()
+    rows = q.order_by(OpportunityScore.score.desc().nullslast(), func.count(Contact.id).desc(), Company.id).offset(offset).limit(limit).all()
+    return CompanyConnectionsListOut(
+        total=total,
+        items=[
+            CompanyConnectionsOut(
+                company_id=cid, company_name=name, business_type=btype, opportunity_score=score,
+                estimated_requirement=req, contact_count=n, with_email=ne, with_linkedin=nl, with_phone=np,
+            )
+            for cid, name, btype, score, req, n, ne, nl, np in rows
+        ],
+    )
 
 
 @router.post("/contacts/{contact_id}/draft-message", response_model=DraftMessageOut)

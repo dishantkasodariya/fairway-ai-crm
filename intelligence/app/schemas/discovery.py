@@ -34,6 +34,16 @@ class DiscoveryRunOut(BaseModel):
     signals_status: str = "not_started"
     signals_researched_count: int = 0
     error: str | None = None
+    pipeline_status: str = "not_started"
+    pipeline_stage: str | None = None
+    suitable_count: int = 0
+    skipped_count: int = 0
+    signals_total: int = 0
+    signals_batch_size: int | None = None
+    contacts_status: str = "not_started"
+    contacts_companies_done: int = 0
+    contacts_found_count: int = 0
+    pipeline_note: str | None = None
     created_at: datetime
     completed_at: datetime | None
 
@@ -41,3 +51,10 @@ class DiscoveryRunOut(BaseModel):
 class RunSignalsCreate(BaseModel):
     # How many of the run's best unscored prospects to research (each costs search + LLM calls).
     limit: int = Field(default=10, ge=1, le=25)
+
+
+class RunPipelineCreate(BaseModel):
+    # Overrides for this run; unset = SIGNALS_BATCH_SIZE / SIGNALS_MAX_PER_RUN / CONTACTS_TOP_N.
+    signals_batch_size: int | None = Field(default=None, ge=1, le=500)
+    signals_max: int | None = Field(default=None, ge=0, le=5000)
+    contacts_top_n: int | None = Field(default=None, ge=0, le=200)

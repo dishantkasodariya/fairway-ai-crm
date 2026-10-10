@@ -46,7 +46,9 @@ DUMMY_PLACES = [
     ("Bharat Polymers & Plastics", (-0.035, -0.020), "rule"),
     ("Mehta Enterprises", (0.045, 0.030), "ai"),
     ("Riverbank Holdings", (0.015, -0.050), "ai_fails"),
+    ("Gujarat Salt Works", (-0.012, 0.040), "rule_unsuitable"),
 ]
+SUITABLE = 5  # all but the unclassified one (LLM outage) and the salt works
 
 results: list[tuple[str, bool, str]] = []
 
@@ -102,7 +104,7 @@ class FakeClassifier:
     def classify(self, name, address="", website=None):
         if "Riverbank" in name:
             raise RuntimeError("simulated LLM outage")
-        return {"category": "Logistics", "confidence": "medium", "reason": "fake LLM: distributor of packaged goods"}
+        return {"category": "Shipping/Logistics/Transport", "confidence": "medium", "reason": "fake LLM: distributor of packaged goods"}
 
 
 class FakeRevenueAgent:
@@ -147,6 +149,11 @@ def install_fakes():
     dr.AIFallbackClassifier = FakeClassifier
     jr.RevenueAgent = FakeRevenueAgent
     jr.SignalAgent = FakeSignalAgent
+    import jobs.run_pipeline as rp
+    from testing.fake_providers import FakeApolloClient
+
+    rp.ApolloClient = FakeApolloClient
+    rp.get_settings().apollo_api_key = rp.get_settings().apollo_api_key or "fake-key-for-e2e"
     return dr
 
 
@@ -225,9 +232,7 @@ def main() -> int:
 
     dr = install_fakes()
     from app.db.base import SessionLocal
-    from app.db.models import Company, DiscoveryRun, DiscoveryRunStatus, OpportunityScore, RevenueEnrichmentStatus, Signal
-    from jobs.enrich_revenue_runner import run_enrich_revenue_job
-    from jobs.run_signals_runner import run_signals_for_run_job
+    from app.db.models import Company, DiscoveryRun, DiscoveryRunStatus, OpportunityScore, RevenueSnapshot, Signal
 
     ih = {"X-API-Key": intel_key}
     s = requests.Session()
@@ -278,7 +283,7 @@ def main() -> int:
     check("all dummy companies created", run.companies_found == len(DUMMY_PLACES), str(run.companies_found))
     comps = {c.name.replace(f"{TAG} ", ""): c for c in db.query(Company).filter(Company.place_id.like(PLACE_PREFIX + "%"))}
     check("rule-based business type", comps["Shree Ambica Chemicals Pvt Ltd"].business_type == "Chemicals", comps["Shree Ambica Chemicals Pvt Ltd"].business_type)
-    check("AI fallback business type", comps["Mehta Enterprises"].business_type == "Logistics", comps["Mehta Enterprises"].business_type)
+    check("AI fallback business type", comps["Mehta Enterprises"].business_type == "Shipping/Logistics/Transport", comps["Mehta Enterprises"].business_type)
     check("LLM outage leaves company unclassified, not lost", comps["Riverbank Holdings"].business_type_confidence == "low", comps["Riverbank Holdings"].business_type_reason)
 
     rr = requests.get(f"{intel_api}/v1/discovery/runs/{run.id}", headers=ih, timeout=15).json()
@@ -288,25 +293,38 @@ def main() -> int:
     check("API: run results list every company with distance", lst["total"] == len(DUMMY_PLACES) and all(i["distance_km"] is not None for i in lst["items"]),
           f"total={lst['total']}")
 
-    # -- Revenue
-    print("\n4. Intelligence: revenue research for the run")
-    run.revenue_enrichment_status = RevenueEnrichmentStatus.running; db.commit()
-    run_enrich_revenue_job(run.id)
-    db.refresh(run)
-    check("revenue researched for every company", run.revenue_enriched_count == len(DUMMY_PLACES), str(run.revenue_enriched_count))
+    # -- One-click pipeline: revenue -> rank -> signals in batches -> Apollo contacts
+    print("\n4. Intelligence: pipeline (revenue, rank by fit x revenue, signals in batches of 2, Apollo top 2)")
+    from jobs.run_pipeline import run_pipeline_job
 
-    # -- Signals + score
-    print("\n5. Intelligence: signals (expansion, lease expiry...) and opportunity score")
-    run.signals_status = "running"; db.commit()
-    run_signals_for_run_job(run.id, limit=10)
+    run.pipeline_status = "running"; db.commit()
+    run_pipeline_job(run.id, signals_batch_size=2, contacts_top_n=2)
     db.expire_all(); db.refresh(run)
-    check("signals researched for the run", run.signals_status == "done" and run.signals_researched_count >= 4, f"{run.signals_status} {run.signals_researched_count}")
+    check("pipeline done", run.pipeline_status == "done", f"{run.pipeline_status} {run.pipeline_note or ''}")
+    check("suitable vs skipped business types", run.suitable_count == SUITABLE and run.skipped_count == len(DUMMY_PLACES) - SUITABLE,
+          f"suitable={run.suitable_count} skipped={run.skipped_count}")
+    check("revenue researched for suitable companies only", run.revenue_enriched_count == SUITABLE, str(run.revenue_enriched_count))
+    salt = comps["Gujarat Salt Works"]
+    check("no research spend on skipped companies",
+          not db.query(RevenueSnapshot).filter(RevenueSnapshot.company_id == salt.id).count()
+          and not db.query(OpportunityScore).filter(OpportunityScore.company_id == salt.id).count())
+    check("signals for every suitable company, in batches", run.signals_total == SUITABLE and run.signals_researched_count == SUITABLE
+          and run.signals_batch_size == 2, f"{run.signals_researched_count}/{run.signals_total} batch={run.signals_batch_size}")
     top = comps["Shree Ambica Chemicals Pvt Ltd"]
     sigs = db.query(Signal).filter(Signal.company_id == top.id).all()
     check("uncited signal dropped", all(sg.source_url for sg in sigs) and len(sigs) == 2, f"{len(sigs)} stored")
     score = db.query(OpportunityScore).filter(OpportunityScore.company_id == top.id).one_or_none()
     check("opportunity score computed", score is not None and score.score > 0, f"score={score.score if score else None}")
     check("warehouse requirement estimated", score is not None and bool(score.estimated_requirement), score.estimated_requirement if score else "")
+    top_score = max(o.score for o in db.query(OpportunityScore).filter(OpportunityScore.company_id.in_([c.id for c in comps.values()])))
+    check("biggest chemicals company scores highest", score is not None and score.score == top_score, f"{score.score if score else None} vs max {top_score}")
+    check("Apollo contacts for the top 2", run.contacts_status == "done" and run.contacts_companies_done == 2 and run.contacts_found_count == 6,
+          f"{run.contacts_status} companies={run.contacts_companies_done} people={run.contacts_found_count}")
+    run.pipeline_status = "running"; db.commit()
+    run_pipeline_job(run.id, signals_batch_size=2, contacts_top_n=2)
+    db.expire_all(); db.refresh(run)
+    check("re-running the pipeline spends nothing twice", run.revenue_enriched_count == 0 and run.signals_total == 0,
+          f"revenue={run.revenue_enriched_count} signals={run.signals_total}")
 
     # -- Overlapping search: known companies must still show up
     print("\n6. Intelligence: a second search over the same area (coordinates only, no warehouse)")
@@ -345,6 +363,15 @@ def main() -> int:
     check("adding again is refused (no duplicate deal)", r.status_code in (409, 400), f"HTTP {r.status_code}")
     st = s.get(f"{args.crm}/intelligence/companies/{prospect_id}/crm-status", timeout=20).json()["data"]
     check("prospect shows 'In CRM'", bool(st.get("inCrm") or st.get("openInquiry")), str({k: st.get(k) for k in ("inCrm",)}))
+
+    r = s.get(f"{args.crm}/intelligence/contacts/by-company", params={"search": TAG}, timeout=20)
+    rows = r.json()["data"]["items"] if r.ok else []
+    mine = next((x for x in rows if x["companyId"] == prospect_id), None)
+    check("Connections: one row per company with its people count", mine is not None and mine["contactCount"] == 4,
+          f"{mine['contactCount'] if mine else r.text[:120]} (3 from Apollo + 1 added by hand)")
+    r = s.get(f"{args.crm}/intelligence/companies/{prospect_id}/contacts", timeout=20)
+    people = r.json()["data"]["items"] if r.ok else []
+    check("Connections: opening the company lists its people", len(people) == 4 and any(p["source"] == "apollo" for p in people), str(len(people)))
 
     print("\n8. CRM: follow-up loop")
     r = s.post(f"{args.crm}/inquiries/{inq_id}/touches", json={"channel": "Call", "outcome": "no_reply", "note": "E2E: no answer"}, timeout=20)

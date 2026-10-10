@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,6 +50,39 @@ class Settings(BaseSettings):
     signals_cron_interval_hours: int = 24
 
     apollo_api_key: str = ""
+
+    # Intelligence pipeline (jobs/run_pipeline.py)
+    signals_batch_size: int = 100
+    signals_max_per_run: int = 0  # 0 = every suitable company, batch after batch
+    contacts_top_n: int = 25
+    # Business-type fit for a warehouse-leasing business. Primary first, secondary next,
+    # anything else is skipped (no revenue/signals spend). Comma-separated in .env.
+    suitable_business_types_primary: str = (
+        "Chemicals,Pharma/Life Sciences,Plastics/Packaging,Agrochemicals/Fertilizer,"
+        "Shipping/Logistics/Transport,Food/Beverage,Automobile/Auto Parts,Electronics/Electrical,Textile"
+    )
+    suitable_business_types_secondary: str = (
+        "Metal/Engineering/Fabrication,Paper/Board,Rubber,Edible Oil,Solar/Renewable Energy,"
+        "Ceramics/Tiles,Cement/Construction Materials,Leather,Flour/Grain Mill"
+    )
+
+    @field_validator(
+        "openai_model_bulk", "openai_model_judgment", "openai_reasoning_effort",
+        "suitable_business_types_primary", "suitable_business_types_secondary",
+        mode="before",
+    )
+    @classmethod
+    def _blank_means_default(cls, v, info):
+        # An empty line in .env (OPENAI_MODEL_BULK=) keeps the built-in default instead of "".
+        if isinstance(v, str) and not v.strip():
+            return cls.model_fields[info.field_name].default
+        return v
+
+    def business_type_tiers(self) -> dict[str, float]:
+        """business type -> fit weight (1.0 primary, 0.6 secondary)."""
+        tiers = {t.strip(): 0.6 for t in self.suitable_business_types_secondary.split(",") if t.strip()}
+        tiers.update({t.strip(): 1.0 for t in self.suitable_business_types_primary.split(",") if t.strip()})
+        return tiers
 
     log_level: str = "INFO"
     otel_enabled: bool = True

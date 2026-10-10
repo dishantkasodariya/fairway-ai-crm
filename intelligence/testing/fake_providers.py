@@ -37,14 +37,20 @@ def _area_name(lat: float, lng: float) -> str:
 
 
 def fake_find_companies_tiled(lat, lng, radius_m, api_key=None, **_):
-    """Eight companies spread inside the radius. The same area always yields the same
-    place_ids, so a second search over it finds them as already known."""
+    """About two companies per km of radius (8-60), spread inside it, including some
+    business types we skip (salt works, warehouses). The same area always yields the
+    same place_ids, so a second search over it finds them as already known."""
     radius_km = radius_m / 1000
     area = _area_name(lat, lng)
+    count = max(8, min(60, int(radius_km * 2)))
+    templates = _TEMPLATES + [("{area} Salt Works", None), ("{area} Cold Storage & Warehousing", None)]
     companies = []
-    for i, (template, _) in enumerate(_TEMPLATES):
+    for i in range(count):
+        template = templates[i % len(templates)][0]
+        if i >= len(templates):
+            template = template.replace("{area}", "{area} Unit " + str(i // len(templates) + 1))
         angle = (i * 137.5) % 360
-        dist = radius_km * (0.15 + 0.1 * i)  # 15%..85% of the radius
+        dist = radius_km * (0.1 + 0.85 * ((i * 0.618) % 1))  # spread over 10%..95% of the radius
         dlat = (dist / 111.0) * math.cos(math.radians(angle))
         dlng = (dist / (111.0 * math.cos(math.radians(lat)))) * math.sin(math.radians(angle))
         clat, clng = lat + dlat, lng + dlng
@@ -108,6 +114,38 @@ class FakeSignalAgent:
         return {"signals": signals, "estimated_sqft": f"{20 + h % 40},000 sq ft"}
 
 
+class FakeApolloClient:
+    """Three decision-makers per company domain, no emails unlocked (like the real search)."""
+
+    def __init__(self, api_key=None):
+        pass
+
+    def search_people(self, organization_domain, titles=None, per_page=10):
+        roles = ["Head of Supply Chain", "Plant Head", "Logistics Manager"]
+        first = ["Rakesh", "Priya", "Hitesh"]
+        return [{
+            "first_name": first[i], "last_name": f"Fake{i + 1}", "title": roles[i],
+            "email": None, "email_status": "unavailable",
+            "linkedin_url": f"https://www.linkedin.com/in/fake-{organization_domain.split('.')[0]}-{i}",
+        } for i in range(3)]
+
+    def enrich_organization(self, domain):
+        return {"name": domain}
+
+
+class FakeOutreachAgent:
+    def __init__(self, settings=None):
+        pass
+
+    def draft(self, contact_name, contact_title=None, company_name="", why=None, estimated_requirement=None, **_):
+        need = f" for about {estimated_requirement}" if estimated_requirement else ""
+        return {
+            "linkedin_note": f"Hi {contact_name.split()[0]}, Fairway has Grade-A warehouse space near you{need}. Open to a quick chat? (fake draft)",
+            "email_subject": f"Warehouse space near {company_name}",
+            "email_body": f"Dear {contact_name},\n\nWe noticed {company_name} is expanding{need}. Fairway has ready space nearby.\n\n(fake draft)",
+        }
+
+
 def install() -> None:
     import jobs.discovery_runner as dr
     import jobs.runner as jr
@@ -116,6 +154,13 @@ def install() -> None:
     dr.AIFallbackClassifier = FakeClassifier
     jr.RevenueAgent = FakeRevenueAgent
     jr.SignalAgent = FakeSignalAgent
+    jr.ApolloClient = FakeApolloClient
+    import jobs.run_pipeline as rp
+
+    rp.ApolloClient = FakeApolloClient
+    import app.routers.contacts as contacts_router
+
+    contacts_router.OutreachAgent = FakeOutreachAgent
     logger.warning("FAKE_PROVIDERS is on: Places, LLM and research agents are fakes. Never use this in production.")
 
 

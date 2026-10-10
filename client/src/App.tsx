@@ -423,7 +423,7 @@ const AppRouter: React.FC = () => {
             />
           );
         }
-        return <AiConnectionsPage />;
+        return <AiConnectionsPage onOpenProspect={(id) => handleNavigate('ai_prospect_detail', String(id))} />;
 
       case 'proposals':
         if (!canView('proposals')) {

@@ -56,3 +56,22 @@ class OutreachDraftOut(BaseModel):
 class DraftMessageOut(BaseModel):
     linkedin: OutreachDraftOut
     email: OutreachDraftOut
+
+
+class CompanyConnectionsOut(BaseModel):
+    """One row on the Connections page: a company and how many people we can reach there."""
+
+    company_id: int
+    company_name: str
+    business_type: str | None
+    opportunity_score: float | None
+    estimated_requirement: str | None
+    contact_count: int
+    with_email: int
+    with_linkedin: int
+    with_phone: int
+
+
+class CompanyConnectionsListOut(BaseModel):
+    total: int
+    items: list[CompanyConnectionsOut]

@@ -25,6 +25,7 @@ import { cn } from '@/modules/core/lib/utils';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import {
   IntelligenceService,
+  errorText,
   DiscoveredCompany,
   DiscoveryRun,
   BusinessTypeCount,
@@ -68,12 +69,14 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   const [pointInput, setPointInput] = useState('');
   // When set, the results table shows exactly what this search found.
   const [runFilter, setRunFilter] = useState<number | null>(null);
-  const [isResearchingSignals, setIsResearchingSignals] = useState(false);
-  const signalsPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // One-click intelligence pipeline settings (blank = server defaults from .env).
+  const [signalsBatchSize, setSignalsBatchSize] = useState(100);
+  const [contactsTopN, setContactsTopN] = useState(25);
+  const [isStartingPipeline, setIsStartingPipeline] = useState(false);
+  const pipelinePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [run, setRun] = useState<DiscoveryRun | null>(null);
   const [prospects, setProspects] = useState<DiscoveredCompany[]>([]);
   const [isStarting, setIsStarting] = useState(false);
-  const [isEnriching, setIsEnriching] = useState(false);
   const [businessTypes, setBusinessTypes] = useState<BusinessTypeCount[]>([]);
   const [hasResults, setHasResults] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -95,7 +98,6 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const enrichPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -103,18 +105,17 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
       pollRef.current = null;
     }
   };
-  const stopEnrichPolling = () => {
-    if (enrichPollRef.current) {
-      clearInterval(enrichPollRef.current);
-      enrichPollRef.current = null;
+  const stopPipelinePolling = () => {
+    if (pipelinePollRef.current) {
+      clearInterval(pipelinePollRef.current);
+      pipelinePollRef.current = null;
     }
   };
 
   useEffect(() => {
     return () => {
       stopPolling();
-      stopEnrichPolling();
-      if (signalsPollRef.current) clearInterval(signalsPollRef.current);
+      stopPipelinePolling();
     };
   }, []);
 
@@ -247,59 +248,41 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     }
   };
 
-  const handleResearchSignals = async () => {
+  const handleRunPipeline = async () => {
     if (!run) return;
-    setIsResearchingSignals(true);
-    const res = await IntelligenceService.researchRunSignals(run.id, 10);
+    setIsStartingPipeline(true);
+    const res = await IntelligenceService.startRunPipeline(run.id, { signalsBatchSize, contactsTopN });
+    setIsStartingPipeline(false);
     if (!res.success || !res.data) {
-      setIsResearchingSignals(false);
-      toastError('Signals research failed', res.error || 'Could not start signals research.');
+      toastError('Could not start', errorText(res.error, 'Could not start the intelligence pipeline.'));
       return;
     }
     setRun(res.data);
-    if (signalsPollRef.current) clearInterval(signalsPollRef.current);
-    signalsPollRef.current = setInterval(async () => {
+    stopPipelinePolling();
+    let lastStage: string | null = res.data.pipelineStage;
+    pipelinePollRef.current = setInterval(async () => {
       const poll = await IntelligenceService.getDiscoveryRun(run.id);
       if (!poll.success || !poll.data) return;
       setRun(poll.data);
-      if (poll.data.signalsStatus === 'done') {
-        if (signalsPollRef.current) clearInterval(signalsPollRef.current);
-        signalsPollRef.current = null;
-        setIsResearchingSignals(false);
+      // Refresh the table as each stage lands so revenue, then scores appear live.
+      if (poll.data.pipelineStage !== lastStage) {
+        lastStage = poll.data.pipelineStage;
+        loadResults();
+      }
+      if (poll.data.pipelineStatus === 'done' || poll.data.pipelineStatus === 'failed') {
+        stopPipelinePolling();
         await loadResults();
-        success('Signals researched', `Scored ${poll.data.signalsResearchedCount} top prospects from this search.`);
+        if (poll.data.pipelineStatus === 'done') {
+          success(
+            'Intelligence ready',
+            `${poll.data.signalsResearchedCount} companies scored, ${poll.data.contactsFoundCount} contacts found.` +
+              (poll.data.pipelineNote ? ` ${poll.data.pipelineNote}` : '')
+          );
+        } else {
+          toastError('Pipeline stopped', poll.data.pipelineNote || 'The intelligence pipeline stopped.');
+        }
       }
     }, POLL_INTERVAL_MS);
-  };
-
-  const handleEnrichRevenue = async () => {
-    if (!run) return;
-    setIsEnriching(true);
-    try {
-      const res = await IntelligenceService.enrichRevenue(run.id);
-      if (!res.success || !res.data) {
-        toastError('Enrich Failed', res.error || 'Could not start revenue enrichment.');
-        setIsEnriching(false);
-        return;
-      }
-      setRun(res.data);
-
-      stopEnrichPolling();
-      enrichPollRef.current = setInterval(async () => {
-        const poll = await IntelligenceService.getDiscoveryRun(run.id);
-        if (!poll.success || !poll.data) return;
-        setRun(poll.data);
-        if (poll.data.revenueEnrichmentStatus === 'done') {
-          stopEnrichPolling();
-          setIsEnriching(false);
-          await loadResults();
-          success('Revenue Enriched', `Researched revenue for ${poll.data.revenueEnrichedCount} companies.`);
-        }
-      }, POLL_INTERVAL_MS);
-    } catch (err: any) {
-      setIsEnriching(false);
-      toastError('Enrich Failed', err.message || 'Could not start revenue enrichment.');
-    }
   };
 
   // Re-run the results query (server-side paginated) on mount and whenever a filter or page
@@ -459,10 +442,9 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
 
   const isSearching = run !== null && (run.status === 'queued' || run.status === 'running');
   // Only offer enrichment when this run actually brought companies to the warehouse.
-  const showEnrichBanner = run?.status === 'done' && run.revenueEnrichmentStatus === 'not_started' && run.companiesMatched > 0;
-  // Step two, once revenue is in: the score uses revenue, and "best prospects" means biggest first.
-  const showSignalsBanner =
-    run?.status === 'done' && run.companiesMatched > 0 && run.revenueEnrichmentStatus === 'done' && run.signalsStatus !== 'done';
+  const pipelineRunning = run?.pipelineStatus === 'running';
+  // Offer the pipeline once a search has found companies; keep showing it while it runs and after.
+  const showPipelineCard = run?.status === 'done' && run.companiesMatched > 0;
   const searchAreaLabel = run && !run.propertyId ? `${run.warehouseLat.toFixed(4)}, ${run.warehouseLng.toFixed(4)}` : warehouseName(run?.propertyId ?? warehouseId);
 
   return (
@@ -561,25 +543,91 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         </div>
       )}
 
-      {showEnrichBanner && (
-        <Card className="p-4 flex items-center justify-between gap-3 border-fairway-600/30 bg-fairway-600/5">
-          <p className="text-xs text-foreground">
-            This search found {run?.companiesMatched} {run?.companiesMatched === 1 ? 'company' : 'companies'} around {searchAreaLabel}. Research revenue for the ones without it to improve opportunity scoring?
-          </p>
-          <Button type="button" size="sm" onClick={handleEnrichRevenue} isLoading={isEnriching} className="rounded-lg text-xs font-semibold shrink-0">
-            {isEnriching ? `Enriching… (${run?.revenueEnrichedCount ?? 0})` : 'Enrich Revenue'}
-          </Button>
-        </Card>
-      )}
-
-      {showSignalsBanner && (
-        <Card className="p-4 flex items-center justify-between gap-3 border-fairway-600/30 bg-fairway-600/5">
-          <p className="text-xs text-foreground">
-            Research live signals (expansion, hiring, tenders, lease expiries, warehouse needs) for the 10 most promising companies from this search and score them?
-          </p>
-          <Button type="button" size="sm" onClick={handleResearchSignals} isLoading={isResearchingSignals || run?.signalsStatus === 'running'} className="rounded-lg text-xs font-semibold shrink-0">
-            {isResearchingSignals || run?.signalsStatus === 'running' ? `Researching… (${run?.signalsResearchedCount ?? 0})` : 'Research Signals'}
-          </Button>
+      {showPipelineCard && run && (
+        <Card className="p-4 space-y-3 border-fairway-600/30 bg-fairway-600/5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-foreground">Intelligence pipeline</p>
+              <p className="text-[11px] text-foreground-muted mt-0.5">
+                Revenue → rank by business-type fit × revenue → signals in batches of {run.signalsBatchSize ?? signalsBatchSize} → Apollo contacts for the top {contactsTopN}.
+                Unsuitable business types are skipped.
+              </p>
+            </div>
+            {run.pipelineStatus !== 'running' && (
+              <div className="flex items-end gap-2">
+                <label className="text-[10px] font-semibold text-foreground-muted">
+                  Batch size
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={signalsBatchSize}
+                    onChange={(e) => setSignalsBatchSize(Math.max(1, Math.min(500, Number(e.target.value) || 1)))}
+                    className="block w-20 mt-0.5 bg-surface border border-border rounded-lg px-2 py-1 text-xs text-foreground"
+                  />
+                </label>
+                <label className="text-[10px] font-semibold text-foreground-muted">
+                  Contacts for top
+                  <input
+                    type="number"
+                    min={0}
+                    max={200}
+                    value={contactsTopN}
+                    onChange={(e) => setContactsTopN(Math.max(0, Math.min(200, Number(e.target.value) || 0)))}
+                    className="block w-20 mt-0.5 bg-surface border border-border rounded-lg px-2 py-1 text-xs text-foreground"
+                  />
+                </label>
+                <Button type="button" size="sm" onClick={handleRunPipeline} isLoading={isStartingPipeline} className="rounded-lg text-xs font-semibold">
+                  {run.pipelineStatus === 'done' || run.pipelineStatus === 'failed' ? 'Run again' : 'Run Intelligence'}
+                </Button>
+              </div>
+            )}
+          </div>
+          {run.pipelineStatus !== 'not_started' && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+              {[
+                {
+                  key: 'revenue',
+                  label: 'Revenue',
+                  detail: `${run.revenueEnrichedCount} researched · ${run.suitableCount} suitable, ${run.skippedCount} skipped`,
+                  done: run.revenueEnrichmentStatus === 'done' && run.pipelineStage !== 'revenue',
+                },
+                {
+                  key: 'signals',
+                  label: 'Signals & score',
+                  detail: run.signalsTotal
+                    ? `${run.signalsResearchedCount} / ${run.signalsTotal} · batch ${Math.min(Math.ceil((run.signalsResearchedCount + 1) / (run.signalsBatchSize || 1)), Math.ceil(run.signalsTotal / (run.signalsBatchSize || 1)))} of ${Math.ceil(run.signalsTotal / (run.signalsBatchSize || 1))}`
+                    : 'waiting for revenue',
+                  done: run.signalsStatus === 'done' && run.pipelineStage !== 'signals',
+                },
+                {
+                  key: 'contacts',
+                  label: 'Contacts (Apollo)',
+                  detail:
+                    run.contactsStatus === 'blocked'
+                      ? 'not available on this Apollo plan'
+                      : `${run.contactsFoundCount} people at ${run.contactsCompaniesDone} companies`,
+                  done: ['done', 'blocked', 'skipped'].includes(run.contactsStatus),
+                },
+              ].map((step) => {
+                const active = pipelineRunning && run.pipelineStage === step.key;
+                return (
+                  <div
+                    key={step.key}
+                    className={`rounded-lg border px-3 py-2 ${active ? 'border-fairway-600 bg-surface' : 'border-border bg-surface/60'}`}
+                  >
+                    <p className="font-semibold text-foreground flex items-center gap-1.5">
+                      {active && <Loader2 className="w-3 h-3 animate-spin text-fairway-600" />}
+                      {step.done && !active && <span className="text-emerald-600">✓</span>}
+                      {step.label}
+                    </p>
+                    <p className="text-foreground-muted mt-0.5">{step.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {run.pipelineNote && <p className="text-[11px] text-amber-700 dark:text-amber-400">{run.pipelineNote}</p>}
         </Card>
       )}
 

@@ -91,6 +91,17 @@ class DiscoveryRun(Base):
     signals_researched_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     # Why the run failed, shown to the user instead of a bare "failed".
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # One-click pipeline (jobs/run_pipeline.py): revenue -> batched signals -> Apollo contacts.
+    pipeline_status: Mapped[str] = mapped_column(String, default="not_started", server_default="not_started")
+    pipeline_stage: Mapped[str | None] = mapped_column(String, nullable=True)  # revenue | signals | contacts
+    suitable_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    signals_total: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    signals_batch_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    contacts_status: Mapped[str] = mapped_column(String, default="not_started", server_default="not_started")
+    contacts_companies_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    contacts_found_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    pipeline_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 

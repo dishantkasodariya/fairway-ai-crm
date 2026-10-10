@@ -28,6 +28,24 @@ if _settings.fake_providers:
 logger = logging.getLogger(__name__)
 
 
+def _mark_interrupted_work() -> None:
+    """Background work runs in-process, so a restart kills it mid-way. Anything still
+    'running' at startup was interrupted: say so instead of spinning forever."""
+    from sqlalchemy import text
+
+    note = "Interrupted by a service restart. Run it again."
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE discovery_runs SET status='failed', error=:n, completed_at=now() WHERE status IN ('queued','running')"), {"n": note})
+            conn.execute(text("UPDATE discovery_runs SET pipeline_status='failed', pipeline_note=:n WHERE pipeline_status='running'"), {"n": note})
+            conn.execute(text("UPDATE discovery_runs SET revenue_enrichment_status='done' WHERE revenue_enrichment_status='running'"))
+            conn.execute(text("UPDATE discovery_runs SET signals_status='done' WHERE signals_status='running'"))
+            conn.execute(text("UPDATE discovery_runs SET contacts_status='done' WHERE contacts_status='running'"))
+            conn.execute(text("UPDATE jobs SET status='failed', error=:n, finished_at=now() WHERE status IN ('queued','running')"), {"n": note})
+    except Exception:
+        logger.exception("Could not mark interrupted work")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
@@ -35,6 +53,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Warning initializing database schema")
 
+    _mark_interrupted_work()
     if not _settings.fake_providers:  # the cron would research real companies with fake agents
         start_signals_scheduler()
     logger.info("intelligence service startup complete")

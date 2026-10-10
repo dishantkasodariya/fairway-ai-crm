@@ -5,9 +5,10 @@ from sqlalchemy.orm import Session
 from app.db.models import CompanyWarehouseLink, DiscoveryRun, DiscoveryRunCompany, DiscoveryRunStatus, RevenueEnrichmentStatus
 from app.deps import get_db, require_api_key
 from app.rate_limit import limiter
-from app.schemas.discovery import DiscoveryRunCreate, DiscoveryRunOut, RunSignalsCreate
+from app.schemas.discovery import DiscoveryRunCreate, DiscoveryRunOut, RunPipelineCreate, RunSignalsCreate
 from jobs.discovery_runner import run_discovery_job
 from jobs.enrich_revenue_runner import run_enrich_revenue_job
+from jobs.run_pipeline import run_pipeline_job
 from jobs.run_signals_runner import run_signals_for_run_job
 
 router = APIRouter(
@@ -114,4 +115,35 @@ def research_signals(
     db.refresh(run)
 
     background_tasks.add_task(run_signals_for_run_job, run_id, (body or RunSignalsCreate()).limit)
+    return _run_out(db, run)
+
+
+@router.post("/{run_id}/pipeline", response_model=DiscoveryRunOut, status_code=202)
+@limiter.limit("5/minute")
+def run_pipeline(
+    request: Request,
+    run_id: int,
+    background_tasks: BackgroundTasks,
+    body: RunPipelineCreate | None = None,
+    db: Session = Depends(get_db),
+):
+    """Revenue -> rank by business-type fit x revenue -> signals in batches (all suitable
+    companies, or signals_max) -> Apollo contacts for the contacts_top_n best. Poll the run."""
+    run = db.query(DiscoveryRun).filter(DiscoveryRun.id == run_id).one_or_none()
+    if run is None:
+        raise HTTPException(status_code=404, detail="Discovery run not found")
+    if run.status != DiscoveryRunStatus.done:
+        raise HTTPException(status_code=409, detail="The search hasn't finished yet")
+    if run.pipeline_status == "running" or run.revenue_enrichment_status == RevenueEnrichmentStatus.running or run.signals_status == "running":
+        raise HTTPException(status_code=409, detail="This search's research is already running")
+
+    body = body or RunPipelineCreate()
+    run.pipeline_status = "running"
+    run.pipeline_stage = "revenue"
+    run.pipeline_note = None
+    run.contacts_status = "not_started"
+    db.commit()
+    db.refresh(run)
+
+    background_tasks.add_task(run_pipeline_job, run_id, body.signals_batch_size, body.signals_max, body.contacts_top_n)
     return _run_out(db, run)

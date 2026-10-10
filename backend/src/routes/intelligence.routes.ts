@@ -4,6 +4,8 @@ import {
   getDiscoveryRun,
   enrichRevenue,
   researchRunSignals,
+  startRunPipeline,
+  listConnectionsByCompany,
   listDiscoveredCompanies,
   getBusinessTypes,
   getDiscoveredCompany,
@@ -25,6 +27,7 @@ router.post('/discovery/runs', requirePermission('companies', 'create'), startDi
 router.get('/discovery/runs/:runId', requirePermission('companies', 'view'), getDiscoveryRun);
 router.post('/discovery/runs/:runId/enrich-revenue', requirePermission('companies', 'edit'), enrichRevenue);
 router.post('/discovery/runs/:runId/research-signals', requirePermission('companies', 'edit'), researchRunSignals);
+router.post('/discovery/runs/:runId/pipeline', requirePermission('companies', 'edit'), startRunPipeline);
 router.get('/companies/business-types', requirePermission('companies', 'view'), getBusinessTypes);
 router.get('/companies', requirePermission('companies', 'view'), listDiscoveredCompanies);
 router.get('/companies/:id', requirePermission('companies', 'view'), getDiscoveredCompany);
@@ -36,6 +39,7 @@ router.post('/companies/:id/contacts', requirePermission('companies', 'edit'), c
 router.get('/companies/:id/crm-status', requirePermission('companies', 'view'), crmStatus);
 router.post('/companies/:id/add-to-crm', requirePermission('inquiries', 'create'), addToCrm);
 router.delete('/contacts/:id', requirePermission('companies', 'edit'), deleteContact);
+router.get('/contacts/by-company', requirePermission('companies', 'view'), listConnectionsByCompany);
 router.get('/contacts', requirePermission('companies', 'view'), listAllContacts);
 router.post('/contacts/:id/draft-message', requirePermission('companies', 'edit'), draftMessage);
 router.post('/contacts/:id/send-email', requirePermission('companies', 'edit'), sendOutreachEmail);

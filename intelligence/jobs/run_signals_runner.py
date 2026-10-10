@@ -1,6 +1,6 @@
 """
 Signals research for one discovery run's best prospects: the companies this run
-found, one per account, not yet scored, biggest revenue first (then nearest),
+found, one per account, not yet scored, best fit x revenue first (unsuitable types skipped),
 capped at `limit` so a large search can't spend hundreds of search/LLM calls in
 one click. Reuses run_signal_research_job unchanged, the same way
 enrich_revenue_runner reuses run_revenue_research_job.
@@ -34,35 +34,10 @@ MAX_LIMIT = 25
 
 
 def select_run_prospects(db, run_id: int, limit: int) -> list[int]:
-    """Account ids (a site resolves to its parent) found by the run, unscored,
-    ordered by best known revenue then distance from the run's centre."""
-    account_id = func.coalesce(Company.parent_company_id, Company.id)
-    revenue = (
-        db.query(RevenueSnapshot.company_id, func.max(RevenueSnapshot.revenue_cr).label("revenue_cr"))
-        .group_by(RevenueSnapshot.company_id)
-        .subquery()
-    )
-    rows = (
-        db.query(
-            account_id.label("account_id"),
-            func.max(revenue.c.revenue_cr).label("revenue_cr"),
-            func.min(DiscoveryRunCompany.distance_km).label("distance_km"),
-        )
-        .join(DiscoveryRunCompany, DiscoveryRunCompany.company_id == Company.id)
-        .outerjoin(revenue, revenue.c.company_id == Company.id)
-        .filter(DiscoveryRunCompany.discovery_run_id == run_id)
-        .group_by(account_id)
-        .subquery()
-    )
-    scored = db.query(OpportunityScore.company_id)
-    picked = (
-        db.query(rows.c.account_id)
-        .filter(~rows.c.account_id.in_(scored))
-        .order_by(rows.c.revenue_cr.desc().nullslast(), rows.c.distance_km.asc().nullslast(), rows.c.account_id)
-        .limit(limit)
-        .all()
-    )
-    return [r.account_id for r in picked]
+    """The run's best unscored, suitable accounts: business-type fit x revenue size."""
+    from jobs.run_pipeline import ranked_unscored
+
+    return ranked_unscored(db, run_id, limit)
 
 
 def _create_signal_job(company_id: int) -> int:

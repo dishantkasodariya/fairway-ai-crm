@@ -199,12 +199,46 @@ def run_signal_research_job(job_id: int) -> None:
         db.close()
 
 
-def _company_domain(website: str | None) -> str | None:
+def company_domain(website: str | None) -> str | None:
     if not website:
         return None
     parsed = urlparse(website if "://" in website else f"//{website}")
     domain = parsed.netloc or parsed.path
     return domain.replace("www.", "").strip("/") or None
+
+
+def save_apollo_people(db, company: Company, people: list[dict]) -> int:
+    """Store Apollo People Search results as contacts, skipping people already on file
+    (same LinkedIn URL, email or name). Returns how many were added. Caller commits."""
+    existing = db.query(Contact).filter(Contact.company_id == company.id).all()
+    seen = {c.linkedin_url for c in existing if c.linkedin_url} | {c.email for c in existing if c.email} | {
+        c.name.lower() for c in existing
+    }
+    added = 0
+    for p in people:
+        name = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip() or p.get("name") or "Unknown"
+        email = p.get("email") if p.get("email") and "not_unlocked" not in str(p.get("email")) else None
+        keys = {k for k in (p.get("linkedin_url"), email, name.lower()) if k}
+        if keys & seen:
+            continue
+        seen |= keys
+        phone = p["phone_numbers"][0].get("raw_number") if p.get("phone_numbers") else None
+        db.add(
+            Contact(
+                company_id=company.id,
+                name=name,
+                title=p.get("title"),
+                email=email,
+                email_status=p.get("email_status"),
+                phone=phone,
+                linkedin_url=p.get("linkedin_url"),
+                source="apollo",
+                confidence=None,
+            )
+        )
+        added += 1
+    db.flush()
+    return added
 
 
 def run_contact_enrich_job(job_id: int) -> None:
@@ -220,34 +254,14 @@ def run_contact_enrich_job(job_id: int) -> None:
             span.set_attribute("company.id", job.company_id)
             try:
                 company = db.query(Company).filter(Company.id == job.company_id).one()
-                domain = _company_domain(company.website)
+                domain = company_domain(company.website)
                 if not domain:
                     raise ValueError("Company has no website on file; cannot resolve a domain for Apollo search")
 
                 client = ApolloClient(api_key=get_settings().apollo_api_key)
                 people = client.search_people(organization_domain=domain)
 
-                new_count = 0
-                for p in people:
-                    name = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip() or p.get("name") or "Unknown"
-                    phone = None
-                    if p.get("phone_numbers"):
-                        phone = p["phone_numbers"][0].get("raw_number")
-                    db.add(
-                        Contact(
-                            company_id=company.id,
-                            name=name,
-                            title=p.get("title"),
-                            email=p.get("email"),
-                            email_status=p.get("email_status"),
-                            phone=phone,
-                            linkedin_url=p.get("linkedin_url"),
-                            source="apollo",
-                            confidence=None,
-                        )
-                    )
-                    new_count += 1
-                db.flush()
+                new_count = save_apollo_people(db, company, people)
 
                 job.result = {"new_contacts_found": new_count}
                 job.status = JobStatus.done
