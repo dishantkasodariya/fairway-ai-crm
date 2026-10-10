@@ -240,3 +240,27 @@ Notes carried forward:
   jobs/runner.py now keeps a cited fact unless new research cites a new one.
 - Open data questions: Amit Patel was set as Olpad's manager as a placeholder; Neogen Chemicals exists twice in the
   CRM (comp_e82dd44f / comp_725eaa7a, each with a deal) from the old client-side Add to CRM — merge or keep?
+
+---
+
+## Demo / production readiness (2026-10-10, branch `feature/demo-e2e-readiness`)
+
+| Step | Commit |
+|---|---|
+| Any-coordinates discovery lists its full results (`discovery_run_companies`); dead Places key fails loudly; run-level signals; E2E harness | 85366ff |
+| Warehouse location from a Google Maps link / coordinates (no invented defaults); Map: warehouse radius circle + prospects; Discovery by coordinates; FAKE_PROVIDERS rehearsal mode | 81098a5 |
+| One-click pipeline (revenue → rank by business-type fit × revenue → signals in batches → Apollo); Connections grouped by company; OpenAI model settings; provider key check | 2c2fdae |
+| Rate-limit survival + honest failure counts (found by a real 5-company run) | 14d5cd0 |
+
+How to check before a demo or deploy:
+- `cd intelligence && python -m scripts.check_providers`: one real call per key (Places, LLM, Serper, Apollo).
+- `python scripts/e2e/pipeline_check.py`: 53 checks from coordinates to lease to attribution on tagged dummy data, then cleans up.
+- Rehearse in the UI with no keys: start intelligence with `FAKE_PROVIDERS=true` (refused in production); remove its data with `python scripts/e2e/pipeline_check.py --cleanup-only`.
+
+Open decisions:
+- Owner of a prospect = manager of the nearest managed warehouse, however far away (a prospect 120 km from Kosamba went to its manager). Add a distance cap (e.g. 75 km → Unassigned)?
+- Dashboard "Hot AI prospects" uses score ≥ 70, but Today and the map use ≥ 50.
+- Apollo key is free tier: People Search is blocked (pipeline notes it, key people are added by hand).
+- Groq free tier can't sustain research agents (429/413 even at concurrency 1). Use the paid OpenAI key with LLM_CONCURRENCY 6-10.
+
+Production blockers from the audit (not yet fixed): hard-coded backdoor passwords in `auth.controller.ts` login, seeded users' passwords reset to `fairway123` on every boot (`db.ts`), the client auto-login on localhost, open self-registration, unauthenticated notification writes, the CORS wildcard for *.onrender.com/*.vercel.app, a non-transactional proposal + hold flow (overbooking race), intelligence API key failing open when ENVIRONMENT is unset, and SSRF in the agent fetch tool.
