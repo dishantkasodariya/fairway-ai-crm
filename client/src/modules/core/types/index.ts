@@ -286,8 +286,8 @@ export interface Property {
   flooringCapacityMT: number;
   cctvSecurity: boolean;
   greenBuildingCert: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   photos: string[];
   brochureUrl?: string;
   status: PropertyStatus;

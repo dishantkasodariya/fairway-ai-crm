@@ -129,6 +129,8 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
     name: d.name,
     businessType: d.businessType,
     address: d.address,
+    lat: d.lat,
+    lng: d.lng,
     distanceKm: d.distanceKm,
     siteCount: d.siteCount,
     latestRevenueCr: d.revenueSnapshots[0]?.revenueCr ?? null,

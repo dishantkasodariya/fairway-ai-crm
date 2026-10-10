@@ -31,6 +31,7 @@ sys.path.insert(0, str(INTEL_DIR))
 os.chdir(INTEL_DIR)  # intelligence settings read intelligence/.env
 
 TAG = "[E2E]"
+FAKE_TAG = "[FAKE]"  # rows made while rehearsing with FAKE_PROVIDERS=true
 PLACE_PREFIX = "e2e-place-"
 # A fresh spot (Kosamba, between Surat and Bharuch) and a 10 km search radius.
 CENTER = (21.4630, 72.9560)
@@ -153,23 +154,31 @@ def install_fakes():
 
 def cleanup(intel_url: str, crm_url: str) -> None:
     with psycopg2.connect(intel_url.replace("postgresql+psycopg2", "postgresql")) as conn, conn.cursor() as cur:
-        cur.execute("SELECT id FROM companies WHERE place_id LIKE %s OR name LIKE %s", (PLACE_PREFIX + "%", TAG + "%"))
+        cur.execute("SELECT id FROM companies WHERE place_id LIKE %s OR place_id LIKE 'fake-%%' OR name LIKE %s",
+                    (PLACE_PREFIX + "%", TAG + "%"))
         ids = [r[0] for r in cur.fetchall()]
+        # runs whose every company was fake (rehearsals) go too
+        cur.execute("""SELECT r.id FROM discovery_runs r WHERE EXISTS (SELECT 1 FROM discovery_run_companies x WHERE x.discovery_run_id = r.id)
+                       AND NOT EXISTS (SELECT 1 FROM discovery_run_companies x JOIN companies c ON c.id = x.company_id
+                                       WHERE x.discovery_run_id = r.id AND c.place_id NOT LIKE 'fake-%%' AND c.place_id NOT LIKE %s)""",
+                    (PLACE_PREFIX + "%",))
+        fake_runs = [r[0] for r in cur.fetchall()]
         if ids:
             cur.execute("DELETE FROM outreach_drafts WHERE contact_id IN (SELECT id FROM contacts WHERE company_id = ANY(%s))", (ids,))
             for table in ("signals", "revenue_snapshots", "opportunity_scores", "jobs", "contacts"):
                 cur.execute(f"DELETE FROM {table} WHERE company_id = ANY(%s)", (ids,))
             cur.execute("UPDATE companies SET parent_company_id = NULL WHERE parent_company_id = ANY(%s)", (ids,))
             cur.execute("DELETE FROM companies WHERE id = ANY(%s)", (ids,))
-        cur.execute("DELETE FROM discovery_runs WHERE warehouse_lat = %s AND warehouse_lng = %s", CENTER)
+        cur.execute("DELETE FROM discovery_runs WHERE (warehouse_lat = %s AND warehouse_lng = %s) OR id = ANY(%s)", (*CENTER, fake_runs))
     print(f"  intelligence: removed {len(ids)} dummy companies and the dummy runs")
 
     with psycopg2.connect(crm_url.split("?")[0]) as conn, conn.cursor() as cur:
         cur.execute("SELECT id FROM properties WHERE name LIKE %s", (TAG + "%",))
         props = [r[0] for r in cur.fetchall()]
-        cur.execute("SELECT id FROM companies WHERE name LIKE %s", (TAG + "%",))
+        cur.execute("SELECT id FROM companies WHERE name LIKE %s OR name LIKE %s", (TAG + "%", FAKE_TAG + "%"))
         comps = [r[0] for r in cur.fetchall()]
-        cur.execute("SELECT id FROM inquiries WHERE company_name LIKE %s OR company_id = ANY(%s)", (TAG + "%", comps))
+        cur.execute("SELECT id FROM inquiries WHERE company_name LIKE %s OR company_name LIKE %s OR company_id = ANY(%s)",
+                    (TAG + "%", FAKE_TAG + "%", comps))
         inqs = [r[0] for r in cur.fetchall()]
         cur.execute(
             "SELECT table_name FROM information_schema.columns WHERE table_schema='public' AND column_name='inquiry_id'"

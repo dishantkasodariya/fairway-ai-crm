@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     # bypass in app/deps.py. Defaults to dev-like behavior everywhere else.
     environment: str = "development"
 
+    # Rehearsal/testing only: fake Places + LLM + research agents (testing/fake_providers.py).
+    # The service refuses to start with this on when ENVIRONMENT=production.
+    fake_providers: bool = False
+
     places_api: str = ""
     groq_api_key: str = ""
     serper_api_key: str = ""

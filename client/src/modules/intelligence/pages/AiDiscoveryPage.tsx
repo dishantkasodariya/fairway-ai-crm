@@ -63,6 +63,13 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   const [warehousesLoaded, setWarehousesLoaded] = useState(false);
   const [warehouseId, setWarehouseId] = useState('');
   const [radiusKm, setRadiusKm] = useState(10);
+  // Search around a saved warehouse, or around any point (coordinates or a Google Maps link).
+  const [searchMode, setSearchMode] = useState<'warehouse' | 'point'>('warehouse');
+  const [pointInput, setPointInput] = useState('');
+  // When set, the results table shows exactly what this search found.
+  const [runFilter, setRunFilter] = useState<number | null>(null);
+  const [isResearchingSignals, setIsResearchingSignals] = useState(false);
+  const signalsPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [run, setRun] = useState<DiscoveryRun | null>(null);
   const [prospects, setProspects] = useState<DiscoveredCompany[]>([]);
   const [isStarting, setIsStarting] = useState(false);
@@ -107,6 +114,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     return () => {
       stopPolling();
       stopEnrichPolling();
+      if (signalsPollRef.current) clearInterval(signalsPollRef.current);
     };
   }, []);
 
@@ -135,12 +143,14 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     return () => clearTimeout(t);
   }, [search]);
 
-  const loadResults = async (propertyIdOverride?: string) => {
+  const loadResults = async (propertyIdOverride?: string, runIdOverride?: number | null) => {
     const requestId = ++latestRequestRef.current;
-    const propertyId = propertyIdOverride ?? (warehouseFilter !== 'all' ? warehouseFilter : undefined);
+    const discoveryRunId = runIdOverride !== undefined ? runIdOverride ?? undefined : runFilter ?? undefined;
+    const propertyId = discoveryRunId ? undefined : propertyIdOverride ?? (warehouseFilter !== 'all' ? warehouseFilter : undefined);
     setIsLoadingProspects(true);
     try {
       const res = await IntelligenceService.listDiscoveredCompanies({
+        discoveryRunId,
         propertyId,
         sortBy,
         minScore: minScore !== 'all' ? Number(minScore) : undefined,
@@ -173,14 +183,26 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
   };
 
   const handleSearch = async () => {
-    if (!warehouseId) {
-      toastError('Pick a warehouse', 'Choose which warehouse to search around.');
-      return;
-    }
-    try {
-      localStorage.setItem(WAREHOUSE_STORAGE_KEY, warehouseId);
-    } catch {
-      /* remembering the choice is only a convenience */
+    let target: { propertyId?: string; lat?: number; lng?: number };
+    if (searchMode === 'warehouse') {
+      if (!warehouseId) {
+        toastError('Pick a warehouse', 'Choose which warehouse to search around.');
+        return;
+      }
+      try {
+        localStorage.setItem(WAREHOUSE_STORAGE_KEY, warehouseId);
+      } catch {
+        /* remembering the choice is only a convenience */
+      }
+      target = { propertyId: warehouseId };
+    } else {
+      const loc = await PropertyService.resolveLocation(pointInput.trim());
+      if (!loc.success || !loc.data) {
+        const err = (loc as any).error;
+        toastError('Location not recognised', (typeof err === 'string' ? err : err?.message) || 'Paste coordinates or a Google Maps link.');
+        return;
+      }
+      target = { lat: loc.data.lat, lng: loc.data.lng };
     }
 
     setIsStarting(true);
@@ -188,7 +210,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
     setRowSelection({});
     setPagination((p) => ({ ...p, pageIndex: 0 }));
     try {
-      const res = await IntelligenceService.startDiscoveryRun({ propertyId: warehouseId, radiusKm });
+      const res = await IntelligenceService.startDiscoveryRun({ ...target, radiusKm });
       if (!res.success || !res.data) {
         toastError('Search Failed', res.error || 'Could not start the prospect search.');
         return;
@@ -205,24 +227,49 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         setRun(poll.data);
         if (poll.data.status === 'done') {
           stopPolling();
-          // Show everything near this warehouse: the new companies plus already-known ones it re-found.
-          const pid = poll.data.propertyId ?? warehouseId;
-          setWarehouseFilter(pid);
-          await loadResults(pid);
-          const reFound = Math.max(0, poll.data.companiesLinked - poll.data.companiesFound);
+          // Show exactly what this search found: new companies plus already-known ones it re-found.
+          setRunFilter(runId);
+          await loadResults(undefined, runId);
+          const reFound = Math.max(0, poll.data.companiesMatched - poll.data.companiesFound);
           success(
             'Search complete',
-            `${poll.data.companiesFound} new ${poll.data.companiesFound === 1 ? 'company' : 'companies'}` +
-            (reFound > 0 ? `, ${reFound} already known now linked to this warehouse.` : '.')
+            `${poll.data.companiesMatched} ${poll.data.companiesMatched === 1 ? 'company' : 'companies'} within ${poll.data.radiusKm} km` +
+            ` (${poll.data.companiesFound} new${reFound > 0 ? `, ${reFound} already known` : ''}).` +
+            (poll.data.error ? ` Note: ${poll.data.error}` : '')
           );
         } else if (poll.data.status === 'failed') {
           stopPolling();
-          toastError('Search Failed', 'The prospect search failed on the intelligence service.');
+          toastError('Search Failed', poll.data.error || 'The prospect search failed on the intelligence service.');
         }
       }, POLL_INTERVAL_MS);
     } finally {
       setIsStarting(false);
     }
+  };
+
+  const handleResearchSignals = async () => {
+    if (!run) return;
+    setIsResearchingSignals(true);
+    const res = await IntelligenceService.researchRunSignals(run.id, 10);
+    if (!res.success || !res.data) {
+      setIsResearchingSignals(false);
+      toastError('Signals research failed', res.error || 'Could not start signals research.');
+      return;
+    }
+    setRun(res.data);
+    if (signalsPollRef.current) clearInterval(signalsPollRef.current);
+    signalsPollRef.current = setInterval(async () => {
+      const poll = await IntelligenceService.getDiscoveryRun(run.id);
+      if (!poll.success || !poll.data) return;
+      setRun(poll.data);
+      if (poll.data.signalsStatus === 'done') {
+        if (signalsPollRef.current) clearInterval(signalsPollRef.current);
+        signalsPollRef.current = null;
+        setIsResearchingSignals(false);
+        await loadResults();
+        success('Signals researched', `Scored ${poll.data.signalsResearchedCount} top prospects from this search.`);
+      }
+    }, POLL_INTERVAL_MS);
   };
 
   const handleEnrichRevenue = async () => {
@@ -262,7 +309,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
       loadResults();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, businessTypeFilter, warehouseFilter, minScore, sortBy, pagination.pageIndex, pagination.pageSize]);
+  }, [debouncedSearch, businessTypeFilter, warehouseFilter, runFilter, minScore, sortBy, pagination.pageIndex, pagination.pageSize]);
 
   // A filter change can leave the current page out of range; jump back to page 1.
   useEffect(() => {
@@ -412,7 +459,11 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
 
   const isSearching = run !== null && (run.status === 'queued' || run.status === 'running');
   // Only offer enrichment when this run actually brought companies to the warehouse.
-  const showEnrichBanner = run?.status === 'done' && run.revenueEnrichmentStatus === 'not_started' && run.companiesLinked > 0;
+  const showEnrichBanner = run?.status === 'done' && run.revenueEnrichmentStatus === 'not_started' && run.companiesMatched > 0;
+  // Step two, once revenue is in: the score uses revenue, and "best prospects" means biggest first.
+  const showSignalsBanner =
+    run?.status === 'done' && run.companiesMatched > 0 && run.revenueEnrichmentStatus === 'done' && run.signalsStatus !== 'done';
+  const searchAreaLabel = run && !run.propertyId ? `${run.warehouseLat.toFixed(4)}, ${run.warehouseLng.toFixed(4)}` : warehouseName(run?.propertyId ?? warehouseId);
 
   return (
     <div className="space-y-5 p-4 sm:p-6">
@@ -430,16 +481,47 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
 
       <Card className="p-4 sm:p-5 space-y-3">
         <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[240px]">
-            <label className="text-[11px] font-semibold text-foreground-muted block mb-1">Warehouse</label>
-            <Combobox
-              options={warehouses.map((w) => ({ value: w.id, label: w.city ? `${w.name} · ${w.city}` : w.name }))}
-              value={warehouseId}
-              onChange={setWarehouseId}
-              placeholder={warehousesLoaded ? 'No warehouse with a map location' : 'Loading warehouses…'}
-              disabled={isSearching || warehouses.length === 0}
-            />
+          <div>
+            <label className="text-[11px] font-semibold text-foreground-muted block mb-1">Search around</label>
+            <div className="flex rounded-lg border border-border overflow-hidden text-xs font-semibold">
+              {(['warehouse', 'point'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  disabled={isSearching}
+                  onClick={() => setSearchMode(m)}
+                  className={`px-3 py-1.5 cursor-pointer ${searchMode === m ? 'bg-fairway-600 text-white' : 'bg-surface-muted text-foreground-muted hover:text-foreground'}`}
+                >
+                  {m === 'warehouse' ? 'Warehouse' : 'Coordinates / Maps link'}
+                </button>
+              ))}
+            </div>
           </div>
+          {searchMode === 'warehouse' ? (
+            <div className="min-w-[240px]">
+              <label className="text-[11px] font-semibold text-foreground-muted block mb-1">Warehouse</label>
+              <Combobox
+                options={warehouses.map((w) => ({ value: w.id, label: w.city ? `${w.name} · ${w.city}` : w.name }))}
+                value={warehouseId}
+                onChange={setWarehouseId}
+                placeholder={warehousesLoaded ? 'No warehouse with a map location' : 'Loading warehouses…'}
+                disabled={isSearching || warehouses.length === 0}
+              />
+            </div>
+          ) : (
+            <div className="min-w-[280px] flex-1 max-w-md">
+              <label className="text-[11px] font-semibold text-foreground-muted block mb-1">Coordinates or Google Maps link</label>
+              <input
+                type="text"
+                value={pointInput}
+                onChange={(e) => setPointInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && pointInput.trim() && handleSearch()}
+                placeholder="e.g. 21.4779, 72.7234 or https://maps.app.goo.gl/…"
+                disabled={isSearching}
+                className="w-full bg-surface-muted border border-border rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:border-fairway-600"
+              />
+            </div>
+          )}
           <div>
             <label className="text-[11px] font-semibold text-foreground-muted block mb-1">Radius (km)</label>
             <input
@@ -456,7 +538,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
             type="button"
             onClick={handleSearch}
             isLoading={isStarting || isSearching}
-            disabled={!warehouseId}
+            disabled={searchMode === 'warehouse' ? !warehouseId : !pointInput.trim()}
             leftIcon={<Sparkles className="w-3.5 h-3.5" />}
             className="rounded-xl text-xs font-semibold"
           >
@@ -474,7 +556,7 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
         <div className="py-10 text-center space-y-3">
           <Loader2 className="w-8 h-8 text-fairway-600 animate-spin mx-auto" />
           <p className="text-xs text-foreground-muted">
-            Searching {radiusKm} km around {warehouseName(run?.propertyId ?? warehouseId)} and classifying businesses — this can take a minute for larger radii.
+            Searching {radiusKm} km around {searchAreaLabel} and classifying businesses — this can take a minute for larger radii.
           </p>
         </div>
       )}
@@ -482,12 +564,41 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
       {showEnrichBanner && (
         <Card className="p-4 flex items-center justify-between gap-3 border-fairway-600/30 bg-fairway-600/5">
           <p className="text-xs text-foreground">
-            This search brought {run?.companiesLinked} {run?.companiesLinked === 1 ? 'company' : 'companies'} to {warehouseName(run?.propertyId ?? null)}. Research revenue for the ones without it to improve opportunity scoring?
+            This search found {run?.companiesMatched} {run?.companiesMatched === 1 ? 'company' : 'companies'} around {searchAreaLabel}. Research revenue for the ones without it to improve opportunity scoring?
           </p>
           <Button type="button" size="sm" onClick={handleEnrichRevenue} isLoading={isEnriching} className="rounded-lg text-xs font-semibold shrink-0">
             {isEnriching ? `Enriching… (${run?.revenueEnrichedCount ?? 0})` : 'Enrich Revenue'}
           </Button>
         </Card>
+      )}
+
+      {showSignalsBanner && (
+        <Card className="p-4 flex items-center justify-between gap-3 border-fairway-600/30 bg-fairway-600/5">
+          <p className="text-xs text-foreground">
+            Research live signals (expansion, hiring, tenders, lease expiries, warehouse needs) for the 10 most promising companies from this search and score them?
+          </p>
+          <Button type="button" size="sm" onClick={handleResearchSignals} isLoading={isResearchingSignals || run?.signalsStatus === 'running'} className="rounded-lg text-xs font-semibold shrink-0">
+            {isResearchingSignals || run?.signalsStatus === 'running' ? `Researching… (${run?.signalsResearchedCount ?? 0})` : 'Research Signals'}
+          </Button>
+        </Card>
+      )}
+
+      {runFilter !== null && (
+        <div className="flex items-center gap-2 text-[11px] text-foreground-muted">
+          <span className="px-2 py-1 rounded-lg bg-fairway-600/10 text-fairway-700 dark:text-fairway-300 font-semibold">
+            Showing this search's results ({searchAreaLabel}, {run?.radiusKm} km)
+          </span>
+          <button
+            type="button"
+            className="underline cursor-pointer hover:text-foreground"
+            onClick={() => {
+              setRunFilter(null);
+              loadResults(undefined, null);
+            }}
+          >
+            Show all companies
+          </button>
+        </div>
       )}
 
       {loadError && (
@@ -529,7 +640,11 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
               <Combobox
                 options={[{ value: 'all', label: 'All Warehouses' }, ...warehouses.map((w) => ({ value: w.id, label: `Near ${w.name}` }))]}
                 value={warehouseFilter}
-                onChange={setWarehouseFilter}
+                onChange={(v) => {
+                  // Picking a warehouse leaves "this search's results" for that warehouse's list.
+                  setRunFilter(null);
+                  setWarehouseFilter(v);
+                }}
                 placeholder="All Warehouses"
                 className="w-72"
               />

@@ -76,6 +76,11 @@ export class PropertyService {
   /**
    * Create a new property via backend POST /api/properties
    */
+  /** A Google Maps link (full or short), "lat, lng" or DMS -> exact coordinates. */
+  static async resolveLocation(input: string): Promise<ApiResponse<{ lat: number; lng: number; source: string }>> {
+    return api.post<{ lat: number; lng: number; source: string }>('/properties/resolve-location', { input });
+  }
+
   static async createProperty(propertyData: Partial<Property>): Promise<ApiResponse<Property>> {
     return api.post<Property>('/properties', propertyData);
   }

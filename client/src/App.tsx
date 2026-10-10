@@ -470,6 +470,7 @@ const AppRouter: React.FC = () => {
           <MapPage
             onNavigateToCompany={(compKid) => handleNavigate('company_detail', compKid)}
             onNavigateToProperty={(propId) => handleNavigate('property_detail', propId)}
+            onOpenProspect={(id) => handleNavigate('ai_prospect_detail', String(id))}
           />
         );
 

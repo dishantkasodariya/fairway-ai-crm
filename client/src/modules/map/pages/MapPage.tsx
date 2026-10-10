@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import {
   MapPin,
   Search,
   Warehouse,
   ExternalLink,
+  Radar,
+  Loader2,
 } from 'lucide-react';
 import { PropertyService } from '@/modules/core/services/propertyService';
 import { FacilityService } from '@/modules/core/services/facilityService';
 import { Facility, Property } from '@/modules/core/types';
 import { formatSqFt } from '@/modules/core/utils/formatters';
+import { IntelligenceService, DiscoveredCompany } from '@/modules/core/services/intelligenceService';
 
 // Fix Leaflet Default Icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -46,14 +49,42 @@ const MapViewController: React.FC<{ center: [number, number]; zoom: number }> = 
   return null;
 };
 
+// The warehouse a radius view is centred on: bigger, with a halo.
+const selectedPropertyIcon = L.divIcon({
+  className: 'custom-property-marker',
+  html: `<div style="background:#EB661F; color:white; width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; border:3px solid white; box-shadow:0 0 0 6px rgba(235,102,31,0.35), 0 4px 10px rgba(0,0,0,0.35);"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/></svg></div>`,
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40],
+});
+
+// Zoom to show a warehouse's whole search radius.
+const FitRadius: React.FC<{ center: [number, number]; radiusKm: number }> = ({ center, radiusKm }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.fitBounds(L.latLng(center[0], center[1]).toBounds(radiusKm * 2000), { padding: [24, 24], animate: false });
+  }, [center[0], center[1], radiusKm, map]);
+  return null;
+};
+
+const hasLocation = (p: Property): p is Property & { latitude: number; longitude: number } =>
+  p.latitude !== null && p.longitude !== null && Number.isFinite(p.latitude) && Number.isFinite(p.longitude);
+
+const RADIUS_OPTIONS = [10, 20, 30, 50];
+const HOT_SCORE = 50;
+const prospectColor = (c: DiscoveredCompany) =>
+  c.opportunityScore === null ? '#94a3b8' : c.opportunityScore >= HOT_SCORE ? '#dc2626' : '#f59e0b';
+
 export interface IndiaMapViewProps {
   onNavigateToCompany: (companyId: string) => void;
   onNavigateToProperty: (propertyId: string) => void;
+  onOpenProspect?: (prospectId: number) => void;
 }
 
 export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
   onNavigateToCompany,
   onNavigateToProperty,
+  onOpenProspect,
 }) => {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -81,6 +112,43 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
     fetchMapData();
     return () => { isMounted = false; };
   }, []);
+
+  // Prospects around one warehouse: its radius circle and every known company inside it.
+  const [radiusWarehouseId, setRadiusWarehouseId] = useState('');
+  const [radiusKm, setRadiusKm] = useState(30);
+  const [prospects, setProspects] = useState<DiscoveredCompany[]>([]);
+  const [prospectsTotal, setProspectsTotal] = useState(0);
+  const [loadingProspects, setLoadingProspects] = useState(false);
+  const locatedProperties = useMemo(() => properties.filter(hasLocation), [properties]);
+  const unlocatedCount = properties.length - locatedProperties.length;
+  const radiusWarehouse = locatedProperties.find((p) => p.id === radiusWarehouseId) || null;
+
+  useEffect(() => {
+    if (!radiusWarehouse) {
+      setProspects([]);
+      setProspectsTotal(0);
+      return;
+    }
+    let live = true;
+    setLoadingProspects(true);
+    IntelligenceService.listDiscoveredCompanies({
+      near: { lat: radiusWarehouse.latitude, lng: radiusWarehouse.longitude, withinKm: radiusKm },
+      sortBy: 'score',
+      limit: 500,
+    })
+      .then((res) => {
+        if (!live) return;
+        setProspects((res.data?.items || []).filter((c) => c.lat !== null && c.lng !== null));
+        setProspectsTotal(res.data?.total || 0);
+      })
+      .finally(() => live && setLoadingProspects(false));
+    return () => {
+      live = false;
+    };
+  }, [radiusWarehouse?.id, radiusWarehouse?.latitude, radiusWarehouse?.longitude, radiusKm]);
+
+  const hotCount = prospects.filter((c) => (c.opportunityScore ?? 0) >= HOT_SCORE).length;
+  const scoredCount = prospects.filter((c) => c.opportunityScore !== null).length;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCorridor, setSelectedCorridor] = useState('all');
@@ -112,7 +180,7 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
   // Deduplicate and filter properties
   const uniqueProperties = useMemo(() => {
     const seen = new Set<string>();
-    return properties
+    return locatedProperties
       .filter((p) => {
         const key = `${p.code || p.id}`;
         if (seen.has(key)) return false;
@@ -137,7 +205,7 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
 
         return matchesQuery && matchesCorridor;
       });
-  }, [properties, searchQuery, selectedCorridor]);
+  }, [locatedProperties, searchQuery, selectedCorridor]);
 
   // Deduplicate and filter facilities
   const uniqueFacilities = useMemo(() => {
@@ -215,6 +283,57 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
         {/* Left Interactive Sidebar (4 cols) */}
         <div className="order-2 lg:order-1 lg:col-span-4 bg-surface rounded-2xl border border-border shadow-xs p-3.5 flex flex-col max-h-[380px] lg:max-h-none min-h-0 overflow-hidden">
+          {/* Prospects around a warehouse */}
+          <div className="space-y-2 pb-3 border-b border-border shrink-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
+              <Radar className="w-3 h-3 text-fairway-600" /> Prospects around a warehouse
+            </span>
+            <div className="flex gap-2">
+              <select
+                value={radiusWarehouseId}
+                onChange={(e) => {
+                  setRadiusWarehouseId(e.target.value);
+                  // Client plants would bury the prospect dots; they can be switched back on.
+                  if (e.target.value) setShowFacilities(false);
+                }}
+                className="flex-1 min-w-0 bg-surface-muted/50 border border-border rounded-lg text-xs text-foreground h-8 px-2 focus:outline-none focus:border-fairway-600"
+              >
+                <option value="">Choose a warehouse…</option>
+                {locatedProperties.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <select
+                value={radiusKm}
+                onChange={(e) => setRadiusKm(Number(e.target.value))}
+                className="w-20 bg-surface-muted/50 border border-border rounded-lg text-xs text-foreground h-8 px-2 focus:outline-none focus:border-fairway-600"
+              >
+                {RADIUS_OPTIONS.map((r) => (
+                  <option key={r} value={r}>{r} km</option>
+                ))}
+              </select>
+            </div>
+            {radiusWarehouse && (
+              <div className="text-[11px] text-foreground-muted space-y-1">
+                <p className="flex items-center gap-1.5 text-foreground font-semibold">
+                  {loadingProspects && <Loader2 className="w-3 h-3 animate-spin" />}
+                  {prospectsTotal} companies within {radiusKm} km
+                  {prospectsTotal > prospects.length && <span className="font-normal text-foreground-muted">(top {prospects.length} by score shown)</span>}
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-600" /> Hot ≥{HOT_SCORE} ({hotCount})</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Scored ({scoredCount - hotCount})</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Not scored yet ({prospects.length - scoredCount})</span>
+                </div>
+              </div>
+            )}
+            {unlocatedCount > 0 && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                {unlocatedCount} warehouse{unlocatedCount === 1 ? ' has' : 's have'} no map location. Edit {unlocatedCount === 1 ? 'it' : 'them'} to pin the exact spot.
+              </p>
+            )}
+          </div>
+
           {/* Corridor Selection Pills */}
           <div className="space-y-2 pb-3 border-b border-border shrink-0">
             <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted block">
@@ -263,6 +382,7 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
               <div
                 key={p.id}
                 onClick={() => {
+                  setRadiusWarehouseId('');
                   setMapCenter([p.latitude, p.longitude]);
                   setMapZoom(13);
                 }}
@@ -318,9 +438,50 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
             center={mapCenter}
             zoom={mapZoom}
             scrollWheelZoom={true}
+            preferCanvas
             style={{ height: '100%', width: '100%' }}
           >
-            <MapViewController center={mapCenter} zoom={mapZoom} />
+            {/* One view controller at a time: the radius view owns the zoom while it's open. */}
+            {!radiusWarehouse && <MapViewController center={mapCenter} zoom={mapZoom} />}
+            {radiusWarehouse && (
+              <>
+                <FitRadius center={[radiusWarehouse.latitude, radiusWarehouse.longitude]} radiusKm={radiusKm} />
+                <Circle
+                  center={[radiusWarehouse.latitude, radiusWarehouse.longitude]}
+                  radius={radiusKm * 1000}
+                  pathOptions={{ color: '#EB661F', weight: 2, dashArray: '6 6', fillColor: '#EB661F', fillOpacity: 0.06 }}
+                />
+                {prospects.map((c) => (
+                  <CircleMarker
+                    key={c.id}
+                    center={[c.lat as number, c.lng as number]}
+                    radius={c.opportunityScore !== null && c.opportunityScore >= HOT_SCORE ? 7 : 5}
+                    pathOptions={{ color: '#ffffff', weight: 1, fillColor: prospectColor(c), fillOpacity: 0.9 }}
+                  >
+                    <Popup>
+                      <div className="p-3 min-w-[200px] max-w-xs text-left bg-white text-slate-900 rounded-xl">
+                        <h4 className="text-sm font-bold leading-snug">{c.name}</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">{c.businessType || 'Business type unknown'}</p>
+                        <div className="grid grid-cols-3 gap-1.5 my-2 p-2 bg-slate-100 rounded-lg text-[11px]">
+                          <div><span className="block text-[9px] uppercase text-slate-500 font-semibold">Distance</span><strong>{c.distanceKm !== null ? `${c.distanceKm.toFixed(1)} km` : '—'}</strong></div>
+                          <div><span className="block text-[9px] uppercase text-slate-500 font-semibold">Revenue</span><strong>{c.latestRevenueCr !== null ? `₹${Math.round(c.latestRevenueCr).toLocaleString('en-IN')} Cr` : '—'}</strong></div>
+                          <div><span className="block text-[9px] uppercase text-slate-500 font-semibold">Score</span><strong>{c.opportunityScore ?? '—'}</strong></div>
+                        </div>
+                        {onOpenProspect && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenProspect(c.id)}
+                            className="w-full text-center text-xs font-bold bg-fairway-600 hover:bg-fairway-700 text-white py-1.5 rounded-lg cursor-pointer"
+                          >
+                            Open prospect →
+                          </button>
+                        )}
+                      </div>
+                    </Popup>
+                  </CircleMarker>
+                ))}
+              </>
+            )}
 
             {/* Clean OpenStreetMap Tiles (Zero Watermarks, No API Key Required) */}
             <TileLayer
@@ -331,7 +492,12 @@ export const IndiaMapView: React.FC<IndiaMapViewProps> = ({
             {/* Fairway Warehouse Properties Pins */}
             {showProperties &&
               uniqueProperties.map((p) => (
-                <Marker key={p.id} position={[p.latitude, p.longitude]} icon={propertyIcon}>
+                <Marker
+                  key={p.id}
+                  position={[p.latitude, p.longitude]}
+                  icon={p.id === radiusWarehouseId ? selectedPropertyIcon : propertyIcon}
+                  zIndexOffset={p.id === radiusWarehouseId ? 1000 : 0}
+                >
                   <Popup>
                     <div className="p-3.5 min-w-[220px] max-w-xs text-left bg-white text-slate-900 rounded-xl">
                       <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200">

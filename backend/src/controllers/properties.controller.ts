@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { isValidLatLng, resolveLocation, LocationParseError } from '../utils/mapLocation.js';
 import { query } from '../config/db.js';
 import crypto from 'crypto';
 import { PROPERTY_WITH_SPACE_SELECT, fetchPropertyWithSpace, recalculatePropertySpace } from '../services/spaceService.js';
@@ -33,8 +34,10 @@ const mapPropertyRow = (row: any) => ({
   flooringCapacityMT: parseFloat(row.flooring_capacity_mt) || 6,
   cctvSecurity: !!row.cctv_security,
   greenBuildingCert: row.green_building_cert || '',
-  latitude: parseFloat(row.latitude) || 21.712,
-  longitude: parseFloat(row.longitude) || 72.585,
+  // null = no map location yet. Never substitute a default: a made-up point puts the
+  // warehouse in the wrong place on the map and centres discovery searches there.
+  latitude: isValidLatLng(row.latitude, row.longitude) ? Number(row.latitude) : null,
+  longitude: isValidLatLng(row.latitude, row.longitude) ? Number(row.longitude) : null,
   photos: typeof row.photos === 'string' ? JSON.parse(row.photos) : (row.photos || []),
   brochureUrl: row.brochure_url || undefined,
   status: row.status || 'Available',
@@ -314,6 +317,10 @@ export const createProperty = async (req: Request, res: Response): Promise<void>
       res.status(400).json({ success: false, error: 'Name, totalAreaSqFt, and rentPerSqFtINR are required.' });
       return;
     }
+    if (!isValidLatLng(latitude, longitude)) {
+      res.status(400).json({ success: false, error: 'A map location is required: paste a Google Maps link or the coordinates.' });
+      return;
+    }
 
     const propId = `prop_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
     const propCode = code || `FW-${finalCity ? finalCity.slice(0, 3).toUpperCase() : 'GUJ'}-${Math.floor(10 + Math.random() * 90)}`;
@@ -360,8 +367,8 @@ export const createProperty = async (req: Request, res: Response): Promise<void>
       flooringCapacityMT || 6,
       cctvSecurity ?? true,
       greenBuildingCert || 'IGBC Certified',
-      latitude || 21.712,
-      longitude || 72.585,
+      Number(latitude),
+      Number(longitude),
       JSON.stringify(photos || []),
       brochureUrl || null,
       status || 'Available',
@@ -427,6 +434,13 @@ export const updateProperty = async (req: Request, res: Response): Promise<void>
       managerName,
       baselineOccupiedSqFt,
     } = req.body;
+
+    // Location is optional on an edit (COALESCE keeps the saved one) but never half or invalid.
+    const locationSent = latitude !== undefined || longitude !== undefined;
+    if (locationSent && !isValidLatLng(latitude, longitude)) {
+      res.status(400).json({ success: false, error: 'That map location is not valid: paste a Google Maps link or the coordinates.' });
+      return;
+    }
 
     // available_area_sq_ft is never written directly. An explicit baseline wins; otherwise a typed
     // "available" figure is translated into the baseline that yields it given current leases/holds.
@@ -543,5 +557,23 @@ export const deleteProperty = async (req: Request, res: Response): Promise<void>
   } catch (error: any) {
     console.error('Error deleting property:', error);
     res.status(500).json({ success: false, error: error.message || 'Failed to delete property.' });
+  }
+};
+
+/**
+ * POST /api/properties/resolve-location { input }
+ * A Google Maps link (full or maps.app.goo.gl), "lat, lng" or DMS -> { lat, lng, source }.
+ */
+export const resolvePropertyLocation = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await resolveLocation(String(req.body?.input ?? ''));
+    res.status(200).json({ success: true, data: result });
+  } catch (error: any) {
+    if (error instanceof LocationParseError) {
+      res.status(400).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('Error resolving location:', error);
+    res.status(500).json({ success: false, error: 'Could not read that location.' });
   }
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import LocationPicker from '../components/LocationPicker';
 import {
   Warehouse,
   ArrowLeft,
@@ -163,13 +164,14 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
   );
 
   // Location
-  const [corridor, setCorridor] = useState(initialProperty?.corridor || 'Sanand Industrial Corridor');
-  const [city, setCity] = useState(initialProperty?.city || 'Ahmedabad');
+  const [corridor, setCorridor] = useState(initialProperty?.corridor || '');
+  const [city, setCity] = useState(initialProperty?.city || '');
   const [state, setState] = useState(initialProperty?.state || 'Gujarat');
-  const [pincode, setPincode] = useState(initialProperty?.pincode || '382110');
+  const [pincode, setPincode] = useState(initialProperty?.pincode || '');
   const [location, setLocation] = useState(initialProperty?.location || '');
-  const [latitude, setLatitude] = useState<number | ''>(initialProperty?.latitude ?? 22.9868);
-  const [longitude, setLongitude] = useState<number | ''>(initialProperty?.longitude ?? 72.3812);
+  // No default point: a warehouse is only placed where someone actually pinned it.
+  const [latitude, setLatitude] = useState<number | ''>(initialProperty?.latitude ?? '');
+  const [longitude, setLongitude] = useState<number | ''>(initialProperty?.longitude ?? '');
 
   // Dimensions & Commercials
   const [totalAreaSqFt, setTotalAreaSqFt] = useState<number | ''>(initialProperty?.totalAreaSqFt ?? '');
@@ -255,6 +257,7 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
     if (!state.trim()) errs.state = 'State is required';
     if (!pincode.trim()) errs.pincode = 'PIN code is required';
     if (!location.trim()) errs.location = 'Micro-market / Site address is required';
+    if (latitude === '' || longitude === '') errs.mapLocation = 'Pin the warehouse: paste a Google Maps link or its coordinates';
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -371,8 +374,8 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
       flooringCapacityMT: Number(flooringCapacityMT),
       cctvSecurity,
       greenBuildingCert: greenBuildingCert.trim() || 'None',
-      latitude: Number(latitude) || 22.9868,
-      longitude: Number(longitude) || 72.3812,
+      latitude: Number(latitude),
+      longitude: Number(longitude),
       photos: initialProperty?.photos || [],
       status: status as PropertyStatus,
       amenities: [
@@ -716,6 +719,20 @@ export const NewPropertyPage: React.FC<NewPropertyPageProps> = ({ onBack, onSucc
                   } rounded-xl text-sm text-foreground h-10 px-3.5 focus:border-fairway-600 focus:outline-none`}
                 />
                 {errors.location && <p className="text-[11px] text-rose-500 font-medium">{errors.location}</p>}
+              </div>
+
+              {/* Exact map location: drives the map pin and every discovery search radius */}
+              <div className="sm:col-span-2 lg:col-span-3">
+                <LocationPicker
+                  latitude={latitude}
+                  longitude={longitude}
+                  error={errors.mapLocation}
+                  onChange={(lat, lng) => {
+                    setLatitude(lat);
+                    setLongitude(lng);
+                    clearError('mapLocation');
+                  }}
+                />
               </div>
             </div>
           </div>

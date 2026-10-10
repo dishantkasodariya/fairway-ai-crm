@@ -50,6 +50,8 @@ class CompanyListItemOut(BaseModel):
     name: str
     business_type: str | None
     address: str | None
+    lat: float | None = None
+    lng: float | None = None
     distance_km: float | None
     site_count: int
     latest_revenue_cr: float | None = None

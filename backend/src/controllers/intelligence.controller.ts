@@ -48,8 +48,11 @@ export async function callIntelligenceApi(
 
   const url = `${config.intelligenceApiUrl}${path}`;
   let lastError: any = null;
+  // Only reads are retried: re-sending a POST after a timeout can start a second paid
+  // discovery run or research job that the first attempt already started.
+  const maxRetries = (options.method || 'GET').toUpperCase() === 'GET' ? retries : 0;
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -69,7 +72,7 @@ export async function callIntelligenceApi(
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         // If 502/503/504 and we have retries remaining, wait and retry
-        if ([502, 503, 504].includes(response.status) && attempt < retries) {
+        if ([502, 503, 504].includes(response.status) && attempt < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 500));
           continue;
         }
@@ -85,7 +88,7 @@ export async function callIntelligenceApi(
       if (err.name === 'AbortError') {
         lastError = new IntelligenceApiError(504, `Intelligence API timed out after ${timeoutMs}ms`, 'TIMEOUT');
       }
-      if (attempt < retries && !(err instanceof IntelligenceApiError && err.status < 500)) {
+      if (attempt < maxRetries && !(err instanceof IntelligenceApiError && err.status < 500)) {
         await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 500));
         continue;
       }
@@ -187,6 +190,23 @@ export const enrichRevenue = async (req: Request, res: Response): Promise<void> 
 };
 
 /**
+ * POST /api/intelligence/discovery/runs/:runId/research-signals { limit? }
+ * Signals + score for the run's best unscored prospects. Poll the run for progress.
+ */
+export const researchRunSignals = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const limit = Math.max(1, Math.min(25, Number(req.body?.limit) || 10));
+    const run = await callIntelligenceApi(`/v1/discovery/runs/${req.params.runId}/research-signals`, {
+      method: 'POST',
+      body: JSON.stringify({ limit }),
+    });
+    res.status(202).json({ success: true, data: toCamelCaseDeep(run) });
+  } catch (error: any) {
+    handleIntelligenceError(res, error, 'Failed to start signals research');
+  }
+};
+
+/**
  * GET /api/intelligence/companies/business-types
  */
 export const getBusinessTypes = async (req: Request, res: Response): Promise<void> => {
@@ -208,7 +228,7 @@ export const getBusinessTypes = async (req: Request, res: Response): Promise<voi
  */
 export const listDiscoveredCompanies = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { discoveryRunId, propertyId, sortBy, minScore, search, businessType, minRevenueCr, maxRevenueCr, limit, offset } = req.query;
+    const { discoveryRunId, propertyId, sortBy, minScore, search, businessType, minRevenueCr, maxRevenueCr, nearLat, nearLng, withinKm, limit, offset } = req.query;
 
     const params = new URLSearchParams();
     if (discoveryRunId) params.set('discovery_run_id', String(discoveryRunId));
@@ -219,6 +239,11 @@ export const listDiscoveredCompanies = async (req: Request, res: Response): Prom
     if (businessType) params.set('business_type', String(businessType));
     if (minRevenueCr) params.set('min_revenue_cr', String(minRevenueCr));
     if (maxRevenueCr) params.set('max_revenue_cr', String(maxRevenueCr));
+    if (nearLat && nearLng && withinKm) {
+      params.set('near_lat', String(nearLat));
+      params.set('near_lng', String(nearLng));
+      params.set('within_km', String(withinKm));
+    }
     if (limit) params.set('limit', String(limit));
     if (offset) params.set('offset', String(offset));
 

@@ -26,6 +26,9 @@ def list_companies(
     min_score: float | None = Query(default=None),
     max_revenue_cr: float | None = Query(default=None),
     min_revenue_cr: float | None = Query(default=None),
+    near_lat: float | None = Query(default=None, ge=-90, le=90, description="With near_lng + within_km: companies within a radius of a point"),
+    near_lng: float | None = Query(default=None, ge=-180, le=180),
+    within_km: float | None = Query(default=None, gt=0, le=200),
     sort_by: str = Query(default="score", pattern="^(score|recency|revenue|distance)$"),
     limit: int = Query(default=50, le=500),
     offset: int = Query(default=0, ge=0),
@@ -111,12 +114,35 @@ def list_companies(
         )
         q = q.join(run_members, run_members.c.account_id == Company.id)
         distance_col = run_members.c.distance_km
+    geo = near_lat is not None and near_lng is not None and within_km is not None
+    if geo:
+        # Geography, not discovery history: every known company within the radius,
+        # however it was found. Distance = the account's nearest site to the point.
+        G = aliased(Company)
+        g_account = func.coalesce(G.parent_company_id, G.id) if group_sites else G.id
+        dlat = func.radians(G.lat - near_lat)
+        dlng = func.radians(G.lng - near_lng)
+        a = func.power(func.sin(dlat / 2), 2) + func.cos(func.radians(near_lat)) * func.cos(func.radians(G.lat)) * func.power(func.sin(dlng / 2), 2)
+        km = 2 * 6371.0088 * func.asin(func.sqrt(a))
+        box = within_km / 111.0
+        near = (
+            db.query(g_account.label("account_id"), func.min(km).label("distance_km"))
+            .filter(G.lat.isnot(None), G.lng.isnot(None))
+            .filter(G.lat.between(near_lat - box, near_lat + box))
+            .filter(G.lng.between(near_lng - box * 1.2, near_lng + box * 1.2))
+            .filter(km <= within_km)
+            .group_by(g_account)
+            .subquery()
+        )
+        q = q.join(near, near.c.account_id == Company.id)
+        if discovery_run_id is None:
+            distance_col = near.c.distance_km
     if property_id:
         chosen = aliased(account_links)
         q = q.join(chosen, (chosen.c.account_id == Company.id) & (chosen.c.property_id == property_id))
-        if discovery_run_id is None:
+        if discovery_run_id is None and not geo:
             distance_col = chosen.c.distance_km
-    elif discovery_run_id is None:
+    elif discovery_run_id is None and not geo:
         distance_col = func.coalesce(nearest.c.distance_km, Company.distance_km)
     q = q.add_columns(distance_col.label("shown_distance_km"))
 
@@ -151,6 +177,8 @@ def list_companies(
             name=company.name,
             business_type=company.business_type,
             address=company.address,
+            lat=company.lat,
+            lng=company.lng,
             distance_km=distance_km,
             site_count=company.site_count if group_sites else 1,
             latest_revenue_cr=latest_revenue_cr,

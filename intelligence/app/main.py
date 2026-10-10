@@ -15,6 +15,15 @@ from app.db.base import Base, engine  # noqa: E402
 import app.db.models  # noqa: E402  # ensure models are loaded
 from app.routers import companies, contacts, discovery, jobs  # noqa: E402
 from jobs.scheduler import start_signals_scheduler  # noqa: E402
+from app.config import get_settings  # noqa: E402
+
+_settings = get_settings()
+if _settings.fake_providers:
+    if _settings.environment.lower() == "production":
+        raise RuntimeError("FAKE_PROVIDERS must never be enabled with ENVIRONMENT=production")
+    from testing.fake_providers import install as _install_fakes  # noqa: E402
+
+    _install_fakes()
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +35,8 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Warning initializing database schema")
 
-    start_signals_scheduler()
+    if not _settings.fake_providers:  # the cron would research real companies with fake agents
+        start_signals_scheduler()
     logger.info("intelligence service startup complete")
     yield
 

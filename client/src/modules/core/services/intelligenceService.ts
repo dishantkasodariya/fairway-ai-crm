@@ -15,6 +15,12 @@ export interface DiscoveryRun {
   apiCallsMade: number;
   revenueEnrichmentStatus: 'not_started' | 'running' | 'done';
   revenueEnrichedCount: number;
+  /** Every company this search found, new or already known (also for ad-hoc points). */
+  companiesMatched: number;
+  signalsStatus: 'not_started' | 'running' | 'done';
+  signalsResearchedCount: number;
+  /** Why the run failed, or a note about partly failed search areas. */
+  error: string | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -62,6 +68,8 @@ export interface DiscoveredCompany {
   name: string;
   businessType: string | null;
   address: string | null;
+  lat: number | null;
+  lng: number | null;
   distanceKm: number | null;
   siteCount: number;
   latestRevenueCr: number | null;
@@ -143,6 +151,8 @@ export interface ListDiscoveredCompaniesParams {
   businessType?: string;
   minRevenueCr?: number;
   maxRevenueCr?: number;
+  /** Every known company within withinKm of a point (geography, not discovery history). */
+  near?: { lat: number; lng: number; withinKm: number };
   limit?: number;
   offset?: number;
 }
@@ -185,6 +195,21 @@ export class IntelligenceService {
   }
 
   /** Kick off revenue research for every company in a run without a RevenueSnapshot yet. */
+  /** Research signals + score for the run's best unscored prospects (biggest revenue first). */
+  static async researchRunSignals(runId: number, limit = 10): Promise<{ success: boolean; data?: DiscoveryRun; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/discovery/runs/${runId}/research-signals`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ limit }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      console.warn('IntelligenceService.researchRunSignals failed:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
   static async enrichRevenue(runId: number): Promise<{ success: boolean; data?: DiscoveryRun; error?: string }> {
     try {
       const res = await fetch(`${API_BASE_URL}/intelligence/discovery/runs/${runId}/enrich-revenue`, {
@@ -229,6 +254,11 @@ export class IntelligenceService {
       if (params.businessType) q.set('businessType', params.businessType);
       if (params.minRevenueCr !== undefined) q.set('minRevenueCr', String(params.minRevenueCr));
       if (params.maxRevenueCr !== undefined) q.set('maxRevenueCr', String(params.maxRevenueCr));
+      if (params.near) {
+        q.set('nearLat', String(params.near.lat));
+        q.set('nearLng', String(params.near.lng));
+        q.set('withinKm', String(params.near.withinKm));
+      }
       if (params.limit !== undefined) q.set('limit', String(params.limit));
       if (params.offset !== undefined) q.set('offset', String(params.offset));
 
