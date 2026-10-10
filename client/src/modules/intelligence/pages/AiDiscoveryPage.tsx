@@ -589,14 +589,24 @@ export const AiDiscoveryPage: React.FC<AiDiscoveryPageProps> = ({ onSelectProspe
                 {
                   key: 'revenue',
                   label: 'Revenue',
-                  detail: `${run.revenueEnrichedCount} researched · ${run.suitableCount} suitable, ${run.skippedCount} skipped`,
+                  detail:
+                    `${run.revenueEnrichedCount} researched · ${run.suitableCount} suitable, ${run.skippedCount} skipped` +
+                    (run.revenueFailedCount ? ` · ${run.revenueFailedCount} failed` : ''),
                   done: run.revenueEnrichmentStatus === 'done' && run.pipelineStage !== 'revenue',
                 },
                 {
                   key: 'signals',
                   label: 'Signals & score',
                   detail: run.signalsTotal
-                    ? `${run.signalsResearchedCount} / ${run.signalsTotal} · batch ${Math.min(Math.ceil((run.signalsResearchedCount + 1) / (run.signalsBatchSize || 1)), Math.ceil(run.signalsTotal / (run.signalsBatchSize || 1)))} of ${Math.ceil(run.signalsTotal / (run.signalsBatchSize || 1))}`
+                    ? (() => {
+                        const handled = run.signalsResearchedCount + run.signalsFailedCount;
+                        const batches = Math.ceil(run.signalsTotal / (run.signalsBatchSize || 1));
+                        const batch = Math.min(Math.floor(handled / (run.signalsBatchSize || 1)) + 1, batches);
+                        return (
+                          `${run.signalsResearchedCount} / ${run.signalsTotal} scored · batch ${batch} of ${batches}` +
+                          (run.signalsFailedCount ? ` · ${run.signalsFailedCount} failed` : '')
+                        );
+                      })()
                     : 'waiting for revenue',
                   done: run.signalsStatus === 'done' && run.pipelineStage !== 'signals',
                 },

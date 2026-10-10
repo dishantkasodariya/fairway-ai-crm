@@ -141,7 +141,11 @@ def run_pipeline(
     run.pipeline_status = "running"
     run.pipeline_stage = "revenue"
     run.pipeline_note = None
+    # Fresh counters, so the progress shown is this pipeline's, not the last one's.
     run.contacts_status = "not_started"
+    run.revenue_enriched_count = run.revenue_failed_count = 0
+    run.signals_total = run.signals_researched_count = run.signals_failed_count = 0
+    run.contacts_companies_done = run.contacts_found_count = 0
     db.commit()
     db.refresh(run)
 

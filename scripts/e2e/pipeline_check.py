@@ -121,10 +121,17 @@ class FakeRevenueAgent:
 
 
 class FakeSignalAgent:
+    calls: dict[str, int] = {}
+
     def __init__(self, settings=None):
         pass
 
     def research(self, name, address="", business_type=None):
+        n = FakeSignalAgent.calls[name] = FakeSignalAgent.calls.get(name, 0) + 1
+        if "Apex Pharma" in name and n == 1:
+            raise RuntimeError("429 Too Many Requests (simulated, first try only)")
+        if "Kosamba Textile" in name:
+            raise RuntimeError("429 Too Many Requests (simulated, every try)")
         recent = (date.today() - timedelta(days=20)).isoformat()
         signals = [{
             "type": "expansion", "summary": f"{name} announced a new production line at Kosamba",
@@ -153,6 +160,7 @@ def install_fakes():
     from testing.fake_providers import FakeApolloClient
 
     rp.ApolloClient = FakeApolloClient
+    rp.RETRY_PAUSE_S = 0
     rp.get_settings().apollo_api_key = rp.get_settings().apollo_api_key or "fake-key-for-e2e"
     return dr
 
@@ -308,8 +316,13 @@ def main() -> int:
     check("no research spend on skipped companies",
           not db.query(RevenueSnapshot).filter(RevenueSnapshot.company_id == salt.id).count()
           and not db.query(OpportunityScore).filter(OpportunityScore.company_id == salt.id).count())
-    check("signals for every suitable company, in batches", run.signals_total == SUITABLE and run.signals_researched_count == SUITABLE
-          and run.signals_batch_size == 2, f"{run.signals_researched_count}/{run.signals_total} batch={run.signals_batch_size}")
+    check("signals for every suitable company, in batches", run.signals_total == SUITABLE and run.signals_batch_size == 2,
+          f"total={run.signals_total} batch={run.signals_batch_size}")
+    check("a rate-limited lookup recovers on the retry pass", db.query(OpportunityScore).filter(
+          OpportunityScore.company_id == comps["Apex Pharma Formulations Ltd"].id).count() == 1)
+    check("a lookup that keeps failing is counted as failed, not researched",
+          run.signals_researched_count == SUITABLE - 1 and run.signals_failed_count == 1 and "failed" in (run.pipeline_note or ""),
+          f"ok={run.signals_researched_count} failed={run.signals_failed_count} note={run.pipeline_note}")
     top = comps["Shree Ambica Chemicals Pvt Ltd"]
     sigs = db.query(Signal).filter(Signal.company_id == top.id).all()
     check("uncited signal dropped", all(sg.source_url for sg in sigs) and len(sigs) == 2, f"{len(sigs)} stored")
@@ -323,7 +336,7 @@ def main() -> int:
     run.pipeline_status = "running"; db.commit()
     run_pipeline_job(run.id, signals_batch_size=2, contacts_top_n=2)
     db.expire_all(); db.refresh(run)
-    check("re-running the pipeline spends nothing twice", run.revenue_enriched_count == 0 and run.signals_total == 0,
+    check("re-running retries only what failed", run.revenue_enriched_count == 0 and run.signals_total == 1,
           f"revenue={run.revenue_enriched_count} signals={run.signals_total}")
 
     # -- Overlapping search: known companies must still show up

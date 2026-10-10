@@ -14,6 +14,7 @@ mid-pipeline is marked as interrupted at startup (see app.main).
 
 import logging
 import math
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
@@ -39,8 +40,7 @@ from jobs.runner import company_domain, run_revenue_research_job, run_signal_res
 logger = logging.getLogger(__name__)
 tracer = get_tracer()
 
-REVENUE_WORKERS = 4
-SIGNAL_WORKERS = 3
+RETRY_PAUSE_S = 20
 
 
 @dataclass
@@ -113,23 +113,52 @@ def _new_job(job_type: JobType, company_id: int) -> int:
         db.close()
 
 
-def _revenue_one(company_id: int) -> None:
-    run_revenue_research_job(_new_job(JobType.revenue_research, company_id))
+def _job_succeeded(job_id: int) -> bool:
+    db = SessionLocal()
+    try:
+        return db.query(Job.status).filter(Job.id == job_id).scalar() == JobStatus.done
+    finally:
+        db.close()
 
 
-def _signals_one(company_id: int) -> None:
-    run_signal_research_job(_new_job(JobType.signal_research, company_id))
+def _revenue_one(company_id: int) -> bool:
+    job_id = _new_job(JobType.revenue_research, company_id)
+    run_revenue_research_job(job_id)
+    return _job_succeeded(job_id)
 
 
-def _fan_out(fn, ids: list[int], workers: int, on_done) -> None:
-    with ThreadPoolExecutor(max_workers=workers) as pool:
+def _signals_one(company_id: int) -> bool:
+    job_id = _new_job(JobType.signal_research, company_id)
+    run_signal_research_job(job_id)
+    return _job_succeeded(job_id)
+
+
+def _fan_out(fn, ids: list[int], workers: int, on_result) -> list[int]:
+    """Run fn over ids with `workers` in parallel; on_result(ok) after each. Returns the failed ids."""
+    failed = []
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
         futures = {pool.submit(fn, cid): cid for cid in ids}
         for future in as_completed(futures):
             try:
-                future.result()
+                ok = bool(future.result())
             except Exception:  # noqa: BLE001 - one company's failure shouldn't stop the batch
                 logger.exception("pipeline: company %s failed", futures[future])
-            on_done()
+                ok = False
+            if not ok:
+                failed.append(futures[future])
+            on_result(ok)
+    return failed
+
+
+def _with_retry_pass(fn, ids: list[int], workers: int, on_result) -> list[int]:
+    """First pass in parallel; anything that failed (usually a rate limit) gets one more,
+    one-at-a-time try after a pause. Returns what still failed. on_result(ok, final)."""
+    failed = _fan_out(fn, ids, workers, lambda ok: on_result(ok, False) if ok else None)
+    if not failed:
+        return []
+    logger.info("pipeline: retrying %d failed lookups one at a time", len(failed))
+    time.sleep(RETRY_PAUSE_S)
+    return _fan_out(fn, failed, 1, lambda ok: on_result(ok, True))
 
 
 def _set(db, run: DiscoveryRun, **fields) -> None:
@@ -158,13 +187,18 @@ def run_pipeline_job(run_id: int, signals_batch_size: int | None = None, signals
 
                 # 1. Revenue for suitable companies that have none.
                 need_revenue = [p.account_id for p in suitable if p.revenue_cr is None]
-                _set(db, run, pipeline_stage="revenue", revenue_enrichment_status="running", revenue_enriched_count=0)
+                workers = settings.llm_concurrency
+                _set(db, run, pipeline_stage="revenue", revenue_enrichment_status="running", revenue_enriched_count=0,
+                     revenue_failed_count=0, signals_failed_count=0)
 
-                def revenue_done():
-                    run.revenue_enriched_count = (run.revenue_enriched_count or 0) + 1
+                def revenue_result(ok, final):
+                    if ok:
+                        run.revenue_enriched_count = (run.revenue_enriched_count or 0) + 1
+                    elif final:
+                        run.revenue_failed_count = (run.revenue_failed_count or 0) + 1
                     db.commit()
 
-                _fan_out(_revenue_one, need_revenue, REVENUE_WORKERS, revenue_done)
+                _with_retry_pass(_revenue_one, need_revenue, workers, revenue_result)
                 _set(db, run, revenue_enrichment_status="done")
 
                 # 2+3. Rank (now that revenue is known) and research signals batch by batch.
@@ -174,20 +208,31 @@ def run_pipeline_job(run_id: int, signals_batch_size: int | None = None, signals
                 _set(db, run, pipeline_stage="signals", signals_status="running", signals_researched_count=0,
                      signals_total=len(queue))
 
-                def signals_done():
-                    run.signals_researched_count = (run.signals_researched_count or 0) + 1
+                def signals_result(ok, final):
+                    if ok:
+                        run.signals_researched_count = (run.signals_researched_count or 0) + 1
+                    elif final:
+                        run.signals_failed_count = (run.signals_failed_count or 0) + 1
                     db.commit()
 
                 for start in range(0, len(queue), batch_size):
                     batch = queue[start:start + batch_size]
                     logger.info("pipeline run=%s signals batch %d-%d of %d", run_id, start + 1, start + len(batch), len(queue))
-                    _fan_out(_signals_one, batch, SIGNAL_WORKERS, signals_done)
+                    _with_retry_pass(_signals_one, batch, workers, signals_result)
                 _set(db, run, signals_status="done")
 
                 # 4. Apollo contacts for the best-scored companies.
                 _set(db, run, pipeline_stage="contacts")
                 find_contacts_for_run(db, run, top_n)
 
+                failures = []
+                if run.revenue_failed_count:
+                    failures.append(f"{run.revenue_failed_count} revenue lookup(s)")
+                if run.signals_failed_count:
+                    failures.append(f"{run.signals_failed_count} signals lookup(s)")
+                if failures:
+                    note = f"{' and '.join(failures)} failed even after a retry (usually LLM rate limits). Run again to retry just those."
+                    run.pipeline_note = f"{run.pipeline_note} {note}" if run.pipeline_note else note
                 _set(db, run, pipeline_status="done", pipeline_stage=None)
                 logger.info("pipeline run=%s done: suitable=%d revenue=%d signals=%d contacts=%d",
                             run_id, len(suitable), run.revenue_enriched_count, run.signals_researched_count,

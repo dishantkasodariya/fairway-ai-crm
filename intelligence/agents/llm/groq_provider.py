@@ -12,7 +12,8 @@ import requests
 from agents.llm.base import ChatResult, LLMProvider, ToolCall
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MAX_RETRIES = 4
+MAX_RETRIES = 5
+RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
 class GroqProvider(LLMProvider):
@@ -52,10 +53,11 @@ class GroqProvider(LLMProvider):
                 json=payload,
                 timeout=60,
             )
-            if resp.status_code != 429 or attempt == MAX_RETRIES - 1:
+            if resp.status_code not in RETRY_STATUS or attempt == MAX_RETRIES - 1:
                 resp.raise_for_status()
                 return resp
-            wait_s = float(resp.headers.get("retry-after", 2 ** attempt * 2))
+            # Honour Retry-After, but never stall a worker for more than a minute per try.
+            wait_s = min(60.0, float(resp.headers.get("retry-after", 2 ** attempt * 3)))
             time.sleep(wait_s)
         raise RuntimeError("unreachable")  # loop always returns or raises above
 

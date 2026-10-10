@@ -102,6 +102,9 @@ class DiscoveryRun(Base):
     contacts_companies_done: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     contacts_found_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     pipeline_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Lookups that still failed after the retry pass (rate limits, provider errors).
+    revenue_failed_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    signals_failed_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 

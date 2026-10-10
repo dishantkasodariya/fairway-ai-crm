@@ -44,6 +44,8 @@ class DiscoveryRunOut(BaseModel):
     contacts_companies_done: int = 0
     contacts_found_count: int = 0
     pipeline_note: str | None = None
+    revenue_failed_count: int = 0
+    signals_failed_count: int = 0
     created_at: datetime
     completed_at: datetime | None
 

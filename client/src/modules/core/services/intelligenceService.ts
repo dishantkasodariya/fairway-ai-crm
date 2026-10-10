@@ -32,6 +32,8 @@ export interface DiscoveryRun {
   contactsCompaniesDone: number;
   contactsFoundCount: number;
   pipelineNote: string | null;
+  revenueFailedCount: number;
+  signalsFailedCount: number;
   createdAt: string;
   completedAt: string | null;
 }

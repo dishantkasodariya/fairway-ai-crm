@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     apollo_api_key: str = ""
 
     # Intelligence pipeline (jobs/run_pipeline.py)
+    # Parallel research agents. Free/low LLM tiers rate-limit hard (Groq free: keep 1-2);
+    # a paid OpenAI tier can take 6-10. Each agent makes several LLM + search calls.
+    llm_concurrency: int = 2
     signals_batch_size: int = 100
     signals_max_per_run: int = 0  # 0 = every suitable company, batch after batch
     contacts_top_n: int = 25
