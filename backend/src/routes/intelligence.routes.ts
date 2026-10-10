@@ -18,7 +18,7 @@ import {
   sendOutreachEmail,
   getResearchJob,
 } from '../controllers/intelligence.controller.js';
-import { crmStatus, addToCrm, createManualContact, deleteContact } from '../controllers/aiProspects.controller.js';
+import { crmStatus, addToCrm, createManualContact, deleteContact, setSignalWatch } from '../controllers/aiProspects.controller.js';
 import { requirePermission } from '../middleware/permission.middleware.js';
 
 const router = Router();
@@ -38,6 +38,7 @@ router.get('/companies/:id/contacts', requirePermission('companies', 'view'), ge
 router.post('/companies/:id/contacts', requirePermission('companies', 'edit'), createManualContact);
 router.get('/companies/:id/crm-status', requirePermission('companies', 'view'), crmStatus);
 router.post('/companies/:id/add-to-crm', requirePermission('inquiries', 'create'), addToCrm);
+router.put('/companies/:id/watch', requirePermission('companies', 'edit'), setSignalWatch);
 router.delete('/contacts/:id', requirePermission('companies', 'edit'), deleteContact);
 router.get('/contacts/by-company', requirePermission('companies', 'view'), listConnectionsByCompany);
 router.get('/contacts', requirePermission('companies', 'view'), listAllContacts);

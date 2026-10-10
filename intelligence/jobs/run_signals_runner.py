@@ -43,7 +43,7 @@ def select_run_prospects(db, run_id: int, limit: int) -> list[int]:
 def _create_signal_job(company_id: int) -> int:
     db = SessionLocal()
     try:
-        job = Job(type=JobType.signal_research, company_id=company_id, status=JobStatus.queued)
+        job = Job(type=JobType.signal_research, company_id=company_id, status=JobStatus.queued, trigger="pipeline")
         db.add(job)
         db.commit()
         db.refresh(job)

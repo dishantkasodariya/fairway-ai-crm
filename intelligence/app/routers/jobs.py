@@ -26,7 +26,7 @@ def _create_and_enqueue(
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    job = Job(type=job_type, company_id=company_id, status=JobStatus.queued, callback_url=callback_url)
+    job = Job(type=job_type, company_id=company_id, status=JobStatus.queued, callback_url=callback_url, trigger="manual")
     db.add(job)
     db.commit()
     db.refresh(job)

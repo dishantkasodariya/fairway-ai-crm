@@ -137,6 +137,11 @@ class FakeSignalAgent:
             "type": "expansion", "summary": f"{name} announced a new production line at Kosamba",
             "date": recent, "source_name": "E2E news", "source_url": "https://example.com/e2e-expansion", "confidence": "high",
         }]
+        if "Chemicals" in name and n >= 3:  # a later scheduled re-check finds one new story
+            signals.append({
+                "type": "tender", "summary": "Won a GIDC tender for a new storage block",
+                "date": recent, "source_name": "E2E tenders", "source_url": "https://example.com/e2e-tender?utm=x", "confidence": "high",
+            })
         if "Chemicals" in name:
             signals.append({
                 "type": "lease_expiry", "summary": "Current 40,000 sq ft warehouse lease in Ankleshwar ends next year",
@@ -348,6 +353,7 @@ def main() -> int:
     check("no duplicates created", rr2["companies_found"] == 0, str(rr2["companies_found"]))
     check("already-known companies listed in the new run", rr2["companies_matched"] == len(DUMMY_PLACES), str(rr2["companies_matched"]))
     run_id, run2_id, top_id = run.id, run2.id, top.id
+    dummy_ids = {c.id for c in comps.values()}
     db.close()
 
     # -- CRM side
@@ -385,6 +391,44 @@ def main() -> int:
     r = s.get(f"{args.crm}/intelligence/companies/{prospect_id}/contacts", timeout=20)
     people = r.json()["data"]["items"] if r.ok else []
     check("Connections: opening the company lists its people", len(people) == 4 and any(p["source"] == "apollo" for p in people), str(len(people)))
+
+    print("\n7b. Scheduled signal hunt: watchlist, re-check every N days, history")
+    from datetime import datetime as _dt, timedelta as _td
+    import jobs.scheduler as sched
+
+    db = SessionLocal()
+    top_row = db.query(Company).filter(Company.id == prospect_id).one()
+    check("added to CRM -> on the signal watchlist", top_row.watch_signals is True)
+    checked_at = top_row.signals_checked_at
+    check("last check recorded", checked_at is not None, str(checked_at))
+    db.close()
+    later = (checked_at or _dt.utcnow()) + _td(days=sched.get_settings().signals_recheck_days + 1)
+    due, _fresh = sched.select_hunt_batch(now=later)
+    check(f"due for a re-check after {sched.get_settings().signals_recheck_days} days", prospect_id in due)
+    due_now, _ = sched.select_hunt_batch(now=checked_at + _td(hours=1))
+    check("not re-checked before it's due", prospect_id not in due_now)
+    # Never let the fake agent touch real companies: hunt only the dummy ones.
+    real_select = sched.select_hunt_batch
+    sched.select_hunt_batch = lambda now=None: tuple([i for i in ids if i in dummy_ids] for ids in real_select(now))
+    try:
+        first = sched.run_signals_hunt(now=later)
+        second_later = later + _td(days=sched.get_settings().signals_recheck_days + 1)
+        second = sched.run_signals_hunt(now=second_later)
+    finally:
+        sched.select_hunt_batch = real_select
+    check("hunt ran the due company", first.get("ok", 0) >= 1 and second.get("ok", 0) >= 1, f"{first} / {second}")
+    detail = requests.get(f"{intel_api}/v1/companies/{prospect_id}", headers=ih, timeout=15).json()
+    watch = detail["signal_watch"]
+    scheduled = [c for c in watch["checks"] if c["trigger"] == "scheduled"]
+    check("re-check with nothing new is in the history, signals not duplicated",
+          any(c["new_signals"] == 0 and (c["already_known"] or 0) >= 2 for c in scheduled), str(scheduled))
+    check("a later re-check's new signal is recorded as new", any(c["new_signals"] == 1 for c in scheduled), str(scheduled))
+    types = [x["type"] for x in detail["signals"]]
+    check("timeline: newest find first, no duplicates", types[0] == "tender" and len(types) == len(set(types)), str(types))
+    recent = requests.get(f"{intel_api}/v1/signals/recent", params={"since": checked_at.isoformat()}, headers=ih, timeout=15).json()
+    check("new signals feed for CRM notifications", any(x["company_id"] == prospect_id and x["type"] == "tender" for x in recent["items"]))
+    r = s.put(f"{args.crm}/intelligence/companies/{prospect_id}/watch", json={"watch": False}, timeout=20)
+    check("stop tracking from the CRM", r.ok and r.json()["data"]["watching"] is False, f"HTTP {r.status_code}")
 
     print("\n8. CRM: follow-up loop")
     r = s.post(f"{args.crm}/inquiries/{inq_id}/touches", json={"channel": "Call", "outcome": "no_reply", "note": "E2E: no answer"}, timeout=20)

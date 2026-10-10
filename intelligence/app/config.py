@@ -45,9 +45,15 @@ class Settings(BaseSettings):
 
     api_key: str = "change_me"
 
+    # Scheduled signal hunt (jobs/scheduler.py): once a day at SIGNALS_CRON_HOUR_IST, re-check
+    # every watched company not checked for SIGNALS_RECHECK_DAYS, then fill the rest of the
+    # batch with suitable companies never researched. A company is watched once it scores
+    # >= SIGNALS_WATCH_MIN_SCORE, when it's added to the CRM, or by hand on its page.
+    signals_cron_enabled: bool = True
+    signals_cron_hour_ist: int = 6
+    signals_recheck_days: int = 3
     signals_cron_batch_size: int = 30
-    signals_cron_stale_days: int = 30
-    signals_cron_interval_hours: int = 24
+    signals_watch_min_score: float = 40
 
     apollo_api_key: str = ""
 

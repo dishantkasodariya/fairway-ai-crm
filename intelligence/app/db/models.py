@@ -130,6 +130,9 @@ class Company(Base):
     business_type_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     site_count: Mapped[int] = mapped_column(Integer, default=1)
+    # Signal watchlist: re-checked every SIGNALS_RECHECK_DAYS by the scheduled hunt.
+    watch_signals: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", index=True)
+    signals_checked_at: Mapped[datetime | None] = mapped_column(nullable=True)
     # Set on a site of a multi-site company ("... Gate 5A") to the account's main row;
     # null for standalone companies and for the parent itself. See discovery/site_grouping.py.
     parent_company_id: Mapped[int | None] = mapped_column(
@@ -270,6 +273,8 @@ class Job(Base):
     result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     callback_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    # What started it: manual | pipeline | scheduled (shown in a company's check history).
+    trigger: Mapped[str | None] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(default=_utcnow)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)

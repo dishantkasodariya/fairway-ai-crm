@@ -2,7 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased, joinedload
 
-from app.db.models import Company, CompanyWarehouseLink, DiscoveryRunCompany, OpportunityScore, RevenueSnapshot
+from datetime import datetime, timedelta
+
+from app.config import get_settings
+from app.db.models import (
+    Company,
+    CompanyWarehouseLink,
+    DiscoveryRunCompany,
+    Job,
+    JobType,
+    OpportunityScore,
+    RevenueSnapshot,
+    Signal,
+)
 from app.deps import get_db, require_api_key
 from app.schemas.companies import (
     BusinessTypeCountOut,
@@ -10,6 +22,12 @@ from app.schemas.companies import (
     CompanyDetailOut,
     CompanyListItemOut,
     CompanyListOut,
+    RecentSignalOut,
+    RecentSignalsOut,
+    SignalCheckOut,
+    SignalOut,
+    SignalWatchOut,
+    WatchUpdate,
 )
 
 router = APIRouter(prefix="/v1/companies", tags=["companies"], dependencies=[Depends(require_api_key)])
@@ -224,4 +242,72 @@ def get_company(company_id: int, db: Session = Depends(get_db)):
     )
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
-    return company
+    out = CompanyDetailOut.model_validate(company)
+    # Newest first by when we found them, so a re-check's finds sit on top.
+    out.signals = sorted(out.signals, key=lambda s: s.created_at or datetime.min, reverse=True)
+    out.signal_watch = _signal_watch(db, company)
+    return out
+
+
+def _signal_watch(db: Session, company: Company) -> SignalWatchOut:
+    recheck_days = get_settings().signals_recheck_days
+    jobs = (
+        db.query(Job)
+        .filter(Job.company_id == company.id, Job.type == JobType.signal_research)
+        .order_by(Job.id.desc())
+        .limit(20)
+        .all()
+    )
+    last = company.signals_checked_at
+    return SignalWatchOut(
+        watching=company.watch_signals,
+        recheck_days=recheck_days,
+        last_checked_at=last,
+        next_check_at=(last + timedelta(days=recheck_days)) if (company.watch_signals and last) else None,
+        checks=[
+            SignalCheckOut(
+                job_id=j.id,
+                checked_at=j.finished_at or j.started_at or j.created_at,
+                trigger=j.trigger,
+                status=j.status.value,
+                new_signals=(j.result or {}).get("new_signals_found"),
+                already_known=(j.result or {}).get("already_known"),
+                error=j.error,
+            )
+            for j in jobs
+        ],
+    )
+
+
+@router.put("/{company_id}/watch", response_model=SignalWatchOut)
+def set_watch(company_id: int, body: WatchUpdate, db: Session = Depends(get_db)):
+    """Add a company to (or remove it from) the scheduled signal re-checks."""
+    company = db.query(Company).filter(Company.id == company_id).one_or_none()
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+    # A site's signals are researched on its account.
+    target = company.parent if company.parent_company_id and company.parent else company
+    target.watch_signals = body.watch
+    db.commit()
+    return _signal_watch(db, target)
+
+
+signals_router = APIRouter(prefix="/v1/signals", tags=["signals"], dependencies=[Depends(require_api_key)])
+
+
+@signals_router.get("/recent", response_model=RecentSignalsOut)
+def recent_signals(
+    db: Session = Depends(get_db),
+    since: datetime = Query(description="Signals first found after this time (UTC)"),
+    watched_only: bool = Query(default=True),
+    limit: int = Query(default=200, le=500),
+):
+    """New signals found since a time, for CRM notifications ("3 new signals for X")."""
+    q = db.query(Signal, Company.name).join(Company, Company.id == Signal.company_id).filter(Signal.created_at > since)
+    if watched_only:
+        q = q.filter(Company.watch_signals.is_(True))
+    rows = q.order_by(Signal.created_at.desc()).limit(limit).all()
+    return RecentSignalsOut(items=[
+        RecentSignalOut(**SignalOut.model_validate(sig).model_dump(), company_id=sig.company_id, company_name=name)
+        for sig, name in rows
+    ])

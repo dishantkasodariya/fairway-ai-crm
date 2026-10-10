@@ -105,7 +105,7 @@ def ranked_unscored(db, run_id: int, limit: int | None = None) -> list[int]:
 def _new_job(job_type: JobType, company_id: int) -> int:
     db = SessionLocal()
     try:
-        job = Job(type=job_type, company_id=company_id, status=JobStatus.queued)
+        job = Job(type=job_type, company_id=company_id, status=JobStatus.queued, trigger="pipeline")
         db.add(job)
         db.commit()
         return job.id

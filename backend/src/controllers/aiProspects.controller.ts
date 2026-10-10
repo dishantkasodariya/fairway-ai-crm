@@ -27,6 +27,12 @@ export const addToCrm = async (req: AuthenticatedRequest, res: Response): Promis
       { contactId: req.body?.contactId ?? null, allowSecondInquiry: !!req.body?.allowSecondInquiry },
       req.user?.userId
     );
+    // A company we're now selling to gets its signals re-checked on the schedule.
+    // Best effort: the deal exists either way.
+    await callIntelligenceApi(`/v1/companies/${Number(req.params.id)}/watch`, {
+      method: 'PUT',
+      body: JSON.stringify({ watch: true }),
+    }).catch((e: any) => console.warn('[ai-prospects] could not add to signal watchlist:', e?.message));
     res.status(201).json({ success: true, data: result });
   } catch (error: any) {
     fail(res, error, 'Failed to add the prospect to the CRM');
@@ -54,5 +60,18 @@ export const deleteContact = async (req: Request, res: Response): Promise<void> 
     res.status(200).json({ success: true });
   } catch (error: any) {
     fail(res, error, 'Failed to delete the contact');
+  }
+};
+
+/** PUT /api/intelligence/companies/:id/watch { watch } — scheduled signal re-checks on/off. */
+export const setSignalWatch = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await callIntelligenceApi(`/v1/companies/${Number(req.params.id)}/watch`, {
+      method: 'PUT',
+      body: JSON.stringify({ watch: !!req.body?.watch }),
+    });
+    res.status(200).json({ success: true, data: toCamelCaseDeep(result) });
+  } catch (error: any) {
+    fail(res, error, 'Failed to update signal tracking');
   }
 };

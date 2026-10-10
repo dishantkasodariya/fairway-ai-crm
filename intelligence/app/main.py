@@ -70,6 +70,7 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(discovery.router)
 app.include_router(companies.router)
+app.include_router(companies.signals_router)
 app.include_router(jobs.router)
 app.include_router(contacts.router)
 

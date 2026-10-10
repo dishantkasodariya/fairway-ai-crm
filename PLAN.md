@@ -251,6 +251,8 @@ Notes carried forward:
 | Warehouse location from a Google Maps link / coordinates (no invented defaults); Map: warehouse radius circle + prospects; Discovery by coordinates; FAKE_PROVIDERS rehearsal mode | 81098a5 |
 | One-click pipeline (revenue → rank by business-type fit × revenue → signals in batches → Apollo); Connections grouped by company; OpenAI model settings; provider key check | 2c2fdae |
 | Rate-limit survival + honest failure counts (found by a real 5-company run) | 14d5cd0 |
+| Tasks: Notify assignee by email (EMAIL_PROVIDER=log for tests) | ea2776a |
+| Scheduled signal hunt + signal watchlist + timeline/check history on the prospect page | (this commit) |
 
 How to check before a demo or deploy:
 - `cd intelligence && python -m scripts.check_providers`: one real call per key (Places, LLM, Serper, Apollo).
@@ -264,3 +266,11 @@ Open decisions:
 - Groq free tier can't sustain research agents (429/413 even at concurrency 1). Use the paid OpenAI key with LLM_CONCURRENCY 6-10.
 
 Production blockers from the audit (not yet fixed): hard-coded backdoor passwords in `auth.controller.ts` login, seeded users' passwords reset to `fairway123` on every boot (`db.ts`), the client auto-login on localhost, open self-registration, unauthenticated notification writes, the CORS wildcard for *.onrender.com/*.vercel.app, a non-transactional proposal + hold flow (overbooking race), intelligence API key failing open when ENVIRONMENT is unset, and SSRF in the agent fetch tool.
+
+Signal hunt (intelligence `jobs/scheduler.py`):
+- Runs daily at SIGNALS_CRON_HOUR_IST (06:00). It re-checks watched companies not checked for SIGNALS_RECHECK_DAYS (3), best score first, then fills SIGNALS_CRON_BATCH_SIZE (30) with suitable never-researched companies.
+- Watched = scored at least SIGNALS_WATCH_MIN_SCORE (40), added to the CRM, or toggled on the prospect page.
+- A Postgres advisory lock means only one process runs it.
+- Re-checks de-duplicate signals (same type + same article), so the timeline shows when each signal was first found. Every check is logged (scheduled/manual/pipeline, plus new vs already-known).
+- The CRM's hourly watcher turns newly found signals on watched companies into notifications.
+- With Groq free the hunt will mostly hit 429s; it needs the paid OpenAI key (keep the batch small, about 30/day, until costs are known).

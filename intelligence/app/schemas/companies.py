@@ -27,6 +27,28 @@ class SignalOut(BaseModel):
     source_name: str | None
     source_url: str | None
     confidence: str | None
+    # When we first found it (date = when the event itself happened, as reported).
+    created_at: datetime | None = None
+
+
+class SignalCheckOut(BaseModel):
+    """One signals research run for a company: when, what started it, what it found."""
+
+    job_id: int
+    checked_at: datetime | None
+    trigger: str | None
+    status: str
+    new_signals: int | None = None
+    already_known: int | None = None
+    error: str | None = None
+
+
+class SignalWatchOut(BaseModel):
+    watching: bool
+    recheck_days: int
+    last_checked_at: datetime | None
+    next_check_at: datetime | None
+    checks: list[SignalCheckOut] = []
 
 
 class OpportunityScoreOut(BaseModel):
@@ -108,6 +130,7 @@ class CompanyDetailOut(BaseModel):
     parent_company_id: int | None = None
     parent: SiteOut | None = None
     sites: list[SiteOut] = []
+    signal_watch: SignalWatchOut | None = None
 
 
 class CompanyListOut(BaseModel):
@@ -122,3 +145,16 @@ class BusinessTypeCountOut(BaseModel):
 
 class BusinessTypesOut(BaseModel):
     items: list[BusinessTypeCountOut]
+
+
+class WatchUpdate(BaseModel):
+    watch: bool
+
+
+class RecentSignalOut(SignalOut):
+    company_id: int
+    company_name: str
+
+
+class RecentSignalsOut(BaseModel):
+    items: list[RecentSignalOut]

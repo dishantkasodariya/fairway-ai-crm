@@ -94,6 +94,15 @@ def run_revenue_research_job(job_id: int) -> None:
         db.close()
 
 
+def _signal_key(sig_type: str, source_url: str | None, summary: str | None) -> tuple:
+    """Same story = same type and same article (ignoring tracking params/trailing slash),
+    or the same type and wording when there's no URL."""
+    if source_url:
+        parsed = urlparse(source_url.strip())
+        return (sig_type, (parsed.netloc.replace("www.", "") + parsed.path.rstrip("/")).lower())
+    return (sig_type, " ".join((summary or "").lower().split()))
+
+
 def run_signal_research_job(job_id: int) -> None:
     db = SessionLocal()
     try:
@@ -112,10 +121,20 @@ def run_signal_research_job(job_id: int) -> None:
                     name=company.name, address=company.address or "", business_type=company.business_type
                 )
 
+                # A re-check finds many of the same stories again: keep only what's new, so
+                # the company's timeline shows when each signal was first found.
+                existing = db.query(Signal).filter(Signal.company_id == company.id).all()
+                seen = {_signal_key(e.type.value, e.source_url, e.summary) for e in existing}
                 new_count = 0
+                duplicates = 0
                 for s in found.get("signals", []):
                     if s.get("type") not in SignalType._value2member_map_ or not s.get("source_url"):
                         continue
+                    key = _signal_key(s["type"], s.get("source_url"), s.get("summary", ""))
+                    if key in seen:
+                        duplicates += 1
+                        continue
+                    seen.add(key)
                     db.add(
                         Signal(
                             company_id=company.id,
@@ -174,8 +193,14 @@ def run_signal_research_job(job_id: int) -> None:
                 score_row.latest_signal_sort_key = fused["latest_signal_sort_key"]
                 score_row.latest_signal_freshness = fused["latest_signal_freshness"]
 
+                company.signals_checked_at = _utcnow().replace(tzinfo=None)
+                # Anything worth a call gets re-checked on the schedule from now on.
+                if (fused["opportunity_score"] or 0) >= get_settings().signals_watch_min_score:
+                    company.watch_signals = True
+
                 job.result = {
                     "new_signals_found": new_count,
+                    "already_known": duplicates,
                     "opportunity_score": fused["opportunity_score"],
                     "research_stats": found.get("research_stats"),
                 }

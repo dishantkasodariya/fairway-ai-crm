@@ -158,7 +158,10 @@ export interface DiscoveredCompanyDetail
     sourceName: string | null;
     sourceUrl: string | null;
     confidence: string | null;
+    /** When we first found it (`date` is when the event happened, as reported). */
+    createdAt: string | null;
   }>;
+  signalWatch: SignalWatch | null;
   opportunityScore: {
     score: number;
     why: string | null;
@@ -169,6 +172,23 @@ export interface DiscoveredCompanyDetail
     latestSignalDate: string | null;
     latestSignalFreshness: string | null;
   } | null;
+}
+
+/** Scheduled signal re-checks for one company, and its check history. */
+export interface SignalWatch {
+  watching: boolean;
+  recheckDays: number;
+  lastCheckedAt: string | null;
+  nextCheckAt: string | null;
+  checks: Array<{
+    jobId: number;
+    checkedAt: string | null;
+    trigger: 'manual' | 'pipeline' | 'scheduled' | null;
+    status: 'queued' | 'running' | 'done' | 'failed';
+    newSignals: number | null;
+    alreadyKnown: number | null;
+    error: string | null;
+  }>;
 }
 
 export interface ListDiscoveredCompaniesParams {
@@ -324,6 +344,19 @@ export class IntelligenceService {
       });
       const json = await res.json();
       return json;
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  static async setSignalWatch(id: number, watch: boolean): Promise<{ success: boolean; data?: SignalWatch; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/intelligence/companies/${id}/watch`, {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ watch }),
+      });
+      return await res.json();
     } catch (err: any) {
       return { success: false, error: err.message };
     }

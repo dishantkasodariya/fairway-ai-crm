@@ -17,6 +17,7 @@ async function fetchDiscoveredCompanies(): Promise<DiscoveredCompany[]> {
   const url = `${config.intelligenceApiUrl}/v1/companies?sort_by=recency&limit=50`;
   const response = await fetch(url, {
     headers: { 'X-API-Key': config.intelligenceApiKey },
+    signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) {
     throw new Error(`Intelligence API error (${response.status})`);
@@ -35,7 +36,7 @@ async function fetchDiscoveredCompanies(): Promise<DiscoveredCompany[]> {
  */
 async function alreadyNotifiedCompanyIds(): Promise<Set<string>> {
   const res = await query(
-    `SELECT entity_id FROM notifications WHERE type = 'ai_signal' AND entity_type = 'company';`
+    `SELECT entity_id FROM notifications WHERE type = 'ai_signal' AND entity_type IN ('company', 'ai_prospect');`
   );
   return new Set(res.rows.map((r: any) => r.entity_id));
 }
@@ -44,7 +45,7 @@ async function insertHotCompanyNotification(company: DiscoveredCompany): Promise
   const id = `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   await query(
     `INSERT INTO notifications (id, type, title, message, entity_type, entity_id, is_read, created_at)
-     VALUES ($1, 'ai_signal', $2, $3, 'company', $4, false, CURRENT_TIMESTAMP)
+     VALUES ($1, 'ai_signal', $2, $3, 'ai_prospect', $4, false, CURRENT_TIMESTAMP)
      ON CONFLICT (id) DO NOTHING;`,
     [
       id,
@@ -61,6 +62,52 @@ async function setWatermark(): Promise<void> {
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;`,
     [WATERMARK_KEY, new Date().toISOString()]
   );
+}
+
+const NEW_SIGNALS_WATERMARK_KEY = 'ai_signals_new_since';
+
+const SIGNAL_LABELS: Record<string, string> = {
+  expansion: 'expansion', funding: 'funding', tender: 'tender', hiring: 'hiring', regulatory: 'regulatory',
+  import_export: 'import/export', distribution: 'distribution', filings: 'filings', lease_expiry: 'lease expiry',
+  distress: 'distress',
+};
+
+/**
+ * New signals the scheduled hunt found on watched companies since the last run:
+ * one notification per company ("2 new signals for X: expansion, lease expiry").
+ */
+async function notifyNewSignals(): Promise<number> {
+  const mark = await query('SELECT value FROM system_metadata WHERE key = $1', [NEW_SIGNALS_WATERMARK_KEY]);
+  const startedAt = new Date().toISOString();
+  // First run: start from now instead of announcing every signal ever found.
+  const since = mark.rows[0]?.value || startedAt;
+  const response = await fetch(
+    `${config.intelligenceApiUrl}/v1/signals/recent?since=${encodeURIComponent(since.replace('Z', ''))}`,
+    { headers: { 'X-API-Key': config.intelligenceApiKey }, signal: AbortSignal.timeout(15000) }
+  );
+  if (!response.ok) throw new Error(`Intelligence API error (${response.status})`);
+  const items: { company_id: number; company_name: string; type: string; summary: string }[] = (await response.json()).items || [];
+
+  const byCompany = new Map<number, typeof items>();
+  for (const s of items) byCompany.set(s.company_id, [...(byCompany.get(s.company_id) || []), s]);
+  for (const [companyId, sigs] of byCompany) {
+    const kinds = [...new Set(sigs.map((s) => SIGNAL_LABELS[s.type] || s.type))].join(', ');
+    await query(
+      `INSERT INTO notifications (id, type, title, message, entity_type, entity_id, is_read, created_at)
+       VALUES ($1, 'ai_signal', $2, $3, 'ai_prospect', $4, false, CURRENT_TIMESTAMP)`,
+      [
+        `notif_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+        `${sigs.length} new signal${sigs.length === 1 ? '' : 's'}: ${sigs[0].company_name}`,
+        `${kinds}. Latest: ${sigs[0].summary}`.slice(0, 480),
+        String(companyId),
+      ]
+    );
+  }
+  await query(
+    `INSERT INTO system_metadata (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;`,
+    [NEW_SIGNALS_WATERMARK_KEY, startedAt]
+  );
+  return byCompany.size;
 }
 
 export async function runAiSignalsWatch(): Promise<void> {
@@ -80,6 +127,10 @@ export async function runAiSignalsWatch(): Promise<void> {
 
     if (newlyHot.length > 0) {
       console.log(`[aiSignalsWatcher] ${newlyHot.length} newly-hot compan${newlyHot.length === 1 ? 'y' : 'ies'} notified`);
+    }
+    const withNewSignals = await notifyNewSignals();
+    if (withNewSignals > 0) {
+      console.log(`[aiSignalsWatcher] new signals notified for ${withNewSignals} watched compan${withNewSignals === 1 ? 'y' : 'ies'}`);
     }
   } catch (error: any) {
     console.error('[aiSignalsWatcher] run failed:', error.message);

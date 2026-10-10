@@ -269,6 +269,8 @@ export const AppShell: React.FC<AppShellProps> = ({
       onNavigate('tasks', id);
     } else if (t === 'proposal' || t === 'proposals' || t === 'proposal_updated') {
       onNavigate('proposals', id);
+    } else if (t === 'ai_prospect') {
+      onNavigate('ai_prospect_detail', id);
     } else if (t === 'company' || t === 'companies' || t === 'contact' || t === 'facility') {
       if (id) {
         onNavigate('company_detail', id);

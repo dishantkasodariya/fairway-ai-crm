@@ -15,6 +15,7 @@ import { PropertyService } from '@/modules/core/services/propertyService';
 import { addProspectToCrm } from '../utils/addProspectToCrm';
 import { exportProspectsCsv } from '../utils/exportProspectsCsv';
 import { OutreachDraftModal, OutreachChannel } from '../components/OutreachDraftModal';
+import { SignalsTimeline } from '../components/SignalsTimeline';
 
 export interface AiProspectDetailPageProps {
   prospectId: number;
@@ -75,12 +76,15 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
     }
   };
 
+  const reloadDetail = async () => {
+    const res = await IntelligenceService.getDiscoveredCompany(prospectId);
+    if (res.success && res.data) setDetail(res.data);
+  };
+
   useEffect(() => {
     setIsLoading(true);
     Promise.all([
-      IntelligenceService.getDiscoveredCompany(prospectId).then((res) => {
-        if (res.success && res.data) setDetail(res.data);
-      }),
+      reloadDetail(),
       loadCrmAndContacts(),
     ]).finally(() => setIsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -472,24 +476,7 @@ export const AiProspectDetailPage: React.FC<AiProspectDetailPageProps> = ({ pros
         )}
       </Card>
 
-      <Card className="p-5 space-y-2">
-        <h2 className="text-sm font-bold text-foreground">Signals Timeline</h2>
-        {detail.signals.length === 0 ? (
-          <p className="text-xs text-foreground-muted">No signals researched yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {detail.signals.map((s) => (
-              <div key={s.id} className="text-xs border-b border-border pb-2 last:border-0">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" size="sm">{s.type}</Badge>
-                  <span className="text-foreground-muted">{s.date}</span>
-                </div>
-                <p className="text-foreground mt-1">{s.summary}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+      <SignalsTimeline prospectId={prospectId} detail={detail} onRefresh={reloadDetail} />
     </div>
   );
 };
