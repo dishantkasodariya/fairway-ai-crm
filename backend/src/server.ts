@@ -4,6 +4,7 @@ import { initDatabase, pool } from './config/db.js';
 import { startAiSignalsWatcher } from './jobs/aiSignalsWatcher.js';
 import { startTodayDigest } from './jobs/todayDigest.js';
 import { startMonthlyDiscovery } from './jobs/monthlyDiscovery.js';
+import { startOutreachCronRunner } from './jobs/outreachCronRunner.js';
 
 const PORT = config.port;
 
@@ -21,6 +22,8 @@ const startServer = async () => {
   if (process.env.DISCOVERY_CRON_ENABLED === 'true') {
     startMonthlyDiscovery();
   }
+  // Automated Bulk Outreach / Sequences Cron Runner
+  startOutreachCronRunner();
 
   // Keep Render intelligence service awake and warm (free tier idle spin-down prevention)
   if (config.intelligenceApiUrl && config.intelligenceApiUrl.includes('onrender.com')) {

@@ -183,6 +183,16 @@ export const createCommunication = async (req: Request, res: Response): Promise<
         subject || `${channel} communication logged`,
         message.slice(0, 120),
       ]);
+
+      // If inbound reply/communication, halt outreach sequence follow-ups
+      if (direction === 'Inbound' && (contactId || companyId)) {
+        await query(
+          `UPDATE outreach_enrollments 
+           SET status = 'replied', updated_at = CURRENT_TIMESTAMP 
+           WHERE (contact_id = $1 OR company_id = $2) AND status IN ('pending', 'sent')`,
+          [contactId ? String(contactId) : null, companyId ? String(companyId) : null]
+        );
+      }
     } catch {}
 
     res.status(201).json({

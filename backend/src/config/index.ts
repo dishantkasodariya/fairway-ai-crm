@@ -27,13 +27,17 @@ export const config = {
   // "log" = don't send; append each email to EMAIL_OUTBOX_FILE (dev, tests, rehearsals).
   emailProvider: (process.env.EMAIL_PROVIDER || 'resend') as 'resend' | 'smtp' | 'log',
   emailOutboxFile: process.env.EMAIL_OUTBOX_FILE || 'logs/email-outbox.jsonl',
-  resendApiKey: process.env.RESEND_API_KEY || '',
-  resendFromEmail: process.env.RESEND_FROM_EMAIL || '',
-  resendFromName: process.env.RESEND_FROM_NAME || 'Fairway Warehousing',
-  smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+  resendApiKey: (process.env.RESEND_API_KEY || '').trim(),
+  resendFromEmail: (process.env.RESEND_FROM_EMAIL || '').trim(),
+  resendFromName: (process.env.RESEND_FROM_NAME || 'Fairway Warehousing').trim(),
+  smtpHost: (process.env.SMTP_HOST || 'smtp.gmail.com').trim(),
   smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 465,
-  smtpUser: process.env.SMTP_USER || '',
-  smtpPass: process.env.SMTP_PASS || '',
-  smtpFromName: process.env.SMTP_FROM_NAME || 'Fairway Warehousing',
+  smtpUser: (process.env.SMTP_USER || '').trim(),
+  smtpPass: (process.env.SMTP_PASS || '').trim(),
+  smtpFromName: (process.env.SMTP_FROM_NAME || 'Fairway Warehousing').trim(),
+  // Automated Bulk Outreach / Sequences Cron
+  outreachCronEnabled: process.env.OUTREACH_CRON_ENABLED !== 'false',
+  outreachDailyLimit: parseInt(process.env.OUTREACH_DAILY_LIMIT || '50', 10),
+  outreachDelayMs: parseInt(process.env.OUTREACH_DELAY_MS || '3000', 10),
 };
 

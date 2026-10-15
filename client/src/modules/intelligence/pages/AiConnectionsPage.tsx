@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Sparkles, Link2, Mail, Phone, Search, ChevronRight, ArrowLeft, Building2, Loader2 } from 'lucide-react';
+import { Sparkles, Link2, Mail, Phone, Search, ChevronRight, ArrowLeft, Building2, Loader2, Layers, Send, CheckSquare, Square } from 'lucide-react';
 import { ColumnDef, useTable } from '@tanstack/react-table';
 import {
   DataGrid,
@@ -11,6 +11,7 @@ import { DataGridColumnHeader } from '@/components/reui/data-grid/data-grid-colu
 import { DataGridScrollArea } from '@/components/reui/data-grid/data-grid-scroll-area';
 import { DataGridTable } from '@/components/reui/data-grid/data-grid-table';
 import { Card } from '@/modules/core/components/ui/Card';
+import { Button } from '@/modules/core/components/ui/Button';
 import { useToast } from '@/modules/core/providers/ToastContext';
 import {
   IntelligenceService,
@@ -19,6 +20,8 @@ import {
   errorText,
 } from '@/modules/core/services/intelligenceService';
 import { OutreachDraftModal } from '../components/OutreachDraftModal';
+import { BulkOutreachModal } from '../components/BulkOutreachModal';
+import { CampaignsDrawer } from '../components/CampaignsDrawer';
 
 type Channel = 'linkedin' | 'email';
 
@@ -49,6 +52,11 @@ export const AiConnectionsPage: React.FC<AiConnectionsPageProps> = ({ onOpenPros
 
   const [activeContact, setActiveContact] = useState<Contact | null>(null);
   const [activeChannel, setActiveChannel] = useState<Channel>('linkedin');
+
+  // Bulk outreach sequence selection state
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<number>>(new Set());
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isCampaignsDrawerOpen, setIsCampaignsDrawerOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -94,8 +102,70 @@ export const AiConnectionsPage: React.FC<AiConnectionsPageProps> = ({ onOpenPros
     setActiveChannel(channel);
   };
 
+  const toggleContactSelection = (id: number) => {
+    setSelectedContactIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedContactIds.size === people.length && people.length > 0) {
+      setSelectedContactIds(new Set());
+    } else {
+      setSelectedContactIds(new Set(people.map((p) => p.id)));
+    }
+  };
+
+  const selectedContactsForOutreach = useMemo(() => {
+    const targetPeople = selectedContactIds.size > 0
+      ? people.filter((p) => selectedContactIds.has(p.id))
+      : people;
+    return targetPeople.map((p) => ({
+      id: p.id,
+      companyId: p.companyId,
+      name: p.name,
+      email: p.email,
+      companyName: selected?.companyName || 'Company',
+    }));
+  }, [people, selectedContactIds, selected?.companyName]);
+
   const columns = useMemo<ColumnDef<DataGridFeatures, Contact>[]>(
     () => [
+      {
+        id: 'select',
+        header: () => (
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="p-1 text-foreground-muted hover:text-foreground cursor-pointer flex items-center justify-center"
+            title="Select / deselect all"
+          >
+            {people.length > 0 && selectedContactIds.size === people.length ? (
+              <CheckSquare className="w-4 h-4 text-fairway-600" />
+            ) : (
+              <Square className="w-4 h-4" />
+            )}
+          </button>
+        ),
+        cell: ({ row }) => (
+          <button
+            type="button"
+            onClick={() => toggleContactSelection(row.original.id)}
+            className="p-1 text-foreground-muted hover:text-foreground cursor-pointer flex items-center justify-center"
+          >
+            {selectedContactIds.has(row.original.id) ? (
+              <CheckSquare className="w-4 h-4 text-fairway-600" />
+            ) : (
+              <Square className="w-4 h-4" />
+            )}
+          </button>
+        ),
+        size: 40,
+        enableSorting: false,
+      },
       {
         id: 'name',
         accessorKey: 'name',
@@ -164,7 +234,7 @@ export const AiConnectionsPage: React.FC<AiConnectionsPageProps> = ({ onOpenPros
         enableSorting: false,
       },
     ],
-    []
+    [people, selectedContactIds]
   );
 
   const table = useTable({
@@ -178,21 +248,34 @@ export const AiConnectionsPage: React.FC<AiConnectionsPageProps> = ({ onOpenPros
 
   return (
     <div className="space-y-5 p-4 sm:p-6">
-      <div>
-        <h1 className="text-lg font-bold text-foreground tracking-tight flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-fairway-600" />
-          AI Connections
-        </h1>
-        <p className="text-xs text-foreground-muted mt-0.5">
-          People at AI-discovered companies, found via Apollo or added by hand. Drafts are for review — nothing sends automatically.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-bold text-foreground tracking-tight flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-fairway-600" />
+            AI Connections
+          </h1>
+          <p className="text-xs text-foreground-muted mt-0.5">
+            Key decision-makers at AI-discovered companies. Single reachout or automated bulk sequences with follow-up logic.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsCampaignsDrawerOpen(true)}
+          className="px-3 py-1.5 rounded-lg border border-border bg-surface text-foreground hover:bg-surface-muted text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+        >
+          <Layers className="w-4 h-4 text-fairway-600" />
+          <span>Outreach Sequences & Campaigns</span>
+        </button>
       </div>
 
       {selected ? (
         <div className="space-y-4">
           <button
             type="button"
-            onClick={() => setSelected(null)}
+            onClick={() => {
+              setSelected(null);
+              setSelectedContactIds(new Set());
+            }}
             className="text-xs font-semibold text-foreground-muted hover:text-foreground flex items-center gap-1 cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> All companies
@@ -209,16 +292,60 @@ export const AiConnectionsPage: React.FC<AiConnectionsPageProps> = ({ onOpenPros
                 {selected.estimatedRequirement && ` · needs ${selected.estimatedRequirement}`}
               </p>
             </div>
-            {onOpenProspect && (
-              <button
-                type="button"
-                onClick={() => onOpenProspect(selected.companyId)}
-                className="text-xs font-semibold text-fairway-600 hover:underline cursor-pointer"
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedContactIds(new Set(people.filter((p) => p.email).map((p) => p.id)));
+                  setIsBulkModalOpen(true);
+                }}
+                disabled={people.filter((p) => p.email).length === 0}
+                className="text-xs gap-1.5 cursor-pointer"
               >
-                Open prospect →
-              </button>
-            )}
+                <Send className="w-3.5 h-3.5 text-fairway-600" />
+                Bulk Reachout to Company ({people.filter((p) => p.email).length})
+              </Button>
+              {onOpenProspect && (
+                <button
+                  type="button"
+                  onClick={() => onOpenProspect(selected.companyId)}
+                  className="text-xs font-semibold text-fairway-600 hover:underline cursor-pointer"
+                >
+                  Open prospect →
+                </button>
+              )}
+            </div>
           </Card>
+
+          {/* Selection Action Banner */}
+          {selectedContactIds.size > 0 && (
+            <div className="flex items-center justify-between p-2.5 px-4 bg-fairway-50/70 dark:bg-fairway-950/40 border border-fairway-200 dark:border-fairway-800 rounded-lg text-xs">
+              <div className="flex items-center gap-2 font-semibold text-fairway-900 dark:text-fairway-200">
+                <CheckSquare className="w-4 h-4 text-fairway-600" />
+                <span>{selectedContactIds.size} {selectedContactIds.size === 1 ? 'contact' : 'contacts'} selected</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedContactIds(new Set())}
+                  className="text-foreground-muted hover:text-foreground text-xs cursor-pointer font-medium"
+                >
+                  Deselect all
+                </button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsBulkModalOpen(true)}
+                  className="gap-1.5 cursor-pointer text-xs"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Enroll in Bulk Outreach Sequence
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Card className="p-0 border border-border bg-surface shadow-xs rounded-xl overflow-hidden">
             <DataGrid table={table} recordCount={people.length} isLoading={isLoadingPeople} tableLayout={{ columnsResizable: true, headerSticky: true }}>
               <DataGridContainer className="w-full">
@@ -313,6 +440,21 @@ export const AiConnectionsPage: React.FC<AiConnectionsPageProps> = ({ onOpenPros
         contact={activeContact}
         companyName={selected?.companyName || ''}
         channel={activeChannel}
+      />
+
+      <BulkOutreachModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        selectedContacts={selectedContactsForOutreach}
+        onEnrolled={() => {
+          setSelectedContactIds(new Set());
+          setIsCampaignsDrawerOpen(true);
+        }}
+      />
+
+      <CampaignsDrawer
+        isOpen={isCampaignsDrawerOpen}
+        onClose={() => setIsCampaignsDrawerOpen(false)}
       />
     </div>
   );

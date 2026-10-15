@@ -26,6 +26,8 @@ export interface SendOutreachEmailParams {
   /** Optional HTML version; clients that can't show it fall back to `text`. */
   html?: string;
   replyTo?: string;
+  inReplyTo?: string;
+  references?: string;
 }
 
 export async function sendOutreachEmail(params: SendOutreachEmailParams): Promise<{ id: string }> {
@@ -51,6 +53,10 @@ async function sendViaResend(params: SendOutreachEmailParams): Promise<{ id: str
 
   const from = config.resendFromName ? `${config.resendFromName} <${config.resendFromEmail}>` : config.resendFromEmail;
 
+  const headers: Record<string, string> = {};
+  if (params.inReplyTo) headers['In-Reply-To'] = params.inReplyTo;
+  if (params.references) headers['References'] = params.references;
+
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -64,6 +70,7 @@ async function sendViaResend(params: SendOutreachEmailParams): Promise<{ id: str
       text: params.text,
       ...(params.html ? { html: params.html } : {}),
       ...(params.replyTo ? { reply_to: params.replyTo } : {}),
+      ...(Object.keys(headers).length > 0 ? { headers } : {}),
     }),
   });
 
@@ -105,6 +112,8 @@ async function sendViaSmtp(params: SendOutreachEmailParams): Promise<{ id: strin
       text: params.text,
       ...(params.html ? { html: params.html } : {}),
       ...(params.replyTo ? { replyTo: params.replyTo } : {}),
+      ...(params.inReplyTo ? { inReplyTo: params.inReplyTo } : {}),
+      ...(params.references ? { references: params.references } : {}),
     });
     return { id: info.messageId };
   } catch (err: any) {
