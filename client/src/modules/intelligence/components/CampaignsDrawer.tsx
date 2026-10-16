@@ -173,7 +173,7 @@ export const CampaignsDrawer: React.FC<CampaignsDrawerProps> = ({ isOpen, onClos
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-foreground text-sm">{selectedCampaign.name}</h3>
                 <span className="text-[11px] text-foreground-muted">
-                  Follow-up interval: {selectedCampaign.followUpDelayDays || 3} days
+                  Follow-up interval: {selectedCampaign.followUpDelayDays || 7} days
                 </span>
               </div>
               <div className="text-[11px] text-foreground-muted bg-surface-muted p-2 rounded border border-border">

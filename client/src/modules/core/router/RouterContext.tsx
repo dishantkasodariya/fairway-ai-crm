@@ -166,6 +166,14 @@ export function parseRoute(pathname: string): {
     return { view: 'communications', isAuth: false, authType: 'login' };
   }
 
+  if (cleanPath === '/calls/new' || cleanPath === '/new-call') {
+    return { view: 'new_call', isAuth: false, authType: 'login' };
+  }
+
+  if (cleanPath === '/calls') {
+    return { view: 'calls', isAuth: false, authType: 'login' };
+  }
+
   if (cleanPath === '/404' || cleanPath === '/not-found') {
     return { view: 'not_found', isAuth: false, authType: 'login' };
   }
@@ -219,6 +227,10 @@ export function pathToView(view: ActiveNavView, entityId?: string): string {
       return '/documents';
     case 'communications':
       return '/communications';
+    case 'calls':
+      return '/calls';
+    case 'new_call':
+      return '/calls/new';
     case 'map':
       return '/map';
     case 'import':

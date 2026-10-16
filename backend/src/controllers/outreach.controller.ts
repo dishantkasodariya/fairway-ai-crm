@@ -58,7 +58,7 @@ export const createCampaign = async (req: AuthenticatedRequest, res: Response): 
       name: name.trim(),
       subjectTemplate: subjectTemplate.trim(),
       bodyTemplate: bodyTemplate.trim(),
-      followUpDelayDays: Number(followUpDelayDays) || 3,
+      followUpDelayDays: Number(followUpDelayDays) || 7,
       followUpSubjectTemplate: followUpSubjectTemplate?.trim() || undefined,
       followUpBodyTemplate: followUpBodyTemplate?.trim() || undefined,
       followUp2DelayDays: Number(followUp2DelayDays) || 4,

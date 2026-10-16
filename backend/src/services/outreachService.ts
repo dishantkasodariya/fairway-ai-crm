@@ -148,7 +148,7 @@ export class OutreachService {
       data.name,
       data.subjectTemplate,
       data.bodyTemplate,
-      data.followUpDelayDays ?? 3,
+      data.followUpDelayDays ?? 7,
       data.followUpSubjectTemplate || null,
       data.followUpBodyTemplate || null,
       data.followUp2DelayDays ?? 4,

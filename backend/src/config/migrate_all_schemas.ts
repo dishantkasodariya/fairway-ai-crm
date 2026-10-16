@@ -689,53 +689,64 @@ export async function runAllSchemaFixes() {
       ['lr_9', 'Other / Unspecified', 'Other', 9],
     ];
 
-    for (const [id, reason, category, order] of initialReasons) {
-      await pool.query(
-        'INSERT INTO lost_reasons (id, reason, category, sort_order) VALUES ($1, $2, $3, $4) ON CONFLICT (reason) DO NOTHING;',
-        [id, reason, category, order]
-      );
+    try {
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_lost_reasons_reason ON lost_reasons(reason);`);
+      for (const [id, reason, category, order] of initialReasons) {
+        await pool.query(
+          'INSERT INTO lost_reasons (id, reason, category, sort_order) VALUES ($1, $2, $3, $4) ON CONFLICT (reason) DO NOTHING;',
+          [id, reason, category, order]
+        );
+      }
+    } catch (err: any) {
+      console.warn('lost_reasons note:', err.message);
     }
 
     // 26. Outreach campaigns and follow-up sequence enrollments
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS outreach_campaigns (
-        id VARCHAR(100) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        subject_template VARCHAR(255) NOT NULL,
-        body_template TEXT NOT NULL,
-        follow_up_delay_days INT DEFAULT 3,
-        follow_up_subject_template VARCHAR(255),
-        follow_up_body_template TEXT,
-        follow_up_2_delay_days INT DEFAULT 4,
-        follow_up_2_subject_template VARCHAR(255),
-        follow_up_2_body_template TEXT,
-        status VARCHAR(50) DEFAULT 'active',
-        created_by VARCHAR(100),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS outreach_campaigns (
+          id VARCHAR(100) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          subject_template VARCHAR(255) NOT NULL,
+          body_template TEXT NOT NULL,
+          follow_up_delay_days INT DEFAULT 7,
+          follow_up_subject_template VARCHAR(255),
+          follow_up_body_template TEXT,
+          follow_up_2_delay_days INT DEFAULT 4,
+          follow_up_2_subject_template VARCHAR(255),
+          follow_up_2_body_template TEXT,
+          status VARCHAR(50) DEFAULT 'active',
+          created_by VARCHAR(100),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
 
-      CREATE TABLE IF NOT EXISTS outreach_enrollments (
-        id VARCHAR(100) PRIMARY KEY,
-        campaign_id VARCHAR(100) REFERENCES outreach_campaigns(id) ON DELETE CASCADE,
-        contact_id VARCHAR(100),
-        company_id VARCHAR(100),
-        recipient_email VARCHAR(255) NOT NULL,
-        recipient_name VARCHAR(255),
-        company_name VARCHAR(255),
-        current_step INT DEFAULT 1,
-        status VARCHAR(50) DEFAULT 'pending',
-        last_message_id VARCHAR(255),
-        last_sent_at TIMESTAMP WITH TIME ZONE,
-        next_send_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        error_message TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
+        CREATE TABLE IF NOT EXISTS outreach_enrollments (
+          id VARCHAR(100) PRIMARY KEY,
+          campaign_id VARCHAR(100) REFERENCES outreach_campaigns(id) ON DELETE CASCADE,
+          contact_id VARCHAR(100),
+          company_id VARCHAR(100),
+          recipient_email VARCHAR(255) NOT NULL,
+          recipient_name VARCHAR(255),
+          company_name VARCHAR(255),
+          current_step INT DEFAULT 1,
+          status VARCHAR(50) DEFAULT 'pending',
+          last_message_id VARCHAR(255),
+          last_sent_at TIMESTAMP WITH TIME ZONE,
+          next_send_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          error_message TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
 
-      CREATE INDEX IF NOT EXISTS idx_outreach_enrollments_due ON outreach_enrollments (status, next_send_at);
-      CREATE INDEX IF NOT EXISTS idx_outreach_enrollments_email ON outreach_enrollments (recipient_email);
-    `);
+        CREATE INDEX IF NOT EXISTS idx_outreach_enrollments_due ON outreach_enrollments (status, next_send_at);
+        CREATE INDEX IF NOT EXISTS idx_outreach_enrollments_email ON outreach_enrollments (recipient_email);
+      `);
+      console.log('✓ Outreach campaigns and enrollments tables ensured.');
+    } catch (err: any) {
+      console.error('outreach tables migration error:', err.message);
+      throw err;
+    }
   } catch (err: any) {
     console.warn('alignment note:', err.message);
   }

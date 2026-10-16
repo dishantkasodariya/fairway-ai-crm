@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n \"BACKEND,CLIENT\" -c \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix client\"",
+    "dev:all": "concurrently -n \"BACKEND,CLIENT,INTEL\" -c \"cyan,magenta,yellow\" \"npm run dev --prefix backend\" \"npm run dev --prefix client\" \"npm run dev:intelligence\"",
+    "dev:intelligence": "cd intelligence && .\\venv\\Scripts\\uvicorn.exe app.main:app --port 8000",
     "dev:client": "npm run dev --prefix client",
     "dev:backend": "npm run dev --prefix backend",
     "build:client": "npm run build --prefix client",

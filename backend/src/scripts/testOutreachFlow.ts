@@ -11,7 +11,7 @@ async function runTest() {
       name: `Test Warehouse Outreach ${Date.now()}`,
       subjectTemplate: 'Industrial space inquiry for {{company}}',
       bodyTemplate: 'Hi {{name}}, we have 50,000 sq.ft available in your corridor. Interested in details?',
-      followUpDelayDays: 3,
+      followUpDelayDays: 7,
       followUpSubjectTemplate: 'Quick follow-up: Space for {{company}}',
       followUpBodyTemplate: 'Hi {{name}}, just bumping this in case you missed my earlier email regarding warehousing space.',
     });

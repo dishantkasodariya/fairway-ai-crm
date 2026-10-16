@@ -96,7 +96,7 @@ export async function runOutreachBatchNow(options?: {
       let references: string | undefined = undefined;
       let nextStep = currentStep;
       let willComplete = false;
-      let nextDelayDays = 3;
+      let nextDelayDays = 7;
 
       if (lead.status === 'pending' || currentStep === 1) {
         // Step 1: Initial Pitch
@@ -105,7 +105,7 @@ export async function runOutreachBatchNow(options?: {
 
         if (lead.follow_up_body_template && lead.follow_up_body_template.trim()) {
           nextStep = 2;
-          nextDelayDays = lead.follow_up_delay_days || 3;
+          nextDelayDays = lead.follow_up_delay_days || 7;
         } else {
           willComplete = true;
         }

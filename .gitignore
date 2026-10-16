@@ -34,3 +34,7 @@ Thumbs.db
 
 # Vercel & Deployments
 .vercel
+
+# Excel and Data Spreadsheets
+*.xlsx
+*.xls

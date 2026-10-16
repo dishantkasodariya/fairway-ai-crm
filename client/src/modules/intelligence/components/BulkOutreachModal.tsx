@@ -40,7 +40,7 @@ export const BulkOutreachModal: React.FC<BulkOutreachModalProps> = ({
 
   // Follow-up 1
   const [enableFollowUp1, setEnableFollowUp1] = useState(true);
-  const [followUpDelayDays, setFollowUpDelayDays] = useState(3);
+  const [followUpDelayDays, setFollowUpDelayDays] = useState(7);
   const [followUpSubject, setFollowUpSubject] = useState('');
   const [followUpBody, setFollowUpBody] = useState(
     `Hi {{firstName}},\n\nJust bumping this to the top of your inbox in case you missed my earlier email regarding warehousing options for {{company}}.\n\nLet me know if you would like me to share our latest site layout and spec sheet.\n\nBest regards.`
@@ -326,7 +326,7 @@ export const BulkOutreachModal: React.FC<BulkOutreachModalProps> = ({
                       min={1}
                       max={30}
                       value={followUpDelayDays}
-                      onChange={(e) => setFollowUpDelayDays(parseInt(e.target.value, 10) || 3)}
+                      onChange={(e) => setFollowUpDelayDays(parseInt(e.target.value, 10) || 7)}
                       className="w-14 px-2 py-1 bg-surface border border-border rounded text-center text-xs font-semibold text-foreground focus:outline-none focus:border-fairway-600"
                     />
                     <span>days after Step 1. If prospect hasn't replied, send automatically:</span>
