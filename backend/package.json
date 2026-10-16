@@ -6,9 +6,9 @@
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon",
-    "build": "tsc",
-    "start": "OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-fairway-backend} OTEL_TRACES_EXPORTER=${OTEL_TRACES_EXPORTER:-otlp} node --import @opentelemetry/auto-instrumentations-node/register dist/server.js",
+    "dev": "node api.js && nodemon",
+    "build": "node api.js && tsc",
+    "start": "node api.js && OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-fairway-backend} OTEL_TRACES_EXPORTER=${OTEL_TRACES_EXPORTER:-otlp} node --import @opentelemetry/auto-instrumentations-node/register dist/server.js",
     "test": "tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {
