@@ -1005,7 +1005,7 @@ export const UserManagementTab: React.FC<UserManagementTabProps> = ({ roles, isL
 
             <div className="p-2.5 rounded-xl bg-surface-muted border border-border text-[11px] text-foreground-muted flex items-center gap-2">
               <Lock className="w-3.5 h-3.5 text-fairway-600 shrink-0" />
-              <span>If password is left blank, temporary password will be <strong>fairway@123</strong>.</span>
+              <span>If password is left blank, temporary password will be <strong>fairway123</strong>.</span>
             </div>
 
             <div className="flex flex-col-reverse xs:flex-row xs:items-center xs:justify-end gap-2.5 sm:gap-3 pt-3 border-t border-border w-full">
