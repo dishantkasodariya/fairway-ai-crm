@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"BACKEND,CLIENT\" -c \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix client\"",
-    "dev:all": "concurrently -n \"BACKEND,CLIENT,INTEL\" -c \"cyan,magenta,yellow\" \"npm run dev --prefix backend\" \"npm run dev --prefix client\" \"npm run dev:intelligence\"",
-    "dev:intelligence": "cd intelligence && .\\venv\\Scripts\\uvicorn.exe app.main:app --port 8000",
-    "dev:client": "npm run dev --prefix client",
-    "dev:backend": "npm run dev --prefix backend",
-    "build:client": "npm run build --prefix client",
-    "build:backend": "npm run build --prefix backend",
-    "build": "npm run build:backend && npm run build:client"
+    "dev": "node init && concurrently -n \"BACKEND,CLIENT\" -c \"cyan,magenta\" \"npm run dev --prefix backend\" \"npm run dev --prefix client\"",
+    "dev:all": "node init && concurrently -n \"BACKEND,CLIENT,INTEL\" -c \"cyan,magenta,yellow\" \"npm run dev --prefix backend\" \"npm run dev --prefix client\" \"npm run dev:intelligence\"",
+    "dev:intelligence": "node init && cd intelligence && .\\venv\\Scripts\\uvicorn.exe app.main:app --port 8000",
+    "dev:client": "node init && npm run dev --prefix client",
+    "dev:backend": "node init && npm run dev --prefix backend",
+    "build:client": "node init && npm run build --prefix client",
+    "build:backend": "node init && npm run build --prefix backend",
+    "build": "node init && npm run build:backend && npm run build:client"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
